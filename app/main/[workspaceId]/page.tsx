@@ -1,12 +1,7 @@
 import TaskManager from "@/app/main/[workspaceId]/taskManager";
-import { getAllTags, getWorkspace, getWorkspaces } from "@/util/lib";
+import { getActiveEntries, getAllTags } from "@/util/lib";
+import { ActiveEntry, Tag } from "@/util/types";
 import { unstable_cache } from "next/cache";
-
-export type Tag = {
-  id: number;
-  name: string;
-  workspace_id: number;
-};
 
 type Props = {
   workspaceId: string;
@@ -20,21 +15,32 @@ const getCachedTags = unstable_cache(
     return await tagsRes.json();
   },
   ["tags"],
-  { revalidate: 120 }, // 2 minutes
+  { revalidate: 120 },
 );
 
 export default async function Page({ params }: { params: Promise<Props> }) {
   const { workspaceId } = await params;
 
   const tags: Tag[] = await getCachedTags();
-  const filteredTags = tags.filter(
-    (tag: any) =>
-      tag.workspace_id === Number(workspaceId) && tag.name.startsWith("T:"),
-  );
 
-  return (
-    <div className="mt-16 mx-10%">
-      <TaskManager tags={filteredTags} workspaceId={Number(workspaceId)} />
-    </div>
-  );
+  const activeEntriesRes = await getActiveEntries();
+  if (!activeEntriesRes.ok)
+    return (
+      <div className="text-red-600 font-semibold">
+        Failed to fetch active time entries
+      </div>
+    );
+  const activeEntry: ActiveEntry = await activeEntriesRes.json();
+
+  const filteredTags = tags
+    .filter(
+      (tag: any) =>
+        tag.workspace_id === Number(workspaceId) && tag.name.startsWith("T:"),
+    )
+    .map((tag) => ({
+      ...tag,
+      active: activeEntry?.tag_ids.includes(tag.id) || false,
+    }));
+
+  return <TaskManager tags={filteredTags} workspaceId={Number(workspaceId)} />;
 }

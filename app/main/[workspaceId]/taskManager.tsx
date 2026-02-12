@@ -8,7 +8,7 @@ import { CreateTagParams, CreateTagResponse } from "../../api/create-tag/route";
 import { useRouter } from "next/navigation";
 import { TaskHierarchy } from "./taskHierarchy";
 import { StartNewEntryParams } from "../../api/start-new-entry/route";
-import { Tag } from "./page";
+import { Tag } from "@/util/types";
 
 export type TaskNode = {
   name: string;
@@ -16,6 +16,7 @@ export type TaskNode = {
   depth: number;
   parent: TaskNode | null;
   children: Set<TaskNode>;
+  active: boolean;
 };
 
 export default function TaskManager({
@@ -23,14 +24,16 @@ export default function TaskManager({
   tags,
 }: {
   workspaceId: number;
-  tags: Tag[];
+  tags: (Tag & { active: boolean })[];
 }) {
   const [rootName, setRootName] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const router = useRouter();
 
-  function buildTaskHierarchy(tags: Tag[]): Set<TaskNode> {
+  function buildTaskHierarchy(
+    tags: (Tag & { active: boolean })[],
+  ): Set<TaskNode> {
     const tagMap = new Map<string, TaskNode>();
     const roots = new Set<TaskNode>();
 
@@ -51,6 +54,7 @@ export default function TaskManager({
             depth: currentPath.split("::").length - 1,
             parent,
             children: new Set<TaskNode>(),
+            active: tag.active,
           };
           tagMap.set(currentPath, newNode);
 

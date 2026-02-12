@@ -60,6 +60,12 @@ export async function getWorkspaces(): Promise<Response> {
   });
 }
 
+export async function getActiveEntries(): Promise<Response> {
+  return await fetch(`${TOGGL_ME}/time_entries/current`, {
+    headers: getAuthHeader(),
+  });
+}
+
 export async function getWorkspaceTags(
   workspace_id: number,
 ): Promise<Response> {

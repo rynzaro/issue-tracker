@@ -129,5 +129,8 @@ export async function POST(req: NextRequest) {
 
 ## Todos
 
+- start entries + parent entries
+- stop entries + parent entries
 - check for already existing tags
 - notification system
+- navbar

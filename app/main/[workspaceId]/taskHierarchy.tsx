@@ -25,7 +25,12 @@ function TagEntryComponent({
   const [isExpanded, setIsExpanded] = useState(false);
   return (
     <div className="ml-8 flex flex-col gap-4">
-      <div className="border border-gray-300 rounded-lg text-left flex">
+      <div
+        className={clsx(
+          "border border-gray-300 rounded-lg text-left flex",
+          node.active && "bg-green-100",
+        )}
+      >
         <button
           type="button"
           disabled={node.children.size === 0}
