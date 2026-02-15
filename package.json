@@ -3,7 +3,10 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "db:start": "docker compose up -d",
+    "db:stop": "docker compose down",
+    "db:reset": "docker compose down -v",
+    "dev": "pnpm run db:start && next dev",
     "build": "next build",
     "start": "next start",
     "lint": "eslint"
@@ -11,9 +14,13 @@
   "dependencies": {
     "@headlessui/react": "^2.2.9",
     "@heroicons/react": "^2.2.0",
+    "@prisma/adapter-mariadb": "^7.4.0",
     "@prisma/client": "^7.4.0",
+    "bcrypt": "^6.0.0",
     "clsx": "^2.1.1",
+    "motion": "^12.34.0",
     "next": "16.1.6",
+    "next-auth": "5.0.0-beta.30",
     "prisma": "^7.4.0",
     "react": "19.2.3",
     "react-dom": "19.2.3",
@@ -22,12 +29,13 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
+    "@types/bcrypt": "^6.0.0",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.1.6",
-    "tailwindcss": "^4",
+    "tailwindcss": "^4.1.18",
     "typescript": "^5"
   }
 }
