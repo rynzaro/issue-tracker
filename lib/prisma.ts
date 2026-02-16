@@ -2,16 +2,15 @@ import { PrismaClient } from "@prisma/client";
 import { PrismaMariaDb } from "@prisma/adapter-mariadb";
 
 const prismaClientSingleton = () => {
-  const adapter = new PrismaMariaDb(
-    {
-      host: "localhost",
-      port: 3306,
-      user: "issue_tracker",
-      password: "issue_tracker",
-      database: "issue_tracker",
-      connectionLimit: 5,
-    }
-  );
+  const adapter = new PrismaMariaDb({
+    host: "127.0.0.1",
+    port: 3306,
+    user: "issue_tracker",
+    password: "issue_tracker",
+    database: "issue_tracker",
+    connectionLimit: 5,
+    allowPublicKeyRetrieval: true,
+  });
 
   return new PrismaClient({ adapter });
 };

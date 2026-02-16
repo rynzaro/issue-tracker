@@ -1,9 +1,8 @@
 "use server";
 
-import { signIn } from "@/auth";
+import { signIn, signOut } from "@/auth";
+import { redirect } from "next/navigation";
 import { AuthError } from "next-auth";
-
-// ...
 
 export async function authenticate(
   prevState: string | undefined,
@@ -22,4 +21,15 @@ export async function authenticate(
     }
     throw error;
   }
+}
+
+export async function performLogout() {
+  try {
+    await signOut({ redirect: false });
+  } catch (error) {
+    console.error("Logout error:", error);
+  }
+
+  // redirect() throws a control-flow error (NEXT_REDIRECT) that must not be caught
+  redirect("/public/login");
 }

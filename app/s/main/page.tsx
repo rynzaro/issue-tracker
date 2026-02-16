@@ -2,23 +2,27 @@ import Card from "@/components/card";
 import { getWorkspaces } from "@/lib/util";
 import { Workspace } from "@/lib/types";
 import Link from "next/link";
+import { ErrorText, Text } from "@/components/text";
+import { Heading, Subheading } from "@/components/heading";
 
 export default async function Home() {
-  const workspacesRes = await getWorkspaces();
-  if (!workspacesRes.ok) {
-    return (
-      <div className="text-red-600 font-semibold">
-        Failed to load workspaces
-      </div>
-    );
-  }
-  const workspaces: Workspace[] = await workspacesRes.json();
-
-  console.log(workspaces);
+  // const workspacesRes = await getWorkspaces();
+  // if (!workspacesRes.ok) {
+  //   return <ErrorText>Failed to load workspaces</ErrorText>;
+  // }
+  // const workspaces: Workspace[] = await workspacesRes.json();
 
   return (
-    <div className="flex flex-col gap-6">
-      {workspaces.map((workspace: Workspace) => (
+    <>
+      <Heading level={1}>Welcome to the Issue Tracker</Heading>
+      <Subheading level={1}>Welcome to the Issue Tracker</Subheading>
+      <Subheading level={2}>Welcome to the Issue Tracker</Subheading>
+      <Subheading level={3}>Welcome to the Issue Tracker</Subheading>
+      <Subheading level={4}>Welcome to the Issue Tracker</Subheading>
+      <Subheading level={5}>Welcome to the Issue Tracker</Subheading>
+      <Subheading level={6}>Welcome to the Issue Tracker</Subheading>
+      <Text>Irgendein Text </Text>
+      {/* {workspaces.map((workspace: Workspace) => (
         <Link href={`/main/${workspace.id}`} key={workspace.id}>
           <Card
             key={workspace.id}
@@ -27,7 +31,7 @@ export default async function Home() {
             <div className="font-semibold">{workspace.name}</div>
           </Card>
         </Link>
-      ))}
-    </div>
+      ))} */}
+    </>
   );
 }
