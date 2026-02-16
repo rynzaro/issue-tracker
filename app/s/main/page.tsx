@@ -1,6 +1,6 @@
 import Card from "@/components/card";
-import { getWorkspaces } from "@/util/lib";
-import { Workspace } from "@/util/types";
+import { getWorkspaces } from "@/lib/util";
+import { Workspace } from "@/lib/types";
 import Link from "next/link";
 
 export default async function Home() {

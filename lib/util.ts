@@ -3,7 +3,8 @@ import { TOGGL_ME, TOGGL_API } from "./consts";
 export type ApiErrorCode =
   | "ZOD_VALIDATION_ERROR"
   | "TOGGL_API_ERROR"
-  | "INTERNAL_ERROR";
+  | "INTERNAL_SERVER_ERROR"
+  | "INPUT_FORMAT_ERROR";
 
 export type ApiErrorResponse = {
   error: {
@@ -85,4 +86,10 @@ export function parseTaskString(taskStr: string): string[] | undefined {
     return;
   }
   return taskStr.split("::").map((segment) => segment.replace("T:", ""));
+}
+
+export function validatePassword(password: string): boolean {
+  return /^(?=.*[A-Za-z])(?=.*\d)(?=.*[!@#$%^&*()-])[A-Za-z\d!@#$%^&*()-]{8,}$/.test(
+    password,
+  );
 }

@@ -1,5 +1,5 @@
-import { ApiError } from "@/util/errors";
-import { getAuthHeader, createErrorResponse } from "@/util/lib";
+import { ApiError } from "@/lib/errors";
+import { getAuthHeader, createErrorResponse } from "@/lib/util";
 import { NextRequest, NextResponse } from "next/server";
 import z from "zod";
 

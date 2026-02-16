@@ -2,13 +2,13 @@
 
 import PrimaryButton from "@/components/primaryButton";
 import TextInput from "@/components/textInput";
-import { parseTaskString } from "@/util/lib";
+import { parseTaskString } from "@/lib/util";
 import { useState } from "react";
 import { CreateTagParams, CreateTagResponse } from "../../api/create-tag/route";
 import { useRouter } from "next/navigation";
 import { TaskHierarchy } from "./taskHierarchy";
 import { StartNewEntryParams } from "../../api/start-new-entry/route";
-import { Tag } from "@/util/types";
+import { Tag } from "@/lib/types";
 
 export type TaskNode = {
   name: string;

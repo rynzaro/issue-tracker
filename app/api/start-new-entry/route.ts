@@ -1,5 +1,5 @@
-import { TOGGL_API } from "@/util/consts";
-import { getAuthHeader, createErrorResponse } from "@/util/lib";
+import { TOGGL_API } from "@/lib/consts";
+import { getAuthHeader, createErrorResponse } from "@/lib/util";
 import { NextRequest, NextResponse } from "next/server";
 import z from "zod";
 

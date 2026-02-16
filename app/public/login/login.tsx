@@ -24,7 +24,6 @@ export default function Login() {
     <AuthLayout>
       <form
         action={formAction}
-        method="POST"
         className="grid w-full max-w-sm grid-cols-1 gap-8"
       >
         <Heading>Sign in to your account</Heading>
@@ -48,7 +47,7 @@ export default function Login() {
           </Text>
         </div>
         <input type="hidden" name="redirectTo" value={callbackUrl} />
-        {/* TODO proper loading state */}
+        {/* //TODO proper loading state */}
         <Button type="submit" className="w-full" aria-disabled={isPending}>
           Login
         </Button>
@@ -57,7 +56,7 @@ export default function Login() {
           aria-live="polite"
           aria-atomic="true"
         >
-          {/* TODO proper error handling */}
+          {/* //TODO proper error handling */}
           {errorMessage && (
             <>
               <ExclamationCircleIcon className="h-5 w-5 text-red-500" />

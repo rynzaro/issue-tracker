@@ -1,6 +1,6 @@
 import TaskManager from "@/app/main/[workspaceId]/taskManager";
-import { getActiveEntries, getAllTags } from "@/util/lib";
-import { ActiveEntry, Tag } from "@/util/types";
+import { getActiveEntries, getAllTags } from "@/lib/util";
+import { ActiveEntry, Tag } from "@/lib/types";
 import { unstable_cache } from "next/cache";
 
 type Props = {
