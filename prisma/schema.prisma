@@ -13,26 +13,164 @@ datasource db {
     provider = "mysql"
 }
 
+// TODO - Timestamps for user necessary?
 model User {
-    id       String    @id @default(cuid())
-    email    String    @unique
-    password String
-    projects Project[]
+    id            String      @id @default(cuid())
+    email         String      @unique
+    password      String
+    togglApiToken String?
+    projects      Project[]
+    timeEntries   TimeEntry[]
 }
 
 model Project {
-    id          String @id @default(cuid())
-    name        String
-    description String
-    ownerId     String
-    owner       User   @relation(fields: [ownerId], references: [id])
-    tasks       Task[]
+    id                String          @id @default(cuid())
+    name              String
+    description       String
+    ownerId           String
+    owner             User            @relation(fields: [ownerId], references: [id])
+    tasks             Task[]
+    checkpoints       Checkpoint[]
+    projectSettingsId Int             @unique
+    projectSettings   ProjectSettings @relation(fields: [projectSettingsId], references: [id])
+}
+
+model ProjectSettings {
+    id                             Int      @id @default(autoincrement())
+    autoCheckpointsEnabled         Boolean  @default(true)
+    autoCheckpointOnScopeChange    Boolean  @default(true)
+    autoCheckpointOnEstimateChange Boolean  @default(true)
+    checkpointDebounceMinutes      Int      @default(30)
+    project                        Project?
 }
 
 model Task {
-    id          String   @id @default(cuid())
-    title       String
-    description String
-    project     Project? @relation(fields: [projectId], references: [id])
-    projectId   String?
+    id                String           @id @default(cuid())
+    projectId         String?
+    title             String?
+    description       String?
+    estimate          Int? // in minutes
+    depth             Int? // for nested tasks
+    togglTagId        Int?
+    togglTagName      String?
+    createdAt         DateTime         @default(now())
+    updatedAt         DateTime         @updatedAt
+    completedAt       DateTime?
+    deletedAt         DateTime? // soft delete
+    project           Project?         @relation(fields: [projectId], references: [id])
+    tags              Tag[]
+    taskStatus        TaskStatus       @default(PLANNING)
+    timeEntries       TimeEntry[]
+    todoItems         TodoItem[]
+    convertedTodoItem TodoItem?        @relation("ConvertedTodoItem")
+    taskEvents        TaskEvent[]
+    checkpoints       Checkpoint[]
+    checkpointTasks   CheckpointTask[]
+
+    @@index([projectId])
+}
+
+model TimeEntry {
+    id        String    @id @default(cuid())
+    startedAt DateTime
+    stoppedAt DateTime?
+    duration  Int? // SECONDS, computed on stop
+    createdAt DateTime  @default(now())
+    taskId    String
+    task      Task      @relation(fields: [taskId], references: [id])
+    userId    String
+    user      User      @relation(fields: [userId], references: [id])
+}
+
+model TaskEvent {
+    id        String        @id @default(cuid())
+    taskId    String
+    task      Task          @relation(fields: [taskId], references: [id])
+    eventType TaskEventType
+    payload   Json
+    createdAt DateTime      @default(now())
+}
+
+model TodoItem {
+    id                Int      @id @default(autoincrement())
+    taskId            String
+    task              Task     @relation(fields: [taskId], references: [id])
+    title             String
+    isCompleted       Boolean  @default(false)
+    estimate          Int? // in minutes
+    convertedToTaskId String?  @unique
+    convertedToTask   Task?    @relation("ConvertedTodoItem", fields: [convertedToTaskId], references: [id])
+    createdAt         DateTime @default(now())
+}
+
+model Tag {
+    id    Int    @id @default(autoincrement())
+    name  String
+    tasks Task[]
+}
+
+model Checkpoint {
+    id                       String            @id @default(cuid())
+    projectId                String
+    project                  Project           @relation(fields: [projectId], references: [id])
+    taskId                   String
+    task                     Task              @relation(fields: [taskId], references: [id])
+    trigger                  CheckpointTrigger
+    label                    String?
+    isBaseline               Boolean           @default(false)
+    childCount               Int
+    estimatedTotal           Int? // in minutes, sum of task and subtasks
+    trackedTotal             Int // in seconds, sum of task and subtasks
+    ownEstimate              Int? // in minutes, only the task's own estimate
+    newChildrenSinceBaseline Int               @default(0)
+    createdAt                DateTime          @default(now())
+    checkpointTasks          CheckpointTask[]
+    addedTasks               CheckpointTask[]  @relation("AddedAtCheckpoint")
+}
+
+model CheckpointTask {
+    id                  String      @id @default(cuid())
+    checkpointId        String
+    Checkpoint          Checkpoint  @relation(fields: [checkpointId], references: [id])
+    taskId              String
+    task                Task        @relation(fields: [taskId], references: [id])
+    estimate            Int? // in minutes
+    trackedSoFar        Int // in seconds
+    status              TaskStatus
+    existedAtBaseline   Boolean
+    addedAtCheckpointId String?
+    addedAtCheckpoint   Checkpoint? @relation("AddedAtCheckpoint", fields: [addedAtCheckpointId], references: [id])
+    createdAt           DateTime    @default(now())
+
+    @@unique([checkpointId, taskId])
+}
+
+enum TaskStatus {
+    PLANNING
+    ACTIVE
+    COMPLETED
+    ARCHIVED
+}
+
+enum TaskEventType {
+    ESTIMATE_SET
+    ESTIMATE_CHANGED
+    SUBTASK_CREATED
+    SUBTASK_REMOVED
+    TODO_ADDED
+    TODO_CONVERTED
+    TODO_COMPLETED
+    TASK_STARTED
+    TASK_COMPLETED
+    TASK_STATUS_CHANGED
+    TAGS_CHANGED
+    CHECKPOINT_CREATED
+}
+
+enum CheckpointTrigger {
+    MANUAL
+    WORK_STARTED
+    SCOPE_CHANGE
+    ESTIMATE_CHANGE
+    TASK_COMPLETED
 }

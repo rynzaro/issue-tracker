@@ -1,5 +1,5 @@
 export type ApiError = {
-  code: "ZOD_VALIDATION_ERROR" | "TOGGL_API_ERROR" | "INTERNAL_ERROR";
+  code: "ZOD_VALIDATION_ERROR" | "INTERNAL_ERROR";
   message: string;
   details?: unknown;
 };

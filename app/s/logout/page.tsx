@@ -1,6 +1,6 @@
 "use client";
 
-import { performLogout } from "@/lib/actions";
+import { performLogout } from "@/lib/actions/auth.actions";
 import { useEffect } from "react";
 
 /**

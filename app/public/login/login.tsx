@@ -7,7 +7,7 @@ import { Field, Label } from "@/components/fieldset";
 import { Heading } from "@/components/heading";
 import { Input } from "@/components/input";
 import { Strong, Text, TextLink } from "@/components/text";
-import { authenticate } from "@/lib/actions";
+import { authenticate } from "@/lib/actions/auth.actions";
 import { ExclamationCircleIcon } from "@heroicons/react/16/solid";
 import { useSearchParams } from "next/navigation";
 import { useActionState } from "react";
