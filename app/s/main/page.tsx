@@ -1,8 +1,4 @@
-import Card from "@/components/card";
-import { getWorkspaces } from "@/lib/util";
-import { Workspace } from "@/lib/types";
-import Link from "next/link";
-import { ErrorText, Text } from "@/components/text";
+import { Text } from "@/components/text";
 import { Heading, Subheading } from "@/components/heading";
 
 export default async function Home() {

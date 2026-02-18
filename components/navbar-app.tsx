@@ -25,7 +25,6 @@ import {
   SidebarLabel,
   SidebarSection,
 } from "@/components/sidebar";
-import { Text } from "@/components/text";
 import { StackedLayout } from "@/components/stacked-layout";
 import {
   ArrowRightStartOnRectangleIcon,
@@ -33,33 +32,36 @@ import {
   Cog8ToothIcon,
   PlusIcon,
 } from "@heroicons/react/16/solid";
+import clsx from "clsx";
 import { ReactNode } from "react";
 
 const navItems = [{ label: "Home", url: "/" }];
-
-function TeamDropdownMenu() {
+1;
+function ProjectDropdownMenu({
+  projects,
+}: {
+  projects: { id: string; name: string }[];
+}) {
   return (
     <DropdownMenu className="min-w-80 lg:min-w-64" anchor="bottom start">
-      <DropdownItem href="/teams/1/settings">
-        <DropdownLabel>Settings</DropdownLabel>
-      </DropdownItem>
+      {projects.map((project, id) => (
+        <DropdownItem key={project.id} href={`/s/project/${project.id}`}>
+          <Avatar
+            initials={project.name.substring(0, 2).toUpperCase()}
+            className={clsx(
+              id % 2 === 0
+                ? "bg-amber-400 text-amber-800"
+                : "bg-green-300 text-green-700",
+            )}
+            square
+          />
+          <DropdownLabel> {project.name}</DropdownLabel>
+        </DropdownItem>
+      ))}
       <DropdownDivider />
-      <DropdownItem href="/teams/1">
-        <Avatar initials="1" className="bg-gray-900 text-white" />
-        <DropdownLabel>Workspace 1</DropdownLabel>
-      </DropdownItem>
-      <DropdownItem href="/teams/2">
-        <Avatar
-          slot="icon"
-          initials="WC"
-          className="bg-purple-500 text-white"
-        />
-        <DropdownLabel>Workspace 2</DropdownLabel>
-      </DropdownItem>
-      <DropdownDivider />
-      <DropdownItem href="/teams/create">
+      <DropdownItem href="/s/project/create">
         <PlusIcon />
-        <DropdownLabel>New team&hellip;</DropdownLabel>
+        <DropdownLabel>Neues Projekt erstellen</DropdownLabel>
       </DropdownItem>
     </DropdownMenu>
   );
@@ -68,9 +70,11 @@ function TeamDropdownMenu() {
 export function NavbarApp({
   children,
   emailAddress,
+  projects,
 }: {
   children: ReactNode;
   emailAddress: string;
+  projects: { id: string; name: string }[];
 }) {
   return (
     <StackedLayout
@@ -81,7 +85,7 @@ export function NavbarApp({
               <NavbarLabel>OnTrack</NavbarLabel>
               <ChevronDownIcon />
             </DropdownButton>
-            <TeamDropdownMenu />
+            <ProjectDropdownMenu projects={projects} />
           </Dropdown>
           <NavbarDivider className="max-lg:hidden" />
           <NavbarSection className="max-lg:hidden">
@@ -121,7 +125,7 @@ export function NavbarApp({
                 <SidebarLabel>OnTrack</SidebarLabel>
                 <ChevronDownIcon />
               </DropdownButton>
-              <TeamDropdownMenu />
+              <ProjectDropdownMenu projects={projects} />
             </Dropdown>
           </SidebarHeader>
           <SidebarBody>

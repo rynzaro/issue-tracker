@@ -26,7 +26,7 @@ Current state and planned work. Check off items as they're completed.
 Rewrite the Prisma schema with the full data model and reorganize the codebase.
 
 - [x] Rewrite `prisma/schema.prisma` with all 8 models + 4 enums (see Target Schema below)
-- [x] Add soft delete support (`deletedAt` field on Task)
+- [x] Add soft delete support (`deletedAt` field on Task, non-cascading, no restore, orphaned children remain)
 - [x] Run initial migration
 - [x] Move Toggl code from `lib/util.ts`, `lib/types.ts`, `lib/consts.ts` → `lib/toggl/`
 - [x] Clean `lib/util.ts` — keep only generic utilities (`validatePassword`, `createErrorResponse`, `parseTaskString`)
@@ -44,30 +44,31 @@ Core task management with time tracking. The first usable version of the app.
 
 - [ ] Project CRUD (create, list, edit, delete)
 - [ ] `project.service.ts` + `project.actions.ts`
-- [ ] Project listing page (`app/s/main/page.tsx`)
-- [ ] Task CRUD (create, edit, delete, reorder)
+- [ ] Project listing selection box in navbar
+- [ ] Task CRUD (create, edit, delete)
 - [ ] `task.service.ts` + `task.actions.ts`
-- [ ] Self-referential task hierarchy (parentId, depth, position)
+- [ ] Self-referential task hierarchy (parentId, depth)
 - [ ] Task tree UI (`app/s/[projectId]/page.tsx`)
 - [ ] Inline estimate editing (minutes)
 - [ ] Task description / notes field
-- [ ] Task category field (optional)
-- [ ] Task status transitions (Planning → Active → Completed → Archived)
+- [ ] Task tags field (M:N, optional)
+- [ ] Task status transitions (bidirectional: any status → any other, `completedAt` set/cleared on COMPLETED transitions)
 - [ ] Time tracking: start/stop timer
 - [ ] `timeEntry.service.ts` + `timeEntry.actions.ts`
 - [ ] Active timer display in navbar
 - [ ] Auto-stop previous timer when starting a new one
-- [ ] Time rollup: parent shows sum of children's tracked time
+- [ ] Time rollup: parent shows sum of children's tracked time (on-the-fly `SUM()` query, acceptable for <10k tasks)
 - [ ] Replace legacy `app/s/[workspaceId]/` with `app/s/[projectId]/`
 - [ ] Delete legacy Toggl API routes (`create-tag/`, `create-tag-without-permission/`, `start-new-entry/`) or move to `app/api/toggl/`
 - [ ] Convert remaining German UI strings to English
+- [ ] optional: Task ordering
 
 ## Iteration 2 — Event Log
 
 Passive audit trail on all task mutations.
 
 - [ ] `event.service.ts` — generic `emitEvent(taskId, type, payload)` function
-- [ ] Add `emitEvent()` calls in `task.service.ts` for: ESTIMATE_SET, ESTIMATE_CHANGED, SUBTASK_CREATED, SUBTASK_REMOVED, TASK_STARTED, TASK_COMPLETED, TASK_STATUS_CHANGED, CATEGORY_CHANGED
+- [ ] Add `emitEvent()` calls in `task.service.ts` for: ESTIMATE_SET, ESTIMATE_CHANGED, SUBTASK_CREATED, SUBTASK_REMOVED, TASK_STARTED, TASK_COMPLETED, TASK_STATUS_CHANGED, TAGS_CHANGED (payload: `{ added: string[], removed: string[] }`)
 - [ ] Add `emitEvent()` calls in `timeEntry.service.ts` for: TASK_STARTED
 - [ ] Event history view (per-task, read-only timeline)
 
@@ -77,19 +78,20 @@ Auto + manual checkpoints with user settings.
 
 - [ ] `checkpoint.service.ts` — createCheckpoint, debounceOrCreate, updateSnapshot, getCheckpointHistory
 - [ ] Checkpoint creation: snapshot task + direct children (estimate, tracked time, status per child)
-- [ ] Baseline concept: first WORK_STARTED checkpoint gets `isBaseline = true`
+- [ ] Baseline concept: first WORK_STARTED checkpoint on **this task** gets `isBaseline = true` (scoped per-task, not per-hierarchy)
+- [ ] add "use current state as baseline" option
 - [ ] `existedAtBaseline` flag on CheckpointTask (enables scope/effort decomposition later)
 - [ ] Auto-checkpoint triggers in `task.service.ts`: SCOPE_CHANGE (add/remove child after baseline), ESTIMATE_CHANGE
-- [ ] Auto-checkpoint triggers in `timeEntry.service.ts`: WORK_STARTED (only if no baseline exists)
+- [ ] Auto-checkpoint triggers in `timeEntry.service.ts`: WORK_STARTED (only if this task has no baseline)
 - [ ] Auto-checkpoint on TASK_COMPLETED
 - [ ] Scoping: checkpoints fire for changed task + direct parent, NEVER grandparent+
-- [ ] Debounce window (default 30 min): group rapid changes into single checkpoint
+- [ ] Debounce window (default 30 min): group rapid changes into single checkpoint (destructive: intermediate checkpoints within window are lost)
 - [ ] Manual "Save Checkpoint" button
-- [ ] User settings page (`app/s/settings/page.tsx`):
-  - [ ] Auto-checkpoints on/off (global toggle)
+- [ ] Project settings page (`app/s/[projectId]/settings/page.tsx`):
+  - [ ] Auto-checkpoints on/off (per-project toggle)
   - [ ] Per-trigger toggles (scope change, estimate change)
   - [ ] Debounce window (minutes)
-- [ ] `user.actions.ts` for saving settings
+- [ ] **Decision**: Create CheckpointTask rows for leaf tasks (no children) or skip? (affects data size)
 - [ ] Checkpoint history view per task
 
 ## Iteration 4 — TodoItem + Conversion
@@ -102,8 +104,7 @@ Lightweight checklists that can become full sub-tasks.
 - [ ] Todo checklist UI on task detail view
 - [ ] Convert todo → sub-task: creates Task with todo's text as title, carries over estimate
 - [ ] Conversion triggers SCOPE_CHANGE checkpoint (if baseline exists)
-- [ ] `isFromTodo` flag on created Task
-- [ ] `convertedToTaskId` link on TodoItem
+- [ ] `convertedToTaskId` link on TodoItem (tracks conversion lineage)
 - [ ] Emit TODO_ADDED, TODO_COMPLETED, TODO_CONVERTED events
 
 ## Iteration 5 — Analysis Dashboard
@@ -111,7 +112,8 @@ Lightweight checklists that can become full sub-tasks.
 Scope vs effort error decomposition and accuracy metrics.
 
 - [ ] `analysis.service.ts`
-- [ ] Compare baseline checkpoint to completion checkpoint
+- [ ] Compare baseline checkpoint to completion checkpoint (or latest checkpoint if task never completed)
+- [ ] **Decision**: Allow analysis on incomplete tasks using latest checkpoint?
 - [ ] Scope error calculation: time on tasks where `existedAtBaseline = false`
 - [ ] Effort error calculation: overrun on tasks where `existedAtBaseline = true`
 - [ ] Per-task accuracy breakdown
@@ -165,11 +167,11 @@ issue-tracker/
 │   └── s/
 │       ├── layout.tsx
 │       ├── main/page.tsx             # Project listing
-│       ├── settings/page.tsx         # User settings (iter 3)
 │       ├── logout/page.tsx
 │       └── [projectId]/
 │           ├── page.tsx              # Task tree view (iter 1)
 │           ├── components/
+│           ├── settings/page.tsx     # Project settings (iter 3)
 │           ├── checkpoints/          # Checkpoint history (iter 3)
 │           └── analysis/             # Analysis dashboard (iter 5)
 ├── components/
@@ -210,14 +212,8 @@ User {
   id: String @id @default(cuid())
   email: String @unique
   password: String
-  autoCheckpointsEnabled: Boolean @default(true)
-  autoCheckpointOnScopeChange: Boolean @default(true)
-  autoCheckpointOnEstimateChange: Boolean @default(true)
-  checkpointDebounceMinutes: Int @default(30)
   togglApiToken: String?
   togglWorkspaceId: String?
-  createdAt: DateTime @default(now())
-  updatedAt: DateTime @updatedAt
 }
 
 Project {
@@ -229,6 +225,17 @@ Project {
   updatedAt: DateTime @updatedAt
 }
 
+ProjectSettings {
+  id: String @id @default(cuid())
+  projectId: String @unique → Project
+  autoCheckpointsEnabled: Boolean @default(true)
+  autoCheckpointOnScopeChange: Boolean @default(true)
+  autoCheckpointOnEstimateChange: Boolean @default(true)
+  checkpointDebounceMinutes: Int @default(30)
+  createdAt: DateTime @default(now())
+  updatedAt: DateTime @updatedAt
+}
+
 Task {
   id: String @id @default(cuid())
   projectId: String → Project
@@ -236,17 +243,28 @@ Task {
   title: String
   description: String?
   estimate: Int? (MINUTES)
-  category: String?
   status: TaskStatus @default(PLANNING)
   depth: Int @default(0)
-  position: Int @default(0)
-  isFromTodo: Boolean @default(false)
   togglTagId: String?
   togglTagName: String?
   createdAt: DateTime @default(now())
   updatedAt: DateTime @updatedAt
   completedAt: DateTime?
   deletedAt: DateTime? (soft delete)
+}
+
+Tag {
+  id: String @id @default(cuid())
+  name: String
+  projectId: String → Project
+  tasks: Task[] (M:N)
+  createdAt: DateTime @default(now())
+}
+
+TaskTag {
+  taskId: String → Task
+  tagId: String → Tag
+  @@id([taskId, tagId])
 }
 
 TimeEntry {
@@ -262,10 +280,10 @@ TimeEntry {
 TodoItem {
   id: String @id @default(cuid())
   taskId: String → Task ("TaskTodos")
-  text: String
-  position: Int @default(0)
+  title: String
   estimate: Int? (MINUTES)
   convertedToTaskId: String? → Task ("TodoConversion")
+  isCompleted: Boolean @default(false)
   createdAt: DateTime @default(now())
 }
 
@@ -311,7 +329,7 @@ enum TaskStatus {
   COMPLETED
   ARCHIVED
 }
-// Status transitions are bidirectional — any status can transition to any other.
+// Status transitions are **bidirectional** — any status → any other, no linear flow enforced.
 // When transitioning TO COMPLETED: set completedAt = now().
 // When transitioning FROM COMPLETED: clear completedAt = null.
 
@@ -326,7 +344,7 @@ enum TaskEventType {
   TASK_STARTED
   TASK_COMPLETED
   TASK_STATUS_CHANGED
-  CATEGORY_CHANGED
+  TAGS_CHANGED
   CHECKPOINT_CREATED
 }
 
@@ -343,12 +361,14 @@ enum CheckpointTrigger {
 
 ```
 User ──1:N──> Project ──1:N──> Task ──1:N──> TimeEntry
-  │                              │
-  ├──1:N──> TimeEntry            ├──self──> Task (children)
-  │                              ├──1:N──> TodoItem (with optional estimate)
-  │                              ├──1:N──> TaskEvent
-  │                              └──1:N──> Checkpoint ──1:N──> CheckpointTask ──N:1──> Task
-  │
+  │                │              │
+  ├──1:N──> TimeEntry  │         ├──self──> Task (children)
+  │                │              ├──M:N──> Tag (via TaskTag)
+  │                │              ├──1:N──> TodoItem (with optional estimate)
+  │                │              ├──1:N──> TaskEvent
+  │                │              └──1:N──> Checkpoint ──1:N──> CheckpointTask ──N:1──> Task
+  │                │
+  │                ├──1:1──> ProjectSettings
   └──1:N──> Project ──1:N──> Checkpoint
 ```
 
@@ -360,15 +380,15 @@ Checkpoints scope to **task + direct parent, NEVER higher**:
 
 ### Checkpoint Triggers
 
-| Trigger           | When                                                               |
-| ----------------- | ------------------------------------------------------------------ |
-| `WORK_STARTED`    | First timer on this task and no baseline exists (becomes baseline) |
-| `SCOPE_CHANGE`    | Sub-task added/removed after baseline exists                       |
-| `ESTIMATE_CHANGE` | Any estimate value changes                                         |
-| `TASK_COMPLETED`  | Task marked done                                                   |
-| `MANUAL`          | User clicks "Save Checkpoint"                                      |
+| Trigger           | When                                                                              |
+| ----------------- | --------------------------------------------------------------------------------- |
+| `WORK_STARTED`    | First timer on **this task** with no baseline (becomes baseline); scoped per-task |
+| `SCOPE_CHANGE`    | Sub-task added/removed after baseline exists on this task                         |
+| `ESTIMATE_CHANGE` | Any estimate value changes                                                        |
+| `TASK_COMPLETED`  | Task marked done                                                                  |
+| `MANUAL`          | User clicks "Save Checkpoint"                                                     |
 
-Auto-checkpoints debounced (30 min default), toggleable per trigger in user settings.
+Auto-checkpoints debounced (30 min default), toggleable per trigger in project settings.
 
 ### Iteration Dependencies
 

@@ -26,22 +26,24 @@ model User {
 model Project {
     id                String          @id @default(cuid())
     name              String
-    description       String
-    ownerId           String
-    owner             User            @relation(fields: [ownerId], references: [id])
+    userId            String
+    user              User            @relation(fields: [userId], references: [id])
+    description       String?
     tasks             Task[]
     checkpoints       Checkpoint[]
     projectSettingsId Int             @unique
     projectSettings   ProjectSettings @relation(fields: [projectSettingsId], references: [id])
+    createdAt         DateTime        @default(now())
 }
 
 model ProjectSettings {
-    id                             Int      @id @default(autoincrement())
-    autoCheckpointsEnabled         Boolean  @default(true)
-    autoCheckpointOnScopeChange    Boolean  @default(true)
-    autoCheckpointOnEstimateChange Boolean  @default(true)
-    checkpointDebounceMinutes      Int      @default(30)
-    project                        Project?
+    id                             Int     @id @default(autoincrement())
+    autoCheckpointsEnabled         Boolean @default(true)
+    autoCheckpointOnScopeChange    Boolean @default(true)
+    autoCheckpointOnEstimateChange Boolean @default(true)
+    checkpointDebounceMinutes      Int     @default(30)
+
+    project Project?
 }
 
 model Task {
@@ -59,7 +61,6 @@ model Task {
     deletedAt         DateTime? // soft delete
     project           Project?         @relation(fields: [projectId], references: [id])
     tags              Tag[]
-    taskStatus        TaskStatus       @default(PLANNING)
     timeEntries       TimeEntry[]
     todoItems         TodoItem[]
     convertedTodoItem TodoItem?        @relation("ConvertedTodoItem")
@@ -136,20 +137,12 @@ model CheckpointTask {
     task                Task        @relation(fields: [taskId], references: [id])
     estimate            Int? // in minutes
     trackedSoFar        Int // in seconds
-    status              TaskStatus
     existedAtBaseline   Boolean
     addedAtCheckpointId String?
     addedAtCheckpoint   Checkpoint? @relation("AddedAtCheckpoint", fields: [addedAtCheckpointId], references: [id])
     createdAt           DateTime    @default(now())
 
     @@unique([checkpointId, taskId])
-}
-
-enum TaskStatus {
-    PLANNING
-    ACTIVE
-    COMPLETED
-    ARCHIVED
 }
 
 enum TaskEventType {
