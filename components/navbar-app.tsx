@@ -44,6 +44,7 @@ function ProjectDropdownMenu({
 }) {
   return (
     <DropdownMenu className="min-w-80 lg:min-w-64" anchor="bottom start">
+      {/*     // TODO proper header       */}
       {projects.map((project, id) => (
         <DropdownItem key={project.id} href={`/s/project/${project.id}`}>
           <Avatar

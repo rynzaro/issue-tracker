@@ -49,21 +49,15 @@ export const { auth, signIn, signOut, handlers } = NextAuth({
   ],
   callbacks: {
     jwt({ token, user }) {
-      console.log("JWT callback - user:", user);
-      console.log("JWT callback - token before:", token);
       if (user) {
         token.id = user.id;
       }
-      console.log("JWT callback - token after:", token);
       return token;
     },
     session({ session, token }) {
-      console.log("Session callback - token:", token);
-      console.log("Session callback - session before:", session);
       if (session.user) {
         session.user.id = token.sub as string;
       }
-      console.log("Session callback - session after:", session);
       return session;
     },
   },
