@@ -1,3 +1,4 @@
+import { Prisma } from "@prisma/client";
 import z from "zod";
 
 export const CreateTaskSchema = z.object({
@@ -18,3 +19,7 @@ export const CreateTaskSchema = z.object({
 });
 
 export type CreateTaskParams = z.infer<typeof CreateTaskSchema>;
+
+export type TaskNode = Prisma.TaskGetPayload<{
+  include: { todoItems: true; tags: true };
+}> & { children: TaskNode[] };

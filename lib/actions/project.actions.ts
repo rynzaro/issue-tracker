@@ -8,12 +8,14 @@ import {
 } from "../services/project.service";
 import {
   createServiceErrorResponse,
+  createSuccessResponseWithData,
   ServiceResponseWithData,
   validateInput,
 } from "../services/serviceUtil";
-import { Project } from "@prisma/client";
+import { Prisma, Project } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { CreateProjectParams, CreateProjectSchema } from "../schema/project";
+import { TaskNode } from "../schema/task";
 
 export async function createProjectAction(
   params: CreateProjectParams,
@@ -71,4 +73,33 @@ export async function getUserProjectWithTasksAction(projectId: string) {
     userId: session.user.id,
     projectId,
   });
+}
+
+export async function getUserProjectWithTasksAndChildrenAction(
+  projectId: string,
+) {
+  const result = await getUserProjectWithTasksAction(projectId);
+
+  if (!result.success) {
+    return result;
+  }
+
+  const project = result.data;
+  const tasks = project.tasks;
+
+  const taskMap = new Map<string, TaskNode>();
+  for (const task of tasks) {
+    taskMap.set(task.id, { ...task, children: [] });
+  }
+
+  const roots: TaskNode[] = [];
+  for (const task of taskMap.values()) {
+    if (task.parentId) {
+      taskMap.get(task.parentId)?.children.push(task);
+    } else {
+      roots.push(task);
+    }
+  }
+
+  return createSuccessResponseWithData({ ...project, tasks: roots });
 }

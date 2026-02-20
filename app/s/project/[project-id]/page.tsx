@@ -1,8 +1,11 @@
 import NotFoundError from "@/components/not-found-error";
-import { Text } from "@/components/text";
-import { getUserProjectWithTasksAction } from "@/lib/actions/project.actions";
+import { getUserProjectWithTasksAndChildrenAction } from "@/lib/actions/project.actions";
 import Tasks from "./tasks";
 import { Heading, Subheading } from "@/components/heading";
+import NewRootTask from "./newRootTask";
+import { Button } from "@/components/button";
+import { Divider } from "@/components/divider";
+import TasksWrapper from "./tasksWrapper";
 
 export default async function Page({
   params,
@@ -11,7 +14,7 @@ export default async function Page({
 }) {
   const { "project-id": projectId } = await params;
 
-  const project = await getUserProjectWithTasksAction(projectId);
+  const project = await getUserProjectWithTasksAndChildrenAction(projectId);
 
   if (!project.success) {
     return (
@@ -22,17 +25,21 @@ export default async function Page({
     );
   }
 
-  console.log(project.data);
+  const tasks = project.data.tasks;
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex items-baseline gap-4">
-        <Heading>{project.data.name}</Heading>
-        <Subheading level={1} className="text-gray-500">
-          Task Manager
-        </Subheading>
+      <div className="flex justify-between">
+        <div className="flex items-baseline gap-4">
+          <Heading>{project.data.name}</Heading>
+          <Subheading level={1} className="text-gray-500">
+            Task Manager
+          </Subheading>
+        </div>
+        <Button>Neue Aufgabe</Button>
       </div>
-      <Tasks projectId={projectId} tasks={project.data.tasks} />
+      <Divider className="my-0" />
+      <TasksWrapper projectId={projectId} tasks={tasks} />
     </div>
   );
 }

@@ -1,60 +1,99 @@
 "use client";
 
 import { Button } from "@/components/button";
+import Card from "@/components/card";
 import { Input } from "@/components/input";
 import { createTaskAction } from "@/lib/actions/task.actions";
-import { CreateTaskParams } from "@/lib/schema/task";
-import { Task } from "@prisma/client";
-import { useState } from "react";
+import { CreateTaskParams, TaskNode } from "@/lib/schema/task";
+import { InformationCircleIcon } from "@heroicons/react/24/outline";
+import {
+  CheckIcon,
+  ChevronDownIcon,
+  ChevronUpIcon,
+  PencilIcon,
+  PlayPauseIcon,
+  PlusIcon,
+  TrashIcon,
+} from "@heroicons/react/16/solid";
+import clsx from "clsx";
+import { useRouter } from "next/navigation";
+import { Dispatch, SetStateAction, useState } from "react";
+import TaskRowButton from "./taskRowButton";
 
 export default function Tasks({
   projectId,
-  tasks,
+  task,
+  isRoot,
+  setNewTaskParent,
+  setTaskToEdit,
 }: {
   projectId: string;
-  tasks: Task[];
+  task: TaskNode;
+  isRoot: boolean;
+  setNewTaskParent: Dispatch<SetStateAction<TaskNode | null>>;
+  setTaskToEdit: (task: TaskNode) => void;
 }) {
-  const [localTasks, setLocalTasks] = useState(tasks);
-  const [newTaskTitle, setNewTaskTitle] = useState("");
-  const [newSubTaskTitle, setNewSubTaskTitle] = useState("");
+  const [isExpanded, setIsExpanded] = useState(false);
 
-  async function handleAddTask() {
-    if (!newTaskTitle.trim()) return;
-    const body: CreateTaskParams = {
-      title: newTaskTitle,
-      description: "",
-      parentId: null,
-      projectId,
-    };
-    const task = await createTaskAction({ createTaskParams: body });
-    if (task.success) {
-      setLocalTasks([...localTasks, task.data]);
-      setNewTaskTitle("");
-    } else {
-      //TODO error handling
-    }
-  }
   return (
-    <div className="flex flex-col gap-2">
-      {localTasks.map((task) => (
-        <div key={task.id} className="flex gap-2 justify-between">
-          <h3>{task.title}</h3>
-          {task.description && <p>{task.description}</p>}
-          <div className="flex gap-2">
-            <Button className="shrink-0">Unteraufgabe Hinzufügen</Button>
-          </div>
+    <div
+      className={clsx(
+        "flex flex-col gap-4 dark:text-white",
+        !isRoot ? "ml-4  " : "mt-4  font-semibold",
+      )}
+    >
+      <div className="flex justify-between gap-2 items-center py-2 pl-4 pr-2 hover:bg-gray-50 dark:hover:bg-zinc-800 rounded-lg border-l-4 border-gray-300 dark:border-zinc-600">
+        <button
+          onClick={() => {
+            setIsExpanded((prev) => !prev);
+          }}
+          disabled={!task.children || task.children.length === 0}
+          className="flex gap-2"
+        >
+          <h3 className="flex flex-gap-1 items-center">
+            {task.title}
+            {isExpanded ? (
+              <ChevronUpIcon className="w-6 h-6" />
+            ) : task.children.length > 0 ? (
+              <ChevronDownIcon className="w-6 h-6" />
+            ) : null}
+          </h3>
+        </button>
+
+        <div className="flex justify-end gap-2">
+          <TaskRowButton>
+            <PlayPauseIcon className="w-6 h-6" />
+          </TaskRowButton>
+          <TaskRowButton onClick={() => setNewTaskParent(task)}>
+            <PlusIcon className="w-6 h-6" />
+          </TaskRowButton>
+          <TaskRowButton onClick={() => setTaskToEdit(task)}>
+            <PencilIcon className="w-5 h-5" />
+          </TaskRowButton>
+          <TaskRowButton>
+            <CheckIcon className="w-6 h-6" />
+          </TaskRowButton>
+          <TaskRowButton borderless>
+            <InformationCircleIcon className="w-5 h-5" />
+          </TaskRowButton>
+          <TaskRowButton borderless>
+            <TrashIcon className="w-4 h-4" />
+          </TaskRowButton>
         </div>
-      ))}
-      <div className="flex gap-2">
-        <Input
-          type="text"
-          value={newTaskTitle}
-          onChange={(e) => setNewTaskTitle(e.target.value)}
-        />
-        <Button className="shrink-0" onClick={handleAddTask}>
-          Aufgabe Hinzufügen
-        </Button>
       </div>
+      {isExpanded &&
+        task.children &&
+        task.children.length > 0 &&
+        task.children.map((child) => (
+          <Tasks
+            key={child.id}
+            projectId={projectId}
+            task={child}
+            isRoot={false}
+            setNewTaskParent={setNewTaskParent}
+            setTaskToEdit={setTaskToEdit}
+          />
+        ))}
     </div>
   );
 }
