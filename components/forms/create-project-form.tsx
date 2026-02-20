@@ -7,10 +7,8 @@ import { Input } from "../input";
 import { Textarea } from "../textarea";
 import { useRouter } from "next/navigation";
 import { FormState } from "@/lib/formUtils";
-import {
-  createProjectAction,
-  CreateProjectParams,
-} from "@/lib/actions/project.actions";
+import { createProjectAction } from "@/lib/actions/project.actions";
+import { CreateProjectParams } from "@/lib/schema/project";
 
 export default function CreateProjectForm() {
   const [loading, setLoading] = useState(false);

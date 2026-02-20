@@ -7,5 +7,9 @@ export default async function Page() {
   for (const user of users) {
     console.log(`User: ${user.email}`);
   }
-  return <Login />;
+  return (
+    <Suspense>
+      <Login />
+    </Suspense>
+  );
 }

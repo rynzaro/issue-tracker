@@ -1,54 +1,40 @@
 "use server";
 
 import { auth } from "@/auth";
-import z from "zod";
 import { createProject } from "../services/project.service";
 import {
   createServiceErrorResponse,
-  createSuccessResponse,
   ServiceResponseWithData,
+  validateInput,
 } from "../services/serviceUtil";
 import { Project } from "@prisma/client";
 import { revalidatePath } from "next/cache";
-
-const CreateProjectSchema = z.object({
-  name: z.string().min(2).max(100),
-  description: z.string().max(1000).optional(),
-  projectSettings: z
-    .object({
-      autoCheckpointsEnabled: z.boolean(),
-      autoCheckpointOnScopeChange: z.boolean(),
-      autoCheckpointOnEstimateChange: z.boolean(),
-      checkpointDebounceMinutes: z.number().int().min(0).max(1440),
-    })
-    .optional(),
-});
-
-export type CreateProjectParams = z.infer<typeof CreateProjectSchema>;
+import { CreateProjectParams, CreateProjectSchema } from "../schema/project";
 
 export async function createProjectAction(
   params: CreateProjectParams,
 ): Promise<ServiceResponseWithData<Project>> {
+  // 1. Auth
   const session = await auth();
   if (!session?.user?.id) {
-    console.log(session);
-    return createServiceErrorResponse("UNAUTHORIZED", "Unauthorized user");
+    return createServiceErrorResponse(
+      "AUTHORIZATION_ERROR",
+      "Unauthorized user",
+    );
   }
 
-  try {
-    const project = await createProject(
-      session.user.id,
-      params.name,
-      params.description,
-      params.projectSettings,
-    );
-    revalidatePath("/s/main");
-    return createSuccessResponse(project);
-  } catch (error) {
-    return createServiceErrorResponse(
-      "INTERNAL_SERVER_ERROR",
-      "An error occurred while creating the project.",
-      error,
-    );
+  // 2. Validate input
+  const validated = validateInput(CreateProjectSchema, params);
+  if (!validated.success) {
+    return validated;
   }
+
+  // 3. Call service (already handles its own errors via serviceAction)
+  const result = await createProject({
+    userId: session.user.id,
+    createProjectParams: validated.data,
+  });
+
+  revalidatePath("/s/main");
+  return result;
 }

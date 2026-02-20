@@ -4,7 +4,7 @@ import PrimaryButton from "@/components/primaryButton";
 import TextInput from "@/components/textInput";
 import { parseTaskString } from "@/lib/util";
 import { useState } from "react";
-import { CreateTagParams, CreateTagResponse } from "../../api/create-tag/route";
+import { CreateTagParams, CreateTagResponse } from "../create-tag/route";
 import { useRouter } from "next/navigation";
 import { TaskHierarchy } from "./taskHierarchy";
 import { StartNewEntryParams } from "../../api/start-new-entry/route";

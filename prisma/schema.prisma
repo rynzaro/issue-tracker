@@ -34,6 +34,7 @@ model Project {
     projectSettingsId Int             @unique
     projectSettings   ProjectSettings @relation(fields: [projectSettingsId], references: [id])
     createdAt         DateTime        @default(now())
+    deletedAt         DateTime? // soft delete
 }
 
 model ProjectSettings {

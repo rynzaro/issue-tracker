@@ -28,104 +28,72 @@ Every Task is identified with the pre-handle `T` followed by `:name`. Every Task
 
 ## Error Handling
 
-### Response Format
+### Service Layer Error Handling
 
-```json
-{ "error": { "code": "ERROR_CODE", "message": "Description", "details": {} } }
+Result types (Go-style). Every service fn returns `ServiceResponseWithData<T>`. Discriminated union on `success`.
+
+```
+success: true  → { data: T }
+success: false → { error: { code, message, details? } }
 ```
 
-### Error Codes
+All helpers in serviceUtil.ts.
 
-| Code                   | Status      | When                    |
-| ---------------------- | ----------- | ----------------------- |
-| `ZOD_VALIDATION_ERROR` | 400         | Input validation failed |
-| `TOGGL_API_ERROR`      | passthrough | External API error      |
-| `INTERNAL_ERROR`       | 500         | Unexpected error        |
+#### Error Codes
 
-### Helper (`util/lib.ts`)
+| Code                    | When                                   | Client-safe details? |
+| ----------------------- | -------------------------------------- | -------------------- |
+| `VALIDATION_ERROR`      | Bad input (Zod)                        | Yes — field errors   |
+| `NOT_FOUND`             | Resource missing                       | No                   |
+| `AUTHORIZATION_ERROR`   | No session or wrong owner              | No                   |
+| `UNEXPECTED_ERROR`      | Impossible state — needs investigation | No                   |
+| `INTERNAL_SERVER_ERROR` | DB/infra failure                       | No                   |
 
-```typescript
-export function createErrorResponse(
-  code: string,
-  message: string,
-  details?: unknown,
-) {
-  return { error: { code, message, ...(details && { details }) } };
-}
+#### Wrappers
+
+Pick one per service fn. All log internally, never leak raw errors.
+
+| Wrapper                                           | For                                    | Handles                                                                                 |
+| ------------------------------------------------- | -------------------------------------- | --------------------------------------------------------------------------------------- |
+| `serviceQuery(fn, errMsg)`                        | `findMany`, always-returns-data ops    | catch → `INTERNAL_SERVER_ERROR`                                                         |
+| `serviceQueryOrNotFound(fn, notFoundMsg, errMsg)` | `findUnique`, `update`, `delete` by ID | null → `NOT_FOUND`, P2025 → `NOT_FOUND`, catch → `INTERNAL_SERVER_ERROR`                |
+| `serviceAction(fn, errMsg)`                       | Complex ops w/ guards                  | Callback controls returns. Catches `ServiceError` from `unwrap()`. Catch-all safety net |
+
+#### Validation
+
+Action layer validates before calling service. `validateInput` returns `VALIDATION_ERROR` w/ Zod flattened field errors — safe for client.
+
+```ts
+const validated = validateInput(CreateProjectSchema, params);
+if (!validated.success) return validated;
 ```
 
-### Route Template
+#### Chaining (`unwrap`)
 
-```typescript
-import { TOGGL_API } from "@/util/consts";
-import { getAuthHeader, createErrorResponse } from "@/util/lib";
-import { NextRequest, NextResponse } from "next/server";
-import z from "zod";
+Compose service calls inside `serviceAction` without `if (!r.success) return r` boilerplate:
 
-const Params = z.object({
-  name: z.string().min(1, "Required"),
-  workspaceId: z.number().int().positive(),
-});
-
-export type RouteParams = z.infer<typeof Params>;
-
-export async function POST(req: NextRequest) {
-  const { data: params, error } = Params.safeParse(await req.json());
-
-  if (error) {
-    const details = error.issues.map((i) => ({
-      path: i.path.join("."),
-      message: i.message,
-    }));
-    return NextResponse.json(
-      createErrorResponse("ZOD_VALIDATION_ERROR", "Validation failed", details),
-      { status: 400 },
-    );
-  }
-
-  try {
-    const res = await fetch(`${TOGGL_API}/endpoint`, {
-      method: "POST",
-      headers: getAuthHeader(),
-      body: JSON.stringify({
-        workspace_id: params.workspaceId,
-        name: params.name,
-      }),
-    });
-
-    if (!res.ok) {
-      return NextResponse.json(
-        createErrorResponse(
-          "TOGGL_API_ERROR",
-          res.statusText,
-          await res.text(),
-        ),
-        { status: res.status },
-      );
-    }
-
-    const data = await res.json();
-    return NextResponse.json({ ok: true, ...data });
-  } catch (err) {
-    return NextResponse.json(
-      createErrorResponse(
-        "INTERNAL_ERROR",
-        err instanceof Error ? err.message : "Unknown",
-        err,
-      ),
-      { status: 500 },
-    );
-  }
-}
+```ts
+return serviceAction(async () => {
+  const project = unwrap(await getProjectById(id));
+  const tasks = unwrap(await getTasksByProject(project.id));
+  return createSuccessResponseWithData(tasks);
+}, "Failed to load");
 ```
 
-### Key Rules
+`unwrap` extracts `.data` or throws `ServiceError` → `serviceAction` catches + passes through original error response.
 
-- Use `safeParse()` and check `if (error)` before proceeding
-- Convert camelCase params → snake_case for Toggl API (`workspaceId` → `workspace_id`)
-- Assign `response.json()` to variable before spreading (avoids TS2698)
-- Pass through Toggl's HTTP status code in error responses
-- Export `type RouteParams = z.infer<typeof Params>` for client use
+#### Layer Flow
+
+- **Action** — auth → `validateInput` → call service → `revalidatePath` on success
+- **Service** — ownership/biz guards → DB ops via wrapper
+- **Prisma** — never called outside a wrapper or `serviceAction` callback
+
+#### Rules
+
+- No `try/catch` in actions — services catch everything
+- No raw `Error` in responses — wrappers log internally, return clean error
+- `details` only for `VALIDATION_ERROR` — all other codes omit it
+- `UNEXPECTED_ERROR` for impossible states, not `NOT_FOUND`
 
 ## Todos
 
