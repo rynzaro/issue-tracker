@@ -2,6 +2,7 @@ import client from "@/lib/prisma";
 import {
   createServiceErrorResponse,
   createSuccessResponseWithData,
+  logServiceError,
   serviceAction,
   serviceQuery,
   serviceQueryOrNotFound,
@@ -63,6 +64,70 @@ export function getProjectById(projectId: string) {
     "Project not found",
     "Failed to fetch project",
   );
+}
+
+export function getUserProjectById({
+  userId,
+  projectId,
+}: {
+  userId: string;
+  projectId: string;
+}) {
+  return serviceAction(async () => {
+    const project = await client.project.findUnique({
+      where: { id: projectId },
+    });
+
+    if (!project) {
+      return createServiceErrorResponse("NOT_FOUND", "Project not found");
+    }
+
+    if (project.userId !== userId) {
+      logServiceError(
+        "Unauthorized project access",
+        `User ${userId} attempted to access project ${projectId} owned by ${project.userId}`,
+      );
+      return createServiceErrorResponse("NOT_FOUND", "Project not found");
+    }
+
+    return createSuccessResponseWithData(project);
+  }, "Failed to fetch project");
+}
+
+export function getUserProjectWithTasks({
+  userId,
+  projectId,
+}: {
+  userId: string;
+  projectId: string;
+}) {
+  return serviceAction(async () => {
+    const project = await client.project.findUnique({
+      where: { id: projectId },
+      include: {
+        tasks: {
+          include: {
+            todoItems: true,
+            tags: true,
+          },
+        },
+      },
+    });
+
+    if (!project) {
+      return createServiceErrorResponse("NOT_FOUND", "Project not found");
+    }
+
+    if (project.userId !== userId) {
+      logServiceError(
+        "Unauthorized project access",
+        `User ${userId} attempted to access project ${projectId} owned by ${project.userId}`,
+      );
+      return createServiceErrorResponse("NOT_FOUND", "Project not found");
+    }
+
+    return createSuccessResponseWithData(project);
+  }, "Failed to fetch project");
 }
 
 export function getProjectsByUser(userId: string) {

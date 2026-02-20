@@ -13,7 +13,6 @@ datasource db {
     provider = "mysql"
 }
 
-// TODO - Timestamps for user necessary?
 model User {
     id            String      @id @default(cuid())
     email         String      @unique
@@ -33,6 +32,7 @@ model Project {
     checkpoints       Checkpoint[]
     projectSettingsId Int             @unique
     projectSettings   ProjectSettings @relation(fields: [projectSettingsId], references: [id])
+    isDefault         Boolean         @default(false)
     createdAt         DateTime        @default(now())
     deletedAt         DateTime? // soft delete
 }
@@ -60,7 +60,10 @@ model Task {
     updatedAt         DateTime         @updatedAt
     completedAt       DateTime?
     deletedAt         DateTime? // soft delete
+    parentId          String? // for nested tasks
     project           Project?         @relation(fields: [projectId], references: [id])
+    parent            Task?            @relation("TaskChildren", fields: [parentId], references: [id])
+    children          Task[]           @relation("TaskChildren")
     tags              Tag[]
     timeEntries       TimeEntry[]
     todoItems         TodoItem[]

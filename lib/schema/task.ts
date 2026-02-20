@@ -1,7 +1,8 @@
 import z from "zod";
 
 export const CreateTaskSchema = z.object({
-  projectId: z.string().uuid(),
+  projectId: z.cuid(),
+  parentId: z.cuid().nullable(),
   title: z.string().min(2).max(100),
   description: z.string().max(1000).optional(),
   estimate: z.number().int().min(0).optional(),

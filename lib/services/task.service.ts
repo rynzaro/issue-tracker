@@ -34,7 +34,10 @@ export function createTask({
         title: createTaskParams.title,
         description: createTaskParams.description,
         estimate: createTaskParams.estimate,
-        projectId: createTaskParams.projectId,
+        project: { connect: { id: createTaskParams.projectId } },
+        ...(createTaskParams.parentId
+          ? { parent: { connect: { id: createTaskParams.parentId } } }
+          : {}),
         todoItems: {
           create: createTaskParams.todoItems?.map((todo) => ({
             title: todo.title,

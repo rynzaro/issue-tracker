@@ -95,10 +95,37 @@ return serviceAction(async () => {
 - `details` only for `VALIDATION_ERROR` — all other codes omit it
 - `UNEXPECTED_ERROR` for impossible states, not `NOT_FOUND`
 
-## Todos
+#### Authorization & Information Disclosure
 
-- start entries + parent entries
-- stop entries + parent entries
-- check for already existing tags
-- notification system
-- navbar
+Services that check resource ownership must **never reveal whether a resource exists** to unauthorized users. Return the same `NOT_FOUND` error for both "doesn't exist" and "not authorized" to prevent resource enumeration.
+
+Log the real reason server-side via `logServiceError` for debugging:
+
+```ts
+export function getUserProjectById({ userId, projectId }) {
+  return serviceAction(async () => {
+    const project = await client.project.findUnique({ where: { id: projectId } });
+
+    if (!project) {
+      return createServiceErrorResponse("NOT_FOUND", "Project not found");
+    }
+
+    if (project.userId !== userId) {
+      logServiceError(
+        "Unauthorized project access",
+        `User ${userId} attempted to access project ${projectId} owned by ${project.userId}`,
+      );
+      return createServiceErrorResponse("NOT_FOUND", "Project not found");
+    }
+
+    return createSuccessResponseWithData(project);
+  }, "Failed to fetch project");
+}
+```
+
+**Key principles:**
+
+- Client always sees generic `"Project not found"` — same for missing and unauthorized
+- Server logs capture the real reason with user/project details
+- Use `serviceAction` (not `serviceQueryOrNotFound`) for ownership checks — custom logic needs the full control flow
+- `logServiceError` for all denied access attempts — no need for a separate auth logger at current scale

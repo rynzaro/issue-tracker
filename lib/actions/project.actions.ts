@@ -1,7 +1,11 @@
 "use server";
 
 import { auth } from "@/auth";
-import { createProject } from "../services/project.service";
+import {
+  createProject,
+  getUserProjectById,
+  getUserProjectWithTasks,
+} from "../services/project.service";
 import {
   createServiceErrorResponse,
   ServiceResponseWithData,
@@ -37,4 +41,34 @@ export async function createProjectAction(
 
   revalidatePath("/s/main");
   return result;
+}
+
+export async function getUserProjectByIdAction(projectId: string) {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return createServiceErrorResponse(
+      "AUTHORIZATION_ERROR",
+      "Unauthorized user",
+    );
+  }
+
+  return getUserProjectById({
+    userId: session.user.id,
+    projectId,
+  });
+}
+
+export async function getUserProjectWithTasksAction(projectId: string) {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return createServiceErrorResponse(
+      "AUTHORIZATION_ERROR",
+      "Unauthorized user",
+    );
+  }
+
+  return getUserProjectWithTasks({
+    userId: session.user.id,
+    projectId,
+  });
 }

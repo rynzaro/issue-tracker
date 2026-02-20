@@ -41,9 +41,7 @@ export type ServiceResponseWithData<T> =
       };
     };
 
-// ─── Internal Utilities (not exported) ─────────────────────────────────────────
-
-function logServiceError(context: string, error: unknown): void {
+export function logServiceError(context: string, error: unknown): void {
   console.error(`[SERVICE_ERROR] ${context}`, {
     timestamp: new Date().toISOString(),
     error:
