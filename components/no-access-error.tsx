@@ -2,7 +2,7 @@ import { ShieldExclamationIcon } from "@heroicons/react/24/outline";
 import { Badge } from "./badge";
 import { Button } from "./button";
 import { Divider } from "./divider";
-import { Text } from "./text";
+import { SecondaryText } from "./text";
 
 export default function NoAccessError({
   subject = "Zugriff verweigert",
@@ -25,7 +25,7 @@ export default function NoAccessError({
           {subject}
         </h1>
 
-        <Text className="max-w-sm">{description}</Text>
+        <SecondaryText className="max-w-sm">{description}</SecondaryText>
 
         <Button href="/login" color="indigo" className="mt-2">
           Zur Startseite

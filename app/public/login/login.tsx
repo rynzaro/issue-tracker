@@ -6,7 +6,7 @@ import { Checkbox, CheckboxField } from "@/components/checkbox";
 import { Field, Label } from "@/components/fieldset";
 import { Heading } from "@/components/heading";
 import { Input } from "@/components/input";
-import { Strong, Text, TextLink } from "@/components/text";
+import { Strong, SecondaryText, TextLink } from "@/components/text";
 import { authenticate } from "@/lib/actions/auth.actions";
 import { ExclamationCircleIcon } from "@heroicons/react/16/solid";
 import { useSearchParams } from "next/navigation";
@@ -40,11 +40,11 @@ export default function Login() {
             <Checkbox name="remember" />
             <Label>Remember me</Label>
           </CheckboxField>
-          <Text>
+          <SecondaryText>
             <TextLink href="/public/forgot-password">
               <Strong>Forgot password?</Strong>
             </TextLink>
-          </Text>
+          </SecondaryText>
         </div>
         <input type="hidden" name="redirectTo" value={callbackUrl} />
         {/* //TODO proper loading state */}
@@ -64,12 +64,12 @@ export default function Login() {
             </>
           )}
         </div>
-        <Text>
+        <SecondaryText>
           Don’t have an account?{" "}
           <TextLink href="/public/sign-up">
             <Strong>Sign up</Strong>
           </TextLink>
-        </Text>
+        </SecondaryText>
       </form>
     </AuthLayout>
   );

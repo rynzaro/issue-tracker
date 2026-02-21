@@ -19,6 +19,8 @@ import clsx from "clsx";
 import { useRouter } from "next/navigation";
 import { Dispatch, SetStateAction, useState } from "react";
 import TaskRowButton from "./taskRowButton";
+import { Subheading } from "@/components/heading";
+import { SecondaryText } from "@/components/text";
 
 export default function Tasks({
   projectId,
@@ -42,29 +44,38 @@ export default function Tasks({
         !isRoot ? "ml-4  " : "mt-4  font-semibold",
       )}
     >
-      <div className="flex justify-between gap-2 items-center py-2 pl-4 pr-2 hover:bg-gray-50 dark:hover:bg-zinc-800 rounded-lg border-l-4 border-gray-300 dark:border-zinc-600">
-        <button
-          onClick={() => {
+      <div
+        role="button"
+        className="flex justify-between gap-2 items-center py-2 pl-4 pr-2 hover:bg-gray-50 dark:hover:bg-zinc-800 rounded-lg border-l-4 border-gray-300 dark:border-zinc-600"
+        onClick={() => {
+          task.children &&
+            task.children.length > 0 &&
             setIsExpanded((prev) => !prev);
-          }}
-          disabled={!task.children || task.children.length === 0}
-          className="flex gap-2"
-        >
-          <h3 className="flex flex-gap-1 items-center">
+        }}
+      >
+        <div className="flex gap-2 items-baseline">
+          <Subheading level={4} className="flex flex-gap-1 items-center">
             {task.title}
             {isExpanded ? (
               <ChevronUpIcon className="w-6 h-6" />
             ) : task.children.length > 0 ? (
               <ChevronDownIcon className="w-6 h-6" />
             ) : null}
-          </h3>
-        </button>
+          </Subheading>
+          {task.estimate && (
+            <SecondaryText>Schätzung: {task.estimate} Minuten</SecondaryText>
+          )}
+        </div>
 
         <div className="flex justify-end gap-2">
           <TaskRowButton>
             <PlayPauseIcon className="w-6 h-6" />
           </TaskRowButton>
-          <TaskRowButton onClick={() => setNewTaskParent(task)}>
+          <TaskRowButton
+            onClick={() => {
+              setNewTaskParent(task);
+            }}
+          >
             <PlusIcon className="w-6 h-6" />
           </TaskRowButton>
           <TaskRowButton onClick={() => setTaskToEdit(task)}>
@@ -73,11 +84,11 @@ export default function Tasks({
           <TaskRowButton>
             <CheckIcon className="w-6 h-6" />
           </TaskRowButton>
-          <TaskRowButton borderless>
+          <TaskRowButton>
             <InformationCircleIcon className="w-5 h-5" />
           </TaskRowButton>
           <TaskRowButton borderless>
-            <TrashIcon className="w-4 h-4" />
+            <TrashIcon className="w-5 h-5" />
           </TaskRowButton>
         </div>
       </div>

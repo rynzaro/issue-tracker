@@ -2,7 +2,7 @@ import { FaceFrownIcon } from "@heroicons/react/24/outline";
 import { Badge } from "./badge";
 import { Button } from "./button";
 import { Divider } from "./divider";
-import { Text } from "./text";
+import { SecondaryText } from "./text";
 
 export default function NotFoundError({
   subject = "Seite nicht gefunden",
@@ -28,7 +28,7 @@ export default function NotFoundError({
         </h1>
 
         {/* Description */}
-        <Text className="max-w-sm">{description}</Text>
+        <SecondaryText className="max-w-sm">{description}</SecondaryText>
 
         {/* CTA */}
         <Button href="/s/main" color="indigo" className="mt-2">
@@ -37,7 +37,7 @@ export default function NotFoundError({
 
         {/* Support hint */}
         <Divider soft className="mt-2" />
-        <Text className="text-xs">
+        <SecondaryText className="text-xs">
           Falls du glaubst, dass hier ein Fehler vorliegt, wende dich gerne an
           unseren{" "}
           <a
@@ -46,7 +46,7 @@ export default function NotFoundError({
           >
             Support &rarr;
           </a>
-        </Text>
+        </SecondaryText>
       </div>
     </div>
   );

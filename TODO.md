@@ -8,3 +8,4 @@
 - [ ] button hover explanation
 - [ ] todo list functionality
 - [ ] add more description functionality
+- [ ] abgeschätzte dauer -> other input method with rollscroll

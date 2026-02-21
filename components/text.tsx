@@ -1,7 +1,23 @@
 import clsx from "clsx";
 import { Link } from "./link";
 
-export function Text({
+export function PrimaryText({
+  className,
+  ...props
+}: React.ComponentPropsWithoutRef<"p">) {
+  return (
+    <p
+      data-slot="text"
+      {...props}
+      className={clsx(
+        className,
+        "text-base/6 text-zinc-800 sm:text-sm/6 dark:text-zinc-200",
+      )}
+    />
+  );
+}
+
+export function SecondaryText({
   className,
   ...props
 }: React.ComponentPropsWithoutRef<"p">) {

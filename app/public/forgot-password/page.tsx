@@ -3,7 +3,7 @@ import { Button } from "@/components/button";
 import { Field, Label } from "@/components/fieldset";
 import { Heading } from "@/components/heading";
 import { Input } from "@/components/input";
-import { Strong, Text, TextLink } from "@/components/text";
+import { Strong, SecondaryText, TextLink } from "@/components/text";
 
 export default function Page() {
   return (
@@ -14,9 +14,9 @@ export default function Page() {
         className="grid w-full max-w-sm grid-cols-1 gap-8"
       >
         <Heading>Reset your password</Heading>
-        <Text>
+        <SecondaryText>
           Enter your email and we’ll send you a link to reset your password.
-        </Text>
+        </SecondaryText>
         <Field>
           <Label>Email</Label>
           <Input type="email" name="email" />
@@ -24,12 +24,12 @@ export default function Page() {
         <Button type="submit" className="w-full">
           Reset password
         </Button>
-        <Text>
+        <SecondaryText>
           Don’t have an account?{" "}
           <TextLink href="/public/sign-up">
             <Strong>Sign up</Strong>
           </TextLink>
-        </Text>
+        </SecondaryText>
       </form>
     </AuthLayout>
   );

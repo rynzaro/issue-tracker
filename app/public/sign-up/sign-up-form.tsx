@@ -5,7 +5,7 @@ import { Button } from "@/components/button";
 import { ErrorMessage, Field, Label } from "@/components/fieldset";
 import { Heading } from "@/components/heading";
 import { Input } from "@/components/input";
-import { ErrorText, Strong, Text, TextLink } from "@/components/text";
+import { ErrorText, Strong, SecondaryText, TextLink } from "@/components/text";
 import {
   extractFormStateValues,
   FormState,
@@ -126,12 +126,12 @@ export default function SignUpForm() {
         </Button>
       </div>
 
-      <Text>
+      <SecondaryText>
         Already have an account?{" "}
         <TextLink href="/public/login">
           <Strong>Sign in</Strong>
         </TextLink>
-      </Text>
+      </SecondaryText>
     </form>
   );
 }
