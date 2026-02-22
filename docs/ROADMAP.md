@@ -53,10 +53,11 @@ Core task management with time tracking. The first usable version of the app.
 - [x] Task description / notes field
 - [ ] Task tags field (M:N, optional)
 - [ ] Task status transitions: set/clear `completedAt` (complete/uncomplete), set/clear `archivedAt` (archive/unarchive); add `archivedAt DateTime?` to Task schema
-- [ ] Time tracking: start/stop timer (AD-16: single active task, frontend-derived parent indicators)
+- [ ] Time tracking: start/stop timer (AD-16 + AD-17: ActiveTimer table, single active task)
 - [ ] `timeEntry.service.ts` + `timeEntry.actions.ts`
+- [ ] ActiveTimer model + migration (AD-17: `@@unique([userId])`, mandatory `stoppedAt`/`duration` on TimeEntry)
 - [ ] Active timer display in navbar
-- [ ] Auto-stop previous timer when starting a new one
+- [ ] Auto-stop previous timer when starting a new one (handled by ActiveTimer swap in transaction)
 - [ ] Time rollup: parent shows sum of children's tracked time (on-the-fly `SUM()` query, acceptable for <10k tasks)
 - [x] Replace legacy `app/s/[workspaceId]/` with `app/s/project/[project-id]/`
 - [ ] Delete legacy Toggl API routes (`create-tag/`, `create-tag-without-permission/`, `start-new-entry/`) or move to `app/api/toggl/`
@@ -276,8 +277,16 @@ TimeEntry {
   taskId: String → Task
   userId: String → User
   startedAt: DateTime
-  stoppedAt: DateTime?
-  duration: Int? (SECONDS, computed on stop)
+  stoppedAt: DateTime
+  duration: Int (SECONDS, computed on creation)
+  createdAt: DateTime @default(now())
+}
+
+ActiveTimer {
+  id: String @id @default(cuid())
+  userId: String @unique → User (AD-17: one active timer per user)
+  taskId: String → Task
+  startedAt: DateTime
   createdAt: DateTime @default(now())
 }
 
@@ -356,7 +365,7 @@ enum CheckpointTrigger {
 User ──1:N──> Project ──1:N──> Task ──1:N──> TimeEntry
   │                │              │
   ├──1:N──> TimeEntry  │         ├──self──> Task (children)
-  │                │              ├──M:N──> Tag (via TaskTag)
+  ├──1:1──> ActiveTimer│         ├──M:N──> Tag (via TaskTag)
   │                │              ├──1:N──> TodoItem (with optional estimate)
   │                │              ├──1:N──> TaskEvent
   │                │              └──1:N──> Checkpoint ──1:N──> CheckpointTask ──N:1──> Task

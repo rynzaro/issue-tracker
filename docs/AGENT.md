@@ -259,8 +259,16 @@ TimeEntry {
   taskId: String → Task
   userId: String → User
   startedAt: DateTime
-  stoppedAt: DateTime?
-  duration: Int? (SECONDS, computed on stop)
+  stoppedAt: DateTime
+  duration: Int (SECONDS, computed on creation)
+  createdAt: DateTime @default(now())
+}
+
+ActiveTimer {
+  id: String @id @default(cuid())
+  userId: String @unique → User
+  taskId: String → Task
+  startedAt: DateTime
   createdAt: DateTime @default(now())
 }
 
@@ -341,7 +349,7 @@ User ──1:N──> Project ──1:N──> Task ──1:N──> TimeEntry
   │                              │
   ├──1:N──> TimeEntry            ├──self──> Task (children)
   ├──1:N──> Tag                  ├──1:N──> TaskTag ──N:1──> Tag
-  │                              ├──1:N──> TodoItem (with optional estimate)
+  ├──1:1──> ActiveTimer          ├──1:N──> TodoItem (with optional estimate)
   │                              ├──1:N──> TaskEvent
   │                              └──1:N──> Checkpoint ──1:N──> CheckpointTask ──N:1──> Task
   │
@@ -354,7 +362,7 @@ User ──1:N──> Project ──1:N──> Task ──1:N──> TimeEntry
 | -------------------- | --------------------------------------------------------------------- | ------------------------------------- |
 | `project.service`    | Project CRUD                                                          | —                                     |
 | `task.service`       | Task CRUD, hierarchy                                                  | `event.service`, `checkpoint.service` |
-| `timeEntry.service`  | Start/stop timers (single active task — AD-16), duration calculations | `event.service`, `checkpoint.service` |
+| `timeEntry.service`  | Start/stop timers (AD-16/17: ActiveTimer + mandatory stoppedAt), duration calc | `event.service`, `checkpoint.service` |
 | `event.service`      | TaskEvent creation, queries                                           | —                                     |
 | `checkpoint.service` | Checkpoint CRUD, debouncing, snapshots, comparisons                   | —                                     |
 | `todo.service`       | TodoItem CRUD (including estimate), conversion to sub-task            | `task.service`, `event.service`       |
@@ -417,10 +425,11 @@ Update this table as iterations are completed.
 These must ALWAYS hold true. Verify after any change:
 
 1. **Time entries only on tasks** — every TimeEntry must reference a valid Task
-2. **Task depth is accurate** — `task.depth` must equal the number of ancestors (0 for root)
-3. **Checkpoints never cascade above parent** — auto-checkpoint triggers ONLY fire for the changed task and its direct parent
-4. **Events are append-only** — never update or delete TaskEvent rows
-5. **Checkpoint baselines are unique per task** — a task can have at most ONE checkpoint with `isBaseline = true`
-6. **CheckpointTask pairs are unique** — `[checkpointId, taskId]` is enforced as unique
-7. **Toggl is optional** — the app must function fully without any Toggl configuration
-8. **No Toggl env vars** — Toggl API tokens are per-user (stored in User model), never in `.env` or `process.env`
+2. **One ActiveTimer per user** — enforced by `@@unique([userId])` on ActiveTimer (AD-17). ActiveTimer = running, TimeEntry = completed.
+3. **Task depth is accurate** — `task.depth` must equal the number of ancestors (0 for root)
+4. **Checkpoints never cascade above parent** — auto-checkpoint triggers ONLY fire for the changed task and its direct parent
+5. **Events are append-only** — never update or delete TaskEvent rows
+6. **Checkpoint baselines are unique per task** — a task can have at most ONE checkpoint with `isBaseline = true`
+7. **CheckpointTask pairs are unique** — `[checkpointId, taskId]` is enforced as unique
+8. **Toggl is optional** — the app must function fully without any Toggl configuration
+9. **No Toggl env vars** — Toggl API tokens are per-user (stored in User model), never in `.env` or `process.env`

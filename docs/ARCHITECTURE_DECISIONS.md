@@ -64,7 +64,34 @@ Replaced implicit `Tag[] ↔ Task[]` many-to-many with explicit `TaskTag` model.
 
 ### AD-16: Single active task, frontend-derived parent indicators, recursive time rollup
 
-Starting work on a task creates ONE TimeEntry for that task only. Only one task can be active per user at a time — starting a new task auto-stops the previous one. Parent tasks never get their own TimeEntry from child work; instead, the frontend derives a "has active descendant" indicator by walking the task tree during tree building. Total tracked time for any task = own TimeEntries + recursive sum of children's TimeEntries (computed on-the-fly, not denormalized). Status is derived at read time: has active TimeEntry → IN_PROGRESS, `completedAt ≠ null` → DONE, else → OPEN. Complements AD-8 (status via datetime flags). Rejected alternative: creating TimeEntries for ancestor tasks ("ancestor chain") — too many redundant DB rows, time rollup should be computed not duplicated.
+Starting work on a task creates ONE TimeEntry for that task only. Only one task can be active per user at a time — starting a new task auto-stops the previous one. Parent tasks never get their own TimeEntry from child work; instead, the frontend derives a "has active descendant" indicator by walking the task tree during tree building. Total tracked time for any task = own TimeEntries + recursive sum of children's TimeEntries (computed on-the-fly, not denormalized). Status is derived at read time: has ActiveTimer → IN_PROGRESS, `completedAt ≠ null` → DONE, else → OPEN (see AD-17 for ActiveTimer enforcement). Complements AD-8 (status via datetime flags). Rejected alternative: creating TimeEntries for ancestor tasks ("ancestor chain") — too many redundant DB rows, time rollup should be computed not duplicated.
+
+### AD-17: ActiveTimer table; mandatory stoppedAt on TimeEntry
+
+**Context:** Enforce one active timer per user (AD-16).
+
+**Decision:** Separate `ActiveTimer` table (`@@unique([userId])`). `TimeEntry.stoppedAt` and `duration` become NOT NULL.
+
+**Rationale:**
+- `@@unique([userId])` makes the invariant structurally impossible to violate — no app-level assertions needed.
+- No dual source of truth (vs. pointer approach): ActiveTimer = running, TimeEntry = completed. Complementary, not redundant.
+- Forward-compatible with all future delegation models.
+
+**Schema addition:**
+```prisma
+model ActiveTimer {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  taskId    String
+  startedAt DateTime
+  user      User     @relation(fields: [userId], references: [id])
+  task      Task     @relation(fields: [taskId], references: [id])
+}
+```
+
+TimeEntry changes: `stoppedAt DateTime` (NOT NULL), `duration Int` (NOT NULL).
+
+**Consequences:** `startWork` and `stopWork` operate inside a transaction (delete ActiveTimer → insert TimeEntry, or vice versa). Time rollup = `SUM(TimeEntry.duration)` for completed work + `NOW() - ActiveTimer.startedAt` if one exists for the task.
 
 ---
 

@@ -52,17 +52,20 @@ No `TaskStatus` enum. Status is derived from nullable datetime fields on `Task`:
 | Derived state | Condition                                                        |
 | ------------- | ---------------------------------------------------------------- |
 | Active        | `completedAt IS NULL`, `archivedAt IS NULL`, `deletedAt IS NULL` |
+| In Progress   | ActiveTimer exists for this task (AD-17)                         |
 | Completed     | `completedAt IS NOT NULL`                                        |
 | Archived      | `archivedAt IS NOT NULL`                                         |
 | Deleted       | `deletedAt IS NOT NULL` (soft delete, filtered from all queries) |
 
 `completedAt` and `archivedAt` are set/cleared by service code (not DB triggers). `deletedAt` is set-only (no restore). `archivedAt` is planned — not yet in schema.
 
-### AF-7: Single Active Timer
+### AF-7: Single Active Timer (ActiveTimer table)
 
-One timer per user. Starting new auto-stops previous. TimeEntry: start/stop/duration (seconds, computed on stop).
+One timer per user, enforced by `ActiveTimer` table with `@@unique([userId])` (AD-17). Running work lives in ActiveTimer; completed work lives in TimeEntry with mandatory `stoppedAt` and `duration`.
 
-No overlapping entries. Clean time attribution.
+`startWork`: stop existing ActiveTimer (convert to TimeEntry) → create new ActiveTimer. `stopWork`: delete ActiveTimer → create TimeEntry. Both in a transaction.
+
+No overlapping entries. Clean time attribution. DB-enforced invariant.
 
 ### AF-8: Event Log — Append-Only Audit Trail
 

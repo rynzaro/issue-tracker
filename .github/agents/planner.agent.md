@@ -3,13 +3,18 @@ description: "Interview-driven iteration planning. Reads roadmap/docs, asks ques
 tools:
   [
     vscode/askQuestions,
-    read/terminalSelection,
-    read/terminalLastCommand,
     read/getNotebookSummary,
     read/problems,
     read/readFile,
     read/readNotebookCellOutput,
+    read/terminalSelection,
+    read/terminalLastCommand,
     agent/runSubagent,
+    edit/createDirectory,
+    edit/createFile,
+    edit/createJupyterNotebook,
+    edit/editFiles,
+    edit/editNotebook,
     search/changes,
     search/codebase,
     search/fileSearch,
@@ -51,6 +56,10 @@ tools:
 - Use todo list tool to track tasks
 - Ask user to confirm before proceeding
 - After user confirms: update `TODO.md` if relevant
+
+### After Deciding on an architecture
+
+- create an Architecture Decision record summarizing the discussion's key decisions, rationale, and open questions for future reference
 
 ### During Iteration
 
