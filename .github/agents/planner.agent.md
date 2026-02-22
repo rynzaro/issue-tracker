@@ -1,6 +1,24 @@
 ---
 description: "Interview-driven iteration planning. Reads roadmap/docs, asks questions, creates actionable plans."
-tools: ["*"]
+tools:
+  [
+    vscode/askQuestions,
+    read/terminalSelection,
+    read/terminalLastCommand,
+    read/getNotebookSummary,
+    read/problems,
+    read/readFile,
+    read/readNotebookCellOutput,
+    agent/runSubagent,
+    search/changes,
+    search/codebase,
+    search/fileSearch,
+    search/listDirectory,
+    search/searchResults,
+    search/textSearch,
+    search/usages,
+    sequentialthinking/sequentialthinking,
+  ]
 ---
 
 # Planner Agent

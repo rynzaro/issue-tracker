@@ -1,6 +1,29 @@
 ---
 description: "Audits docs against codebase. Finds drift, fixes it. Run after code changes."
-tools: ["*"]
+tools:
+  [
+    vscode/askQuestions,
+    read/terminalSelection,
+    read/terminalLastCommand,
+    read/getNotebookSummary,
+    read/problems,
+    read/readFile,
+    read/readNotebookCellOutput,
+    edit/createDirectory,
+    edit/createFile,
+    edit/createJupyterNotebook,
+    edit/editFiles,
+    edit/editNotebook,
+    search/changes,
+    search/codebase,
+    search/fileSearch,
+    search/listDirectory,
+    search/searchResults,
+    search/textSearch,
+    search/usages,
+    gitkraken/git_log_or_diff,
+    sequentialthinking/sequentialthinking,
+  ]
 ---
 
 # Doc Keeper Agent
@@ -17,16 +40,16 @@ tools: ["*"]
 
 These are the docs to audit. Read ALL of them at session start:
 
-| File | What it covers | Common drift |
-|------|---------------|--------------|
-| `docs/ROADMAP.md` | Iteration plans, checkboxes, target schema | Items done but unchecked, stale schema |
-| `docs/AGENT.md` | Architecture rules, schema reference, iteration status table | Schema out of date, status table stale |
-| `docs/DEVELOPER.md` | Directory structure, tech stack, what works today, conventions | Directory tree wrong, stale "what works" |
-| `docs/USER.md` | User-facing feature descriptions | Features renamed or changed |
-| `docs/ARCHITECTURE_DECISIONS.md` | Numbered AD-* decisions | Missing new decisions |
-| `docs/ARCHITECTURE_FOUNDATION.md` | Root AF-* principles | Principles contradicted by later ADs |
-| `docs/FUTURE_COLLABORATION.md` | Multi-user expansion plan | Schema foundations changed |
-| `TODO.md` | Post-MVP items and UX ideas | Items completed but not removed |
+| File                              | What it covers                                                 | Common drift                             |
+| --------------------------------- | -------------------------------------------------------------- | ---------------------------------------- |
+| `docs/ROADMAP.md`                 | Iteration plans, checkboxes, target schema                     | Items done but unchecked, stale schema   |
+| `docs/AGENT.md`                   | Architecture rules, schema reference, iteration status table   | Schema out of date, status table stale   |
+| `docs/DEVELOPER.md`               | Directory structure, tech stack, what works today, conventions | Directory tree wrong, stale "what works" |
+| `docs/USER.md`                    | User-facing feature descriptions                               | Features renamed or changed              |
+| `docs/ARCHITECTURE_DECISIONS.md`  | Numbered AD-\* decisions                                       | Missing new decisions                    |
+| `docs/ARCHITECTURE_FOUNDATION.md` | Root AF-\* principles                                          | Principles contradicted by later ADs     |
+| `docs/FUTURE_COLLABORATION.md`    | Multi-user expansion plan                                      | Schema foundations changed               |
+| `TODO.md`                         | Post-MVP items and UX ideas                                    | Items completed but not removed          |
 
 ## Workflow
 
@@ -59,12 +82,13 @@ These are the docs to audit. Read ALL of them at session start:
 - **"What Works Today"** in DEVELOPER.md matches actual implemented features
 - **Code conventions** in DEVELOPER.md match actual patterns
 - **Target schema** in ROADMAP.md matches current schema + planned additions
-- **AF-* principles** in ARCHITECTURE_FOUNDATION.md consistent with AD-* decisions
+- **AF-\* principles** in ARCHITECTURE_FOUNDATION.md consistent with AD-\* decisions
 - **Future collaboration** schema references match actual schema
 
 ## Output Format
 
 Per doc file:
+
 ```
 ## [filename]
 - [line/section]: [what's wrong] → [fix applied]

@@ -43,7 +43,7 @@ export default function TasksWrapper({
   }
 
   async function handleCreateTask(
-    event: React.FormEvent<HTMLFormElement>,
+    event: React.SubmitEvent<HTMLFormElement>,
     parentId: string | null,
   ) {
     event.preventDefault();
@@ -55,7 +55,7 @@ export default function TasksWrapper({
     // TODO error handling
   }
 
-  async function handleUpdateTask(event: React.FormEvent<HTMLFormElement>) {
+  async function handleUpdateTask(event: React.SubmitEvent<HTMLFormElement>) {
     event.preventDefault();
     event.stopPropagation();
     if (!taskToEdit) return;
@@ -109,7 +109,7 @@ export default function TasksWrapper({
                   )}
                 </Field>
                 <Field>
-                  <Label>Abgeschätzte Dauer</Label>
+                  <Label>Geschätzte Dauer</Label>
                   <Input
                     inputMode="numeric"
                     name="estimatedDuration"

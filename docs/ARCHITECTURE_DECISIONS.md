@@ -30,9 +30,9 @@ Consistency with `Task.title`.
 
 Not needed yet. Add when required.
 
-### AD-8: Bidirectional status transitions
+### AD-8: Task status via datetime flags, no enum
 
-Any `TaskStatus` → any other. `completedAt` set/cleared on transitions to/from COMPLETED.
+Status is derived from nullable datetime fields (`completedAt`, `archivedAt`, `deletedAt`) rather than a `TaskStatus` enum. Avoids enum migration overhead, allows null-check queries directly, and keeps each state transition explicit. `archivedAt` to be added in Iteration 1.
 
 ### AD-9: WORK_STARTED scoped to task
 
@@ -62,6 +62,10 @@ All FKs `onDelete: Restrict`. Service code handles deletion dependencies explici
 
 Replaced implicit `Tag[] ↔ Task[]` many-to-many with explicit `TaskTag` model. Each row records `taskId`, `tagId`, and `userId` (who applied the tag). In solo mode, userId is always the current user. In future team mode, this enables dual-perspective analysis: planner tags for planning shortcomings, executor tags for execution analysis — both on the same task.
 
+### AD-16: Single active task, frontend-derived parent indicators, recursive time rollup
+
+Starting work on a task creates ONE TimeEntry for that task only. Only one task can be active per user at a time — starting a new task auto-stops the previous one. Parent tasks never get their own TimeEntry from child work; instead, the frontend derives a "has active descendant" indicator by walking the task tree during tree building. Total tracked time for any task = own TimeEntries + recursive sum of children's TimeEntries (computed on-the-fly, not denormalized). Status is derived at read time: has active TimeEntry → IN_PROGRESS, `completedAt ≠ null` → DONE, else → OPEN. Complements AD-8 (status via datetime flags). Rejected alternative: creating TimeEntries for ancestor tasks ("ancestor chain") — too many redundant DB rows, time rollup should be computed not duplicated.
+
 ---
 
 ## Future (decide when relevant)
@@ -70,9 +74,9 @@ Replaced implicit `Tag[] ↔ Task[]` many-to-many with explicit `TaskTag` model.
 
 Position removed (AD-4). Ephemeral or persisted drag-and-drop order? If persisted, re-add `position`.
 
-### Iter 1: Time rollup strategy
+### ~~Iter 1: Time rollup strategy~~ → Resolved by AD-16
 
-On-the-fly `SUM()` vs denormalized `trackedTime` on Task. On-the-fly likely fine for <10k tasks.
+Decision: on-the-fly recursive `SUM()`. A task's total tracked time = own TimeEntries + recursive sum of children's TimeEntries. No denormalized `trackedTime` column. Acceptable for <10k tasks.
 
 ### Iter 3: Debounce = destructive replace?
 

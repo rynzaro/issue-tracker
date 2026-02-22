@@ -45,11 +45,18 @@ M:N relation (Tag model + explicit TaskTag junction). Replaces `category: String
 
 Event: `TAGS_CHANGED`, payload: `{ added: string[], removed: string[] }`.
 
-### AF-6: Bidirectional Status Transitions
+### AF-6: Task Status via Datetime Flags
 
-Four statuses: `PLANNING`, `ACTIVE`, `COMPLETED`, `ARCHIVED`. Any → any. No enforced linear flow.
+No `TaskStatus` enum. Status is derived from nullable datetime fields on `Task`:
 
-`completedAt` set on transition TO COMPLETED, cleared on transition FROM. Service code handles, not DB triggers. Real workflows aren't linear.
+| Derived state | Condition                                                        |
+| ------------- | ---------------------------------------------------------------- |
+| Active        | `completedAt IS NULL`, `archivedAt IS NULL`, `deletedAt IS NULL` |
+| Completed     | `completedAt IS NOT NULL`                                        |
+| Archived      | `archivedAt IS NOT NULL`                                         |
+| Deleted       | `deletedAt IS NOT NULL` (soft delete, filtered from all queries) |
+
+`completedAt` and `archivedAt` are set/cleared by service code (not DB triggers). `deletedAt` is set-only (no restore). `archivedAt` is planned — not yet in schema.
 
 ### AF-7: Single Active Timer
 
@@ -67,7 +74,7 @@ Full history of what changed, when. Feeds checkpoint logic + user-facing timelin
 
 ### AF-9: Checkpoint System — Baseline + Snapshots
 
-Checkpoint = snapshot of task + direct children (estimate, tracked time, status per child).
+Checkpoint = snapshot of task + direct children (estimate, tracked time per child).
 
 First WORK_STARTED checkpoint = baseline (`isBaseline = true`). Analysis compares baseline → completion.
 

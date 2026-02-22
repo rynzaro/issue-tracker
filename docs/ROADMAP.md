@@ -52,8 +52,8 @@ Core task management with time tracking. The first usable version of the app.
 - [x] Inline estimate editing (minutes)
 - [x] Task description / notes field
 - [ ] Task tags field (M:N, optional)
-- [ ] Task status transitions (bidirectional: any status → any other, `completedAt` set/cleared on COMPLETED transitions)
-- [ ] Time tracking: start/stop timer
+- [ ] Task status transitions: set/clear `completedAt` (complete/uncomplete), set/clear `archivedAt` (archive/unarchive); add `archivedAt DateTime?` to Task schema
+- [ ] Time tracking: start/stop timer (AD-16: single active task, frontend-derived parent indicators)
 - [ ] `timeEntry.service.ts` + `timeEntry.actions.ts`
 - [ ] Active timer display in navbar
 - [ ] Auto-stop previous timer when starting a new one
@@ -212,27 +212,28 @@ User {
   email: String @unique
   password: String
   togglApiToken: String?
-  togglWorkspaceId: String?
 }
 
 Project {
   id: String @id @default(cuid())
   name: String
   description: String?
-  ownerId: String → User
+  userId: String → User
+  projectSettingsId: Int @unique → ProjectSettings
+  tasks: Task[]
+  checkpoints: Checkpoint[]
+  isDefault: Boolean @default(false)
   createdAt: DateTime @default(now())
-  updatedAt: DateTime @updatedAt
+  deletedAt: DateTime?
 }
 
 ProjectSettings {
-  id: String @id @default(cuid())
-  projectId: String @unique → Project
+  id: Int @id @default(autoincrement())
   autoCheckpointsEnabled: Boolean @default(true)
   autoCheckpointOnScopeChange: Boolean @default(true)
   autoCheckpointOnEstimateChange: Boolean @default(true)
   checkpointDebounceMinutes: Int @default(30)
-  createdAt: DateTime @default(now())
-  updatedAt: DateTime @updatedAt
+  project: Project?
 }
 
 Task {
@@ -243,14 +244,14 @@ Task {
   title: String
   description: String?
   estimate: Int? (MINUTES)
-  status: TaskStatus @default(PLANNING)
-  depth: Int @default(0)
-  togglTagId: String?
+  depth: Int?
+  togglTagId: Int?
   togglTagName: String?
   createdAt: DateTime @default(now())
   updatedAt: DateTime @updatedAt
-  completedAt: DateTime?
-  deletedAt: DateTime? (soft delete)
+  completedAt: DateTime?          // set when task is completed, cleared on uncomplete
+  archivedAt: DateTime?           // set when task is archived, cleared on unarchive
+  deletedAt: DateTime?            // soft delete — set only, never cleared
 }
 
 Tag {
@@ -281,11 +282,11 @@ TimeEntry {
 }
 
 TodoItem {
-  id: String @id @default(cuid())
+  id: Int @id @default(autoincrement())
   taskId: String → Task ("TaskTodos")
   title: String
   estimate: Int? (MINUTES)
-  convertedToTaskId: String? → Task ("TodoConversion")
+  convertedToTaskId: String? @unique → Task ("ConvertedTodoItem")
   isCompleted: Boolean @default(false)
   createdAt: DateTime @default(now())
 }
@@ -319,22 +320,11 @@ CheckpointTask {
   taskId: String → Task
   estimate: Int? (MINUTES)
   trackedSoFar: Int (SECONDS)
-  status: TaskStatus
   existedAtBaseline: Boolean
   addedAtCheckpointId: String? → Checkpoint
   createdAt: DateTime @default(now())
   @@unique([checkpointId, taskId])
 }
-
-enum TaskStatus {
-  PLANNING
-  ACTIVE
-  COMPLETED
-  ARCHIVED
-}
-// Status transitions are **bidirectional** — any status → any other, no linear flow enforced.
-// When transitioning TO COMPLETED: set completedAt = now().
-// When transitioning FROM COMPLETED: clear completedAt = null.
 
 enum TaskEventType {
   ESTIMATE_SET

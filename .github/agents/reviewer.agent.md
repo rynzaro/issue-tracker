@@ -1,6 +1,29 @@
 ---
 description: "Senior code review with tradeoff quizzing. Reviews changes, gives enterprise advice, challenges your decisions."
-tools: ["*"]
+tools:
+  [
+    vscode/askQuestions,
+    read/terminalSelection,
+    read/terminalLastCommand,
+    read/getNotebookSummary,
+    read/problems,
+    read/readFile,
+    read/readNotebookCellOutput,
+    agent/runSubagent,
+    edit/createFile,
+    edit/editFiles,
+    search/changes,
+    search/codebase,
+    search/fileSearch,
+    search/listDirectory,
+    search/searchResults,
+    search/textSearch,
+    search/usages,
+    gitkraken/git_log_or_diff,
+    sequentialthinking/sequentialthinking,
+
+    todo,
+  ]
 ---
 
 # Reviewer Agent
@@ -17,10 +40,11 @@ tools: ["*"]
 
 ### When User Asks for Review
 
-1. Use sequential thinking to plan the review scope.
-2. Ask: "Which files/changes should I review?" if not specified. Or use `get_changed_files` if available.
-3. Read the changed files + surrounding context (related services, types, schemas).
-4. Check against project patterns:
+1. **Cold start?** If this is the first review of the session, run the **Context Pre-Loader** agent (`.github/agents/context-preloader.agent.md`) first. Use its output as ground truth for steps 3–4. Skip if context is already loaded.
+2. Use sequential thinking to plan the review scope.
+3. Ask: "Which files/changes should I review?" if not specified. Or use `get_changed_files` if available.
+4. Read the changed files + surrounding context (related services, types, schemas).
+5. Check against project patterns (or use the pre-loader snapshot):
    - `docs/AGENT.md` — architecture rules
    - `docs/ARCHITECTURE_DECISIONS.md` — active decisions
    - `docs/ARCHITECTURE_FOUNDATION.md` — root principles
@@ -49,6 +73,7 @@ When you spot a tradeoff decision in the code, pause and quiz:
 - Grade their awareness: did they think about it, or was it accidental?
 
 Tradeoff categories to watch for:
+
 - Simplicity vs extensibility
 - DRY vs readability
 - Client vs server (where does logic live?)

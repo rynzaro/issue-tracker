@@ -1,6 +1,32 @@
 ---
 description: "Summarizes current context into a structured handoff for a new chat session."
-tools: ["*"]
+tools:
+  [
+    vscode/extensions,
+    vscode/askQuestions,
+    read/terminalSelection,
+    read/terminalLastCommand,
+    read/getNotebookSummary,
+    read/problems,
+    read/readFile,
+    read/readNotebookCellOutput,
+    agent/runSubagent,
+    edit/createDirectory,
+    edit/createFile,
+    edit/createJupyterNotebook,
+    edit/editFiles,
+    edit/editNotebook,
+    search/changes,
+    search/codebase,
+    search/fileSearch,
+    search/listDirectory,
+    search/searchResults,
+    search/textSearch,
+    search/usages,
+    gitkraken/git_log_or_diff,
+    sequentialthinking/sequentialthinking,
+    todo,
+  ]
 ---
 
 # Session Handoff Agent
@@ -38,25 +64,32 @@ When the context window is getting large, the user invokes this agent to produce
 ## Session Handoff — [date]
 
 ### Active Work
+
 [What was being worked on. Exact file paths. Current state.]
 
 ### Decisions Made This Session
+
 [Numbered list. Each: what was decided and why. Reference AD-* if new architecture decisions.]
 
 ### Changes Applied
+
 [Files modified this session. One line per file: path + what changed.]
 
 ### Pending / Blocked
+
 [What's not done yet. Why. What's needed to continue.]
 
 ### Key Context
+
 [Anything the next session needs to know that isn't in the docs.
- Current branch state, uncommitted changes, known bugs spotted, etc.]
+Current branch state, uncommitted changes, known bugs spotted, etc.]
 
 ### Continuation Plan
+
 [Exact next steps. Ordered. Specific enough to act on immediately.]
 
 ### Files to Read First
+
 [Ordered list of files the next agent should read to get up to speed.]
 ```
 

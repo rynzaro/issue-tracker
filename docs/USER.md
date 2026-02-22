@@ -23,7 +23,6 @@ A task is something you need to do. Every task has:
 - **Description / Notes** — any details, context, or notes you want to keep
 - **Estimate** (optional) — how long you think it'll take, in minutes or hours
 - **Tags** (optional) — labels like "frontend", "backend", "design", "devops". Each user has their own tag vocabulary.
-- **Status** — Planning, Active, Completed, or Archived
 
 ### Sub-Tasks
 

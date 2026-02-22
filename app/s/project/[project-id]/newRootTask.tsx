@@ -59,7 +59,7 @@ export default function NewRootTask({ projectId }: { projectId: string }) {
                 )}
               </Field>
               <Field>
-                <Label>Abgeschätzte Dauer</Label>
+                <Label>Geschätzte Dauer</Label>
                 <Input
                   inputMode="numeric"
                   name="estimatedDuration"

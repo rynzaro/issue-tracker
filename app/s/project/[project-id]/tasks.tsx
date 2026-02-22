@@ -1,22 +1,19 @@
 "use client";
 
-import { Button } from "@/components/button";
-import Card from "@/components/card";
-import { Input } from "@/components/input";
-import { createTaskAction } from "@/lib/actions/task.actions";
-import { CreateTaskParams, TaskNode } from "@/lib/schema/task";
+import { TaskNode } from "@/lib/schema/task";
 import { InformationCircleIcon } from "@heroicons/react/24/outline";
 import {
   CheckIcon,
   ChevronDownIcon,
   ChevronUpIcon,
+  PauseIcon,
   PencilIcon,
-  PlayPauseIcon,
+  PlayIcon,
   PlusIcon,
+  StopIcon,
   TrashIcon,
 } from "@heroicons/react/16/solid";
 import clsx from "clsx";
-import { useRouter } from "next/navigation";
 import { Dispatch, SetStateAction, useState } from "react";
 import TaskRowButton from "./taskRowButton";
 import { Subheading } from "@/components/heading";
@@ -36,6 +33,8 @@ export default function Tasks({
   setTaskToEdit: (task: TaskNode) => void;
 }) {
   const [isExpanded, setIsExpanded] = useState(false);
+  //TODO implement running state properly, this is just for testing the button UI
+  const [running, setRunning] = useState(false);
 
   return (
     <div
@@ -68,9 +67,15 @@ export default function Tasks({
         </div>
 
         <div className="flex justify-end gap-2">
-          <TaskRowButton>
-            <PlayPauseIcon className="w-6 h-6" />
-          </TaskRowButton>
+          {running ? (
+            <TaskRowButton onClick={() => setRunning(false)} invertedColors>
+              <StopIcon className="w-6 h-6" />
+            </TaskRowButton>
+          ) : (
+            <TaskRowButton onClick={() => setRunning(true)}>
+              <PlayIcon className="w-6 h-6" />
+            </TaskRowButton>
+          )}
           <TaskRowButton
             onClick={() => {
               setNewTaskParent(task);

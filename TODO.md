@@ -19,6 +19,7 @@ Tackle after Iteration 1 ships. These are engineering quality investments, not u
 
 Captured from earlier brainstorming. Prioritize when relevant.
 
+- [ ] Deletion / Archiving architecture + impact of tasks -- do we need deletion AND archiving?
 - [ ] Notification system (success/error toasts after mutations)
 - [ ] Default project functionality (auto-select on login)
 - [ ] Project selection architecture (navbar dropdown vs sidebar vs dedicated page)

@@ -96,8 +96,8 @@ issue-tracker/
 │   ├── errors.ts                     # Error types (ApiError, ApiErrorResponse)
 │   ├── types.ts                      # App-level types
 │   ├── util.ts                       # Generic utilities (validatePassword, createErrorResponse)
-│   ├── actions.ts                    # Legacy auth actions (to be moved)
-│   ├── consts.ts                     # Legacy Toggl constants (to be moved)
+│   ├── actions.ts                    # Legacy auth actions (superseded by lib/actions/auth.actions.ts)
+│   ├── consts.ts                     # Legacy Toggl constants (superseded by lib/toggl/consts.ts)
 │   ├── schema/                       # Zod schemas + derived types
 │   │   ├── task.ts                   # CreateTaskSchema, UpdateTaskSchema, TaskNode type
 │   │   └── project.ts               # Project schemas
@@ -130,7 +130,7 @@ issue-tracker/
 
 - **Auth**: Login, sign-up, logout via NextAuth 5 credentials provider
 - **Protected routing**: Middleware in `proxy.ts` guards `/s/*` routes
-- **Project CRUD**: Create projects, view project list on main page
+- **Project create + list**: Create projects, view project list on main page (no edit/delete UI yet)
 - **Task CRUD**: Create root tasks and sub-tasks, edit tasks (title, description, estimates)
 - **Task hierarchy**: Self-referential `parentId` with recursive tree rendering
 - **Client-side validation**: `useTaskForm` hook validates before submit, inline error display

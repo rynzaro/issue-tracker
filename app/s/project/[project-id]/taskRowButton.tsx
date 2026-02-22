@@ -3,12 +3,14 @@ import { ReactNode } from "react";
 
 export default function TaskRowButton({
   onClick,
-  borderless = false,
   children,
+  borderless = false,
+  invertedColors = false,
 }: {
   onClick?: () => void;
-  borderless?: boolean;
   children: ReactNode;
+  borderless?: boolean;
+  invertedColors?: boolean;
 }) {
   const handleClick = (e: React.MouseEvent<HTMLButtonElement>) => {
     e.stopPropagation();
@@ -24,8 +26,11 @@ export default function TaskRowButton({
   return (
     <button
       className={clsx(
-        "w-10 h-10 rounded hover:bg-gray-300 dark:hover:bg-zinc-700 flex items-center justify-center",
+        "w-10 h-10 rounded flex items-center justify-center",
         !borderless && "border border-gray-300 dark:border-zinc-700",
+        invertedColors
+          ? "bg-zinc-800 text-white dark:bg-white dark:text-zinc-800 hover:bg-zinc-700 dark:hover:bg-gray-200"
+          : "hover:bg-gray-300 dark:hover:bg-zinc-700",
       )}
       onClick={handleClick}
       onKeyDown={handleKeyDown}

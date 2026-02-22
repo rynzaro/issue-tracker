@@ -79,44 +79,44 @@ await emitEvent(id, "ESTIMATE_CHANGED", { old: oldEstimate, new: newEstimate });
 
 Event types and when to emit:
 
-| Event                 | When                                                              |
-| --------------------- | ----------------------------------------------------------------- |
-| `ESTIMATE_SET`        | First time an estimate is set on a task (was null, now has value) |
-| `ESTIMATE_CHANGED`    | Estimate changed from one value to another                        |
-| `SUBTASK_CREATED`     | A child task is created                                           |
-| `SUBTASK_REMOVED`     | A child task is deleted                                           |
-| `TODO_ADDED`          | A TodoItem is added to a task                                     |
-| `TODO_CONVERTED`      | A TodoItem is converted to a sub-task                             |
-| `TODO_COMPLETED`      | A TodoItem is checked off                                         |
-| `TASK_STARTED`        | First TimeEntry ever created for this task                        |
-| `TASK_COMPLETED`      | Task status changes to COMPLETED                                  |
-| `TASK_STATUS_CHANGED` | Task status changes (any transition)                              |
-| `TAGS_CHANGED`        | Tags added and removed from the Task                              |
-| `CHECKPOINT_CREATED`  | A checkpoint is created                                           |
+| Event                 | When                                                                                                  |
+| --------------------- | ----------------------------------------------------------------------------------------------------- |
+| `ESTIMATE_SET`        | First time an estimate is set on a task (was null, now has value)                                     |
+| `ESTIMATE_CHANGED`    | Estimate changed from one value to another                                                            |
+| `SUBTASK_CREATED`     | A child task is created                                                                               |
+| `SUBTASK_REMOVED`     | A child task is deleted                                                                               |
+| `TODO_ADDED`          | A TodoItem is added to a task                                                                         |
+| `TODO_CONVERTED`      | A TodoItem is converted to a sub-task                                                                 |
+| `TODO_COMPLETED`      | A TodoItem is checked off                                                                             |
+| `TASK_STARTED`        | First TimeEntry ever created for this task (AD-16: only the explicitly-started task gets a TimeEntry) |
+| `TASK_COMPLETED`      | `completedAt` is set on a task (task marked done)                                                     |
+| `TASK_STATUS_CHANGED` | `archivedAt` is set or cleared on a task                                                              |
+| `TAGS_CHANGED`        | Tags added and removed from the Task                                                                  |
+| `CHECKPOINT_CREATED`  | A checkpoint is created                                                                               |
 
 #### TaskEvent Payload Specifications
 
 Each event's `payload` field contains structured data. Validate with Zod in `event.service.ts` before inserting.
 
-| Event                 | Payload Schema                                                              | Example                                                                              |
-| --------------------- | --------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
-| `ESTIMATE_SET`        | `{ value: number }` (minutes)                                               | `{ "value": 120 }`                                                                   |
-| `ESTIMATE_CHANGED`    | `{ old: number, new: number }` (minutes)                                    | `{ "old": 120, "new": 180 }`                                                         |
-| `SUBTASK_CREATED`     | `{ childTaskId: string, childTitle: string }`                               | `{ "childTaskId": "cuid123", "childTitle": "Design API" }`                           |
-| `SUBTASK_REMOVED`     | `{ childTaskId: string, childTitle: string }`                               | `{ "childTaskId": "cuid123", "childTitle": "Design API" }`                           |
-| `TASK_STATUS_CHANGED` | `{ oldStatus: TaskStatus, newStatus: TaskStatus }`                          | `{ "oldStatus": "PLANNING", "newStatus": "ACTIVE" }`                                 |
-| `TASK_COMPLETED`      | `{ completedAt: ISO8601 datetime }`                                         | `{ "completedAt": "2026-02-18T14:30:00Z" }`                                          |
-| `TAGS_CHANGED`        | `{ removed: string[], added: string[] }`                                    | `{ "removed": ["backend", "devops"], "added": ["frontend"] }`                        |
-| `TASK_STARTED`        | `{ timeEntryId: string, startedAt: ISO8601 datetime }`                      | `{ "timeEntryId": "cuid456", "startedAt": "2026-02-18T14:00:00Z" }`                  |
-| `TODO_ADDED`          | `{ todoItemId: string, title: string, estimate: number \| null }`           | `{ "todoItemId": "cuid789", "title": "Write tests", "estimate": 30 }`                |
-| `TODO_COMPLETED`      | `{ todoItemId: string, isCompleted: boolean }`                              | `{ "todoItemId": "cuid789", "isCompleted": true }`                                   |
-| `TODO_CONVERTED`      | `{ todoItemId: string, newTaskId: string, newTaskTitle: string }`           | `{ "todoItemId": "cuid789", "newTaskId": "cuid999", "newTaskTitle": "Write tests" }` |
-| `CHECKPOINT_CREATED`  | `{ checkpointId: string, trigger: CheckpointTrigger, isBaseline: boolean }` | `{ "checkpointId": "cp123", "trigger": "WORK_STARTED", "isBaseline": true }`         |
+| Event                 | Payload Schema                                                                  | Example                                                                              |
+| --------------------- | ------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| `ESTIMATE_SET`        | `{ value: number }` (minutes)                                                   | `{ "value": 120 }`                                                                   |
+| `ESTIMATE_CHANGED`    | `{ old: number, new: number }` (minutes)                                        | `{ "old": 120, "new": 180 }`                                                         |
+| `SUBTASK_CREATED`     | `{ childTaskId: string, childTitle: string }`                                   | `{ "childTaskId": "cuid123", "childTitle": "Design API" }`                           |
+| `SUBTASK_REMOVED`     | `{ childTaskId: string, childTitle: string }`                                   | `{ "childTaskId": "cuid123", "childTitle": "Design API" }`                           |
+| `TASK_STATUS_CHANGED` | `{ field: "archivedAt", oldValue: ISO8601 \| null, newValue: ISO8601 \| null }` | `{ "field": "archivedAt", "oldValue": null, "newValue": "2026-02-18T14:30:00Z" }`    |
+| `TASK_COMPLETED`      | `{ completedAt: ISO8601 datetime }`                                             | `{ "completedAt": "2026-02-18T14:30:00Z" }`                                          |
+| `TAGS_CHANGED`        | `{ removed: string[], added: string[] }`                                        | `{ "removed": ["backend", "devops"], "added": ["frontend"] }`                        |
+| `TASK_STARTED`        | `{ timeEntryId: string, startedAt: ISO8601 datetime }`                          | `{ "timeEntryId": "cuid456", "startedAt": "2026-02-18T14:00:00Z" }`                  |
+| `TODO_ADDED`          | `{ todoItemId: string, title: string, estimate: number \| null }`               | `{ "todoItemId": "cuid789", "title": "Write tests", "estimate": 30 }`                |
+| `TODO_COMPLETED`      | `{ todoItemId: string, isCompleted: boolean }`                                  | `{ "todoItemId": "cuid789", "isCompleted": true }`                                   |
+| `TODO_CONVERTED`      | `{ todoItemId: string, newTaskId: string, newTaskTitle: string }`               | `{ "todoItemId": "cuid789", "newTaskId": "cuid999", "newTaskTitle": "Write tests" }` |
+| `CHECKPOINT_CREATED`  | `{ checkpointId: string, trigger: CheckpointTrigger, isBaseline: boolean }`     | `{ "checkpointId": "cp123", "trigger": "WORK_STARTED", "isBaseline": true }`         |
 
 **Notes:**
 
 - All timestamps are ISO8601 format (`YYYY-MM-DDTHH:mm:ssZ`).
-- Enum fields (`TaskStatus`, `CheckpointTrigger`) use their string values.
+- Enum fields (`CheckpointTrigger`) use their string values.
 - IDs are CUIDs.
 - Null values are allowed where indicated.
 - Validate payload shape in `event.service.ts` with Zod before calling the DB `create()`.
@@ -174,13 +174,13 @@ async function checkAutoCheckpoint(
 
 When to trigger (call for BOTH the task and its parent):
 
-| Service Method                           | Trigger           | Condition                                |
-| ---------------------------------------- | ----------------- | ---------------------------------------- |
-| `task.createTask()` (with parentId)      | `SCOPE_CHANGE`    | Only if baseline exists for the parent   |
-| `task.updateTask()` (estimate changed)   | `ESTIMATE_CHANGE` | Always (on the task + its parent)        |
-| `task.updateTask()` (status → COMPLETED) | `TASK_COMPLETED`  | Always                                   |
-| `task.deleteTask()` (with parentId)      | `SCOPE_CHANGE`    | Only if baseline exists for the parent   |
-| `timeEntry.startTimer()`                 | `WORK_STARTED`    | Only if no baseline exists for this task |
+| Service Method                          | Trigger           | Condition                                |
+| --------------------------------------- | ----------------- | ---------------------------------------- |
+| `task.createTask()` (with parentId)     | `SCOPE_CHANGE`    | Only if baseline exists for the parent   |
+| `task.updateTask()` (estimate changed)  | `ESTIMATE_CHANGE` | Always (on the task + its parent)        |
+| `task.updateTask()` (`completedAt` set) | `TASK_COMPLETED`  | Always                                   |
+| `task.deleteTask()` (with parentId)     | `SCOPE_CHANGE`    | Only if baseline exists for the parent   |
+| `timeEntry.startTimer()`                | `WORK_STARTED`    | Only if no baseline exists for this task |
 
 ### 7. Toggl Code is Isolated — Per-User Tokens Only
 
@@ -202,16 +202,22 @@ User {
   togglApiToken: String?
   projects: Project[]
   timeEntries: TimeEntry[]
+  createdTasks: Task[]
+  tags: Tag[]
+  appliedTaskTags: TaskTag[]
 }
 
 Project {
   id: String @id @default(cuid())
   name: String
   description: String?
-  ownerId: String → User
+  userId: String → User
   projectSettingsId: Int @unique → ProjectSettings
   tasks: Task[]
   checkpoints: Checkpoint[]
+  isDefault: Boolean @default(false)
+  createdAt: DateTime @default(now())
+  deletedAt: DateTime?
 }
 
 ProjectSettings {
@@ -231,13 +237,13 @@ Task {
   title: String
   description: String?
   estimate: Int? (MINUTES)
-  status: TaskStatus @default(PLANNING)
-  depth: Int @default(0)
+  depth: Int?
   togglTagId: Int?
   togglTagName: String?
   createdAt: DateTime @default(now())
   updatedAt: DateTime @updatedAt
-  completedAt: DateTime?
+  completedAt: DateTime?          // set when completed, cleared on uncomplete
+  archivedAt: DateTime?           // planned: set when archived, cleared on unarchive
   deletedAt: DateTime? (soft delete)
   taskTags: TaskTag[]
   timeEntries: TimeEntry[]
@@ -277,7 +283,7 @@ Tag {
 }
 
 TaskTag {
-  id: Int @id @default(autoincrement())
+  id: String @id @default(cuid())
   taskId: String → Task
   tagId: Int → Tag
   userId: String → User (who applied this tag)
@@ -302,7 +308,7 @@ Checkpoint {
   isBaseline: Boolean @default(false)
   childCount: Int
   estimatedTotal: Int? (MINUTES)
-  trackedTotal: Int @default(0) (SECONDS)
+  trackedTotal: Int (SECONDS)
   ownEstimate: Int? (MINUTES)
   newChildrenSinceBaseline: Int @default(0)
   createdAt: DateTime @default(now())
@@ -315,18 +321,13 @@ CheckpointTask {
   checkpointId: String → Checkpoint
   taskId: String → Task
   estimate: Int? (MINUTES)
-  trackedSoFar: Int @default(0) (SECONDS)
-  status: TaskStatus
+  trackedSoFar: Int (SECONDS)
   existedAtBaseline: Boolean
   addedAtCheckpointId: String? → Checkpoint (relation: "AddedAtCheckpoint")
   createdAt: DateTime @default(now())
   @@unique([checkpointId, taskId])
 }
 
-enum TaskStatus { PLANNING, ACTIVE, COMPLETED, ARCHIVED }
-// Status transitions are bidirectional — any status can transition to any other.
-// When transitioning TO COMPLETED: set completedAt = now().
-// When transitioning FROM COMPLETED: clear completedAt = null.
 enum TaskEventType { ESTIMATE_SET, ESTIMATE_CHANGED, SUBTASK_CREATED, SUBTASK_REMOVED,
                      TODO_ADDED, TODO_CONVERTED, TODO_COMPLETED, TASK_STARTED,
                      TASK_COMPLETED, TASK_STATUS_CHANGED, TAGS_CHANGED, CHECKPOINT_CREATED }
@@ -349,15 +350,15 @@ User ──1:N──> Project ──1:N──> Task ──1:N──> TimeEntry
 
 ## Service Responsibilities
 
-| Service              | Owns                                                       | Calls                                 |
-| -------------------- | ---------------------------------------------------------- | ------------------------------------- |
-| `project.service`    | Project CRUD                                               | —                                     |
-| `task.service`       | Task CRUD, hierarchy, status transitions                   | `event.service`, `checkpoint.service` |
-| `timeEntry.service`  | Start/stop timers, duration calculations                   | `event.service`, `checkpoint.service` |
-| `event.service`      | TaskEvent creation, queries                                | —                                     |
-| `checkpoint.service` | Checkpoint CRUD, debouncing, snapshots, comparisons        | —                                     |
-| `todo.service`       | TodoItem CRUD (including estimate), conversion to sub-task | `task.service`, `event.service`       |
-| `analysis.service`   | Error decomposition, accuracy metrics, trends              | `checkpoint.service`                  |
+| Service              | Owns                                                                  | Calls                                 |
+| -------------------- | --------------------------------------------------------------------- | ------------------------------------- |
+| `project.service`    | Project CRUD                                                          | —                                     |
+| `task.service`       | Task CRUD, hierarchy                                                  | `event.service`, `checkpoint.service` |
+| `timeEntry.service`  | Start/stop timers (single active task — AD-16), duration calculations | `event.service`, `checkpoint.service` |
+| `event.service`      | TaskEvent creation, queries                                           | —                                     |
+| `checkpoint.service` | Checkpoint CRUD, debouncing, snapshots, comparisons                   | —                                     |
+| `todo.service`       | TodoItem CRUD (including estimate), conversion to sub-task            | `task.service`, `event.service`       |
+| `analysis.service`   | Error decomposition, accuracy metrics, trends                         | `checkpoint.service`                  |
 
 ## File Change Guide
 
