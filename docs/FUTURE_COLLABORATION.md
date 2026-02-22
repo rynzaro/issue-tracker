@@ -36,11 +36,13 @@ Before implementing multi-user project membership, introduce a scoped repository
 **What it is**: A thin wrapper around Prisma that receives the current user/project context at construction and automatically scopes all queries. Instead of `prisma.task.findMany({ where: { projectId, ... } })`, you'd use `scopedRepo.tasks.findMany({ where: { ... } })` where the project scoping is implicit.
 
 **Why before Phase 1**:
+
 - Multi-user projects multiply the surface area for data isolation bugs
 - Forgetting a `userId` or `projectId` filter becomes a cross-tenant data leak, not just a personal inconvenience
 - The pattern also simplifies service code by eliminating repetitive context-passing
 
 **Implementation approach** (decide at implementation time):
+
 - Option A: Prisma Client Extensions with scoped context
 - Option B: Repository classes instantiated per-request with context baked in
 - Option C: Prisma middleware that injects scoping filters

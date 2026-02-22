@@ -401,15 +401,15 @@ Only needed for external integrations (Toggl, webhooks). Internal reads use Serv
 
 Update this table as iterations are completed.
 
-| #   | Name                  | Status      | Key Files                                                      |
-| --- | --------------------- | ----------- | -------------------------------------------------------------- |
-| 0   | Schema + Foundation   | DONE        | prisma/schema.prisma, lib/services/\*, lib/toggl/\*            |
-| 1   | Task Tracking MVP     | IN PROGRESS | task.service, project.service, app/s/project/[project-id]/\*   |
-| 2   | Event Log             | NOT STARTED | event.service, task.service, timeEntry.service                 |
-| 3   | Checkpoint System     | NOT STARTED | checkpoint.service, task.service, app/s/settings/\*            |
-| 4   | TodoItem + Conversion | NOT STARTED | todo.service, components/todo-list.tsx                         |
-| 5   | Analysis Dashboard    | NOT STARTED | analysis.service, app/s/[projectId]/analysis/\*               |
-| 6   | Toggl Integration     | NOT STARTED | lib/toggl/\*, app/s/settings/\*                               |
+| #   | Name                  | Status      | Key Files                                                    |
+| --- | --------------------- | ----------- | ------------------------------------------------------------ |
+| 0   | Schema + Foundation   | DONE        | prisma/schema.prisma, lib/services/\*, lib/toggl/\*          |
+| 1   | Task Tracking MVP     | IN PROGRESS | task.service, project.service, app/s/project/[project-id]/\* |
+| 2   | Event Log             | NOT STARTED | event.service, task.service, timeEntry.service               |
+| 3   | Checkpoint System     | NOT STARTED | checkpoint.service, task.service, app/s/settings/\*          |
+| 4   | TodoItem + Conversion | NOT STARTED | todo.service, components/todo-list.tsx                       |
+| 5   | Analysis Dashboard    | NOT STARTED | analysis.service, app/s/[projectId]/analysis/\*              |
+| 6   | Toggl Integration     | NOT STARTED | lib/toggl/\*, app/s/settings/\*                              |
 
 ## Critical Invariants
 
