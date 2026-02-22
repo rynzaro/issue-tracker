@@ -18,7 +18,7 @@ export function handleInput<T extends Record<string, unknown>>(
   const { name, value } = event.target;
   setValues((prevFormData) => ({
     ...prevFormData,
-    [name]: { ...prevFormData[name], value },
+    [name]: { ...prevFormData[name], value, error: null },
   }));
 }
 

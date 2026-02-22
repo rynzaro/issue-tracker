@@ -46,6 +46,22 @@ Baseline check = "no baseline on this task." Not "nearest ancestor with children
 
 All FKs `onDelete: Restrict`. Service code handles deletion dependencies explicitly.
 
+### AD-12: Task.projectId required
+
+`projectId` is now mandatory on `Task`. Every task belongs to exactly one project. Eliminates the inference chain for ownership (Task → Project → User) and ensures consistent hierarchy.
+
+### AD-13: Task.createdById — direct ownership
+
+`Task.createdById` is a required FK to `User`. Records who created the task, immutable. In solo mode, always the project owner. In future multi-user mode, records the planner/distributor independently of assignees.
+
+### AD-14: Tags scoped per-user
+
+`Tag.userId` added. Each user has their own tag vocabulary, reusable across all their projects. Enables cross-project analysis ("how are my backend estimates across all projects?"). `@@unique([name, userId])` prevents duplicate tag names per user.
+
+### AD-15: Explicit TaskTag junction table with user attribution
+
+Replaced implicit `Tag[] ↔ Task[]` many-to-many with explicit `TaskTag` model. Each row records `taskId`, `tagId`, and `userId` (who applied the tag). In solo mode, userId is always the current user. In future team mode, this enables dual-perspective analysis: planner tags for planning shortcomings, executor tags for execution analysis — both on the same task.
+
 ---
 
 ## Future (decide when relevant)

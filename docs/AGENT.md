@@ -227,6 +227,7 @@ Task {
   id: String @id @default(cuid())
   projectId: String → Project
   parentId: String? → Task (self-ref "SubTasks")
+  createdById: String → User
   title: String
   description: String?
   estimate: Int? (MINUTES)
@@ -238,7 +239,7 @@ Task {
   updatedAt: DateTime @updatedAt
   completedAt: DateTime?
   deletedAt: DateTime? (soft delete)
-  tags: Tag[] (many-to-many)
+  taskTags: TaskTag[]
   timeEntries: TimeEntry[]
   todoItems: TodoItem[]
   convertedTodoItem: TodoItem? (one-to-one)
@@ -270,7 +271,18 @@ TodoItem {
 Tag {
   id: Int @id @default(autoincrement())
   name: String
-  tasks: Task[] (many-to-many)
+  userId: String → User
+  taskTags: TaskTag[]
+  @@unique([name, userId])
+}
+
+TaskTag {
+  id: Int @id @default(autoincrement())
+  taskId: String → Task
+  tagId: Int → Tag
+  userId: String → User (who applied this tag)
+  createdAt: DateTime @default(now())
+  @@unique([taskId, tagId])
 }
 
 TaskEvent {
@@ -327,6 +339,7 @@ enum CheckpointTrigger { MANUAL, WORK_STARTED, SCOPE_CHANGE, ESTIMATE_CHANGE, TA
 User ──1:N──> Project ──1:N──> Task ──1:N──> TimeEntry
   │                              │
   ├──1:N──> TimeEntry            ├──self──> Task (children)
+  ├──1:N──> Tag                  ├──1:N──> TaskTag ──N:1──> Tag
   │                              ├──1:N──> TodoItem (with optional estimate)
   │                              ├──1:N──> TaskEvent
   │                              └──1:N──> Checkpoint ──1:N──> CheckpointTask ──N:1──> Task
@@ -388,15 +401,15 @@ Only needed for external integrations (Toggl, webhooks). Internal reads use Serv
 
 Update this table as iterations are completed.
 
-| #   | Name                  | Status      | Key Files                                             |
-| --- | --------------------- | ----------- | ----------------------------------------------------- |
-| 0   | Schema + Foundation   | NOT STARTED | prisma/schema.prisma, lib/services/_, lib/toggl/_     |
-| 1   | Task Tracking MVP     | NOT STARTED | task.service, timeEntry.service, app/s/[projectId]/\* |
-| 2   | Event Log             | NOT STARTED | event.service, task.service, timeEntry.service        |
-| 3   | Checkpoint System     | NOT STARTED | checkpoint.service, task.service, app/s/settings/\*   |
-| 4   | TodoItem + Conversion | NOT STARTED | todo.service, components/todo-list.tsx                |
-| 5   | Analysis Dashboard    | NOT STARTED | analysis.service, app/s/[projectId]/analysis/\*       |
-| 6   | Toggl Integration     | NOT STARTED | lib/toggl/_, app/s/settings/_                         |
+| #   | Name                  | Status      | Key Files                                                      |
+| --- | --------------------- | ----------- | -------------------------------------------------------------- |
+| 0   | Schema + Foundation   | DONE        | prisma/schema.prisma, lib/services/\*, lib/toggl/\*            |
+| 1   | Task Tracking MVP     | IN PROGRESS | task.service, project.service, app/s/project/[project-id]/\*   |
+| 2   | Event Log             | NOT STARTED | event.service, task.service, timeEntry.service                 |
+| 3   | Checkpoint System     | NOT STARTED | checkpoint.service, task.service, app/s/settings/\*            |
+| 4   | TodoItem + Conversion | NOT STARTED | todo.service, components/todo-list.tsx                         |
+| 5   | Analysis Dashboard    | NOT STARTED | analysis.service, app/s/[projectId]/analysis/\*               |
+| 6   | Toggl Integration     | NOT STARTED | lib/toggl/\*, app/s/settings/\*                               |
 
 ## Critical Invariants
 

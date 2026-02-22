@@ -41,7 +41,7 @@ Every task → one project → one user. Single-user ownership, no sharing/colla
 
 ### AF-5: Tags over Category
 
-M:N relation (Tag model + implicit join). Replaces `category: String?`. Task can span multiple concerns ("frontend" + "auth"). Tags scoped to project.
+M:N relation (Tag model + explicit TaskTag junction). Replaces `category: String?`. Task can span multiple concerns ("frontend" + "auth"). Tags scoped per-user (AD-14). Each user has their own tag vocabulary, reusable across projects. TaskTag junction includes `userId` to record who applied the tag (AD-15).
 
 Event: `TAGS_CHANGED`, payload: `{ added: string[], removed: string[] }`.
 

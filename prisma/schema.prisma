@@ -14,12 +14,15 @@ datasource db {
 }
 
 model User {
-    id            String      @id @default(cuid())
-    email         String      @unique
-    password      String
-    togglApiToken String?
-    projects      Project[]
-    timeEntries   TimeEntry[]
+    id              String      @id @default(cuid())
+    email           String      @unique
+    password        String
+    togglApiToken   String?
+    projects        Project[]
+    timeEntries     TimeEntry[]
+    createdTasks    Task[]      @relation("CreatedTasks")
+    tags            Tag[]
+    appliedTaskTags TaskTag[]   @relation("AppliedTaskTags")
 }
 
 model Project {
@@ -49,8 +52,10 @@ model ProjectSettings {
 
 model Task {
     id                String           @id @default(cuid())
-    projectId         String?
-    title             String?
+    projectId         String
+    createdById       String
+    createdBy         User             @relation("CreatedTasks", fields: [createdById], references: [id])
+    title             String
     description       String?
     estimate          Int? // in minutes
     depth             Int? // for nested tasks
@@ -61,10 +66,10 @@ model Task {
     completedAt       DateTime?
     deletedAt         DateTime? // soft delete
     parentId          String? // for nested tasks
-    project           Project?         @relation(fields: [projectId], references: [id])
+    project           Project          @relation(fields: [projectId], references: [id])
     parent            Task?            @relation("TaskChildren", fields: [parentId], references: [id])
     children          Task[]           @relation("TaskChildren")
-    tags              Tag[]
+    taskTags          TaskTag[]
     timeEntries       TimeEntry[]
     todoItems         TodoItem[]
     convertedTodoItem TodoItem?        @relation("ConvertedTodoItem")
@@ -73,6 +78,7 @@ model Task {
     checkpointTasks   CheckpointTask[]
 
     @@index([projectId])
+    @@index([createdById])
 }
 
 model TimeEntry {
@@ -109,9 +115,28 @@ model TodoItem {
 }
 
 model Tag {
-    id    Int    @id @default(autoincrement())
-    name  String
-    tasks Task[]
+    id       Int       @id @default(autoincrement())
+    name     String
+    userId   String
+    user     User      @relation(fields: [userId], references: [id])
+    taskTags TaskTag[]
+
+    @@unique([name, userId])
+    @@index([userId])
+}
+
+model TaskTag {
+    id        String   @id @default(cuid())
+    taskId    String
+    task      Task     @relation(fields: [taskId], references: [id])
+    tagId     Int
+    tag       Tag      @relation(fields: [tagId], references: [id])
+    userId    String
+    user      User     @relation("AppliedTaskTags", fields: [userId], references: [id])
+    createdAt DateTime @default(now())
+
+    @@unique([taskId, tagId])
+    @@index([userId])
 }
 
 model Checkpoint {

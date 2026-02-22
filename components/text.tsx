@@ -11,7 +11,7 @@ export function PrimaryText({
       {...props}
       className={clsx(
         className,
-        "text-base/6 text-zinc-800 sm:text-sm/6 dark:text-zinc-200",
+        "text-base/6 text-zinc-950 sm:text-sm/6 dark:text-white",
       )}
     />
   );

@@ -1,8 +1,9 @@
 "use client";
 
-import { CreateTaskParams, TaskNode } from "@/lib/schema/task";
+import { TaskNode } from "@/lib/schema/task";
 import Tasks from "./tasks";
 import { useState } from "react";
+import { usePersistentValue, useTaskForm } from "@/lib/hooks";
 import { Button } from "@/components/button";
 import {
   Dialog,
@@ -11,17 +12,10 @@ import {
   DialogDescription,
   DialogTitle,
 } from "@/components/dialog";
-import { Field, FieldGroup, Label } from "@/components/fieldset";
+import { ErrorMessage, Field, FieldGroup, Label } from "@/components/fieldset";
 import { Input } from "@/components/input";
-import TextInput from "@/components/textInput";
 import { Textarea } from "@/components/textarea";
-import {
-  extractFormStateValues,
-  FormState,
-  handleInput,
-} from "@/lib/formUtils";
-import { createTaskAction } from "@/lib/actions/task.actions";
-import { useRouter } from "next/navigation";
+import { handleInput } from "@/lib/formUtils";
 
 export default function TasksWrapper({
   projectId,
@@ -31,90 +25,45 @@ export default function TasksWrapper({
   tasks: TaskNode[];
 }) {
   const [newTaskParent, setNewTaskParent] = useState<TaskNode | null>(null);
+  const displayNewTaskParent = usePersistentValue(newTaskParent);
   const [taskToEdit, setTaskToEdit] = useState<TaskNode | null>(null);
-  const router = useRouter();
-  const [values, setValues] = useState<
-    FormState<{ title: string; estimatedDuration: string; description: string }>
-  >({
-    title: {
-      value: "",
-      required: true,
-      touched: false,
-    },
-    estimatedDuration: {
-      value: "",
-      required: false,
-      touched: false,
-    },
-    description: {
-      value: "",
-      required: false,
-      touched: false,
-    },
-  });
-  function resetForm() {
-    setValues({
-      title: {
-        value: "",
-        required: true,
-        touched: false,
-      },
-      estimatedDuration: {
-        value: "",
-        required: false,
-        touched: false,
-      },
-      description: {
-        value: "",
-        required: false,
-        touched: false,
-      },
-    });
-  }
+  const displayTaskToEdit = usePersistentValue(taskToEdit);
+  const {
+    values,
+    setValues,
+    resetForm,
+    prefillForm,
+    submitCreate,
+    submitUpdate,
+  } = useTaskForm(projectId);
 
   function handleEditClick(task: TaskNode) {
     setTaskToEdit(task);
-    setValues((prev) => ({
-      ...prev,
-      title: {
-        ...prev.title,
-        value: task.title ?? "",
-      },
-      estimatedDuration: {
-        ...prev.estimatedDuration,
-        value: task.estimate ? String(task.estimate) : "",
-      },
-      description: {
-        ...prev.description,
-        value: task.description ?? "",
-      },
-    }));
+    prefillForm(task);
   }
 
-  async function handleSubmit(event: React.SubmitEvent<HTMLFormElement>) {
+  async function handleCreateTask(
+    event: React.FormEvent<HTMLFormElement>,
+    parentId: string | null,
+  ) {
     event.preventDefault();
     event.stopPropagation();
-    // check if password has the right format
-
-    const body: CreateTaskParams = {
-      title: values.title.value,
-      projectId: projectId,
-      description: values.description.value,
-      estimate: values.estimatedDuration.value
-        ? (parseInt(values.estimatedDuration.value) ?? undefined)
-        : undefined,
-      parentId: newTaskParent?.id ?? null,
-    };
-
-    const newTask = await createTaskAction({ createTaskParams: body });
-    if (!newTask.success) {
-      //TODO error handling
-      return;
+    const result = await submitCreate(parentId);
+    if (result.success) {
+      setNewTaskParent(null);
     }
-    // TODO success notification
-    setNewTaskParent(null);
-    resetForm();
-    router.refresh();
+    // TODO error handling
+  }
+
+  async function handleUpdateTask(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    event.stopPropagation();
+    if (!taskToEdit) return;
+    const result = await submitUpdate(taskToEdit.id);
+    if (result.success) {
+      setTaskToEdit(null);
+    }
+    // TODO error handling
   }
 
   return (
@@ -140,9 +89,11 @@ export default function TasksWrapper({
         >
           <DialogTitle>Neue Aufgabe erstellen</DialogTitle>
           <DialogDescription>
-            Erstelle eine neue Aufgabe unter "{newTaskParent?.title}"
+            Erstelle eine neue Aufgabe unter "{displayNewTaskParent?.title}"
           </DialogDescription>
-          <form onSubmit={handleSubmit}>
+          <form
+            onSubmit={(e) => handleCreateTask(e, newTaskParent?.id ?? null)}
+          >
             <DialogBody>
               <FieldGroup>
                 <Field>
@@ -150,8 +101,12 @@ export default function TasksWrapper({
                   <Input
                     name="title"
                     value={values.title.value}
+                    invalid={!!values.title.error}
                     onChange={(e) => handleInput(e, setValues)}
                   />
+                  {values.title.error && (
+                    <ErrorMessage>{values.title.error}</ErrorMessage>
+                  )}
                 </Field>
                 <Field>
                   <Label>Abgeschätzte Dauer</Label>
@@ -173,12 +128,22 @@ export default function TasksWrapper({
                     name="description"
                     rows={4}
                     value={values.description.value}
+                    invalid={!!values.description.error}
                     onChange={(e) => handleInput(e, setValues)}
                   />
+                  {values.description.error && (
+                    <ErrorMessage>{values.description.error}</ErrorMessage>
+                  )}
                 </Field>
               </FieldGroup>
               <DialogActions>
-                <Button plain onClick={() => setNewTaskParent(null)}>
+                <Button
+                  plain
+                  onClick={() => {
+                    setNewTaskParent(null);
+                    resetForm();
+                  }}
+                >
                   Zurück
                 </Button>
                 <Button type="submit"> Aufgabe erstellen</Button>
@@ -196,9 +161,9 @@ export default function TasksWrapper({
         >
           <DialogTitle>Aufgabe bearbeiten</DialogTitle>
           <DialogDescription>
-            Bearbeite die Aufgabe "{taskToEdit?.title}"
+            Bearbeite die Aufgabe "{displayTaskToEdit?.title}"
           </DialogDescription>
-          <form onSubmit={handleSubmit}>
+          <form onSubmit={handleUpdateTask}>
             <DialogBody>
               <FieldGroup>
                 <Field>
@@ -206,8 +171,12 @@ export default function TasksWrapper({
                   <Input
                     name="title"
                     value={values.title.value}
+                    invalid={!!values.title.error}
                     onChange={(e) => handleInput(e, setValues)}
                   />
+                  {values.title.error && (
+                    <ErrorMessage>{values.title.error}</ErrorMessage>
+                  )}
                 </Field>
                 <Field>
                   <Label>Abgeschätzte Dauer</Label>
@@ -229,15 +198,25 @@ export default function TasksWrapper({
                     name="description"
                     rows={4}
                     value={values.description.value}
+                    invalid={!!values.description.error}
                     onChange={(e) => handleInput(e, setValues)}
                   />
+                  {values.description.error && (
+                    <ErrorMessage>{values.description.error}</ErrorMessage>
+                  )}
                 </Field>
               </FieldGroup>
               <DialogActions>
-                <Button plain onClick={() => setNewTaskParent(null)}>
+                <Button
+                  plain
+                  onClick={() => {
+                    setTaskToEdit(null);
+                    resetForm();
+                  }}
+                >
                   Zurück
                 </Button>
-                <Button type="submit"> Aufgabe erstellen</Button>
+                <Button type="submit"> Aufgabe bearbeiten</Button>
               </DialogActions>
             </DialogBody>
           </form>

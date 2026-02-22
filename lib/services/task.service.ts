@@ -1,5 +1,5 @@
 import prisma from "@/lib/prisma";
-import { CreateTaskParams } from "../schema/task";
+import { CreateTaskParams, UpdateTaskParams } from "../schema/task";
 import {
   createServiceErrorResponse,
   createSuccessResponseWithData,
@@ -35,6 +35,7 @@ export function createTask({
         description: createTaskParams.description,
         estimate: createTaskParams.estimate,
         project: { connect: { id: createTaskParams.projectId } },
+        createdBy: { connect: { id: userId } },
         ...(createTaskParams.parentId
           ? { parent: { connect: { id: createTaskParams.parentId } } }
           : {}),
@@ -44,11 +45,65 @@ export function createTask({
             estimate: todo.estimate,
           })),
         },
-        tags: {
-          connect: createTaskParams.tagIds?.map((id) => ({ id })),
+        taskTags: {
+          create: createTaskParams.tagIds?.map((tagId) => ({
+            tag: { connect: { id: tagId } },
+            user: { connect: { id: userId } },
+          })),
         },
       },
     });
     return createSuccessResponseWithData(task);
   }, "Failed to create task");
+}
+
+export function updateTask({
+  userId,
+  updateTaskParams,
+}: {
+  userId: string;
+  updateTaskParams: UpdateTaskParams;
+}) {
+  return serviceAction(async () => {
+    const task = await prisma.task.findUnique({
+      where: { id: updateTaskParams.id },
+      select: { project: { select: { userId: true } } },
+    });
+    if (!task) {
+      return createServiceErrorResponse("NOT_FOUND", "Task not found");
+    }
+    if (!task.project) {
+      return createServiceErrorResponse(
+        "NOT_FOUND",
+        "Task is not associated with a project",
+      );
+    }
+    if (task.project.userId !== userId) {
+      return createServiceErrorResponse(
+        "AUTHORIZATION_ERROR",
+        "User does not have access to this task",
+      );
+    }
+
+    const updatedTask = await client.task.update({
+      where: { id: updateTaskParams.id },
+      data: {
+        title: updateTaskParams.title,
+        description: updateTaskParams.description,
+        estimate: updateTaskParams.estimate,
+        ...(updateTaskParams.tagIds !== null
+          ? {
+              taskTags: {
+                deleteMany: { userId },
+                create: updateTaskParams.tagIds.map((tagId) => ({
+                  tag: { connect: { id: tagId } },
+                  user: { connect: { id: userId } },
+                })),
+              },
+            }
+          : {}),
+      },
+    });
+    return createSuccessResponseWithData(updatedTask);
+  }, "Failed to update task");
 }

@@ -108,7 +108,7 @@ export function getUserProjectWithTasks({
         tasks: {
           include: {
             todoItems: true,
-            tags: true,
+            taskTags: { include: { tag: true } },
           },
         },
       },

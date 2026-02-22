@@ -70,10 +70,7 @@ issue-tracker/
 │   ├── globals.css                   # Global styles (Tailwind)
 │   ├── api/
 │   │   ├── auth/[...nextauth]/       # NextAuth route handler
-│   │   ├── create-account/           # Account creation endpoint
-│   │   ├── create-tag/               # Toggl tag creation (legacy)
-│   │   ├── create-tag-without-permission/  # Toggl tag creation (legacy)
-│   │   └── start-new-entry/          # Toggl time entry (legacy)
+│   │   └── create-account/           # Account creation endpoint
 │   ├── public/                       # Unauthenticated pages
 │   │   ├── login/
 │   │   ├── sign-up/
@@ -82,69 +79,71 @@ issue-tracker/
 │       ├── layout.tsx                # Auth guard + session provider + navbar
 │       ├── main/page.tsx             # Landing page after login
 │       ├── logout/page.tsx
-│       └── [workspaceId]/            # Toggl workspace view (legacy, to be replaced)
-│           ├── page.tsx
-│           ├── taskManager.tsx
-│           └── taskHierarchy.tsx
-├── components/                       # Shared UI components (button, input, dialog, etc.)
+│       └── project/
+│           ├── create/               # Project creation page
+│           └── [project-id]/         # Project task tree view
+│               ├── page.tsx          # Server component — fetches project + tasks
+│               ├── tasksWrapper.tsx   # Client component — task tree + create/edit dialogs
+│               ├── tasks.tsx         # Recursive task row rendering
+│               ├── taskRowButton.tsx  # Task row action buttons
+│               └── newRootTask.tsx    # Root task creation dialog
+├── components/                       # Shared UI components (button, input, dialog, dropdown, etc.)
+│   └── forms/                        # Form components (create-project-form.tsx)
 ├── lib/
 │   ├── prisma.ts                     # Prisma client singleton
-│   ├── actions.ts                    # Auth server actions (authenticate, performLogout)
-│   ├── types.ts                      # Toggl types (Workspace, ActiveEntry, Tag)
-│   ├── consts.ts                     # Toggl API URLs and workspace IDs
+│   ├── hooks.ts                      # React hooks (usePersistentValue, useTaskForm)
+│   ├── formUtils.ts                  # Form state management (FormState<T>, handleInput, etc.)
 │   ├── errors.ts                     # Error types (ApiError, ApiErrorResponse)
-│   ├── util.ts                       # Toggl API wrappers + generic utilities
-│   └── formUtils.ts                  # Form state management helpers
+│   ├── types.ts                      # App-level types
+│   ├── util.ts                       # Generic utilities (validatePassword, createErrorResponse)
+│   ├── actions.ts                    # Legacy auth actions (to be moved)
+│   ├── consts.ts                     # Legacy Toggl constants (to be moved)
+│   ├── schema/                       # Zod schemas + derived types
+│   │   ├── task.ts                   # CreateTaskSchema, UpdateTaskSchema, TaskNode type
+│   │   └── project.ts               # Project schemas
+│   ├── services/                     # Business logic (pure functions, Prisma calls)
+│   │   ├── project.service.ts        # Project reads
+│   │   ├── task.service.ts           # Task CRUD (create, update)
+│   │   ├── serviceUtil.ts            # serviceAction wrapper, error responses
+│   │   └── ...                       # Skeleton services for future iterations
+│   ├── actions/                      # Server Actions ("use server" wrappers around services)
+│   │   ├── auth.actions.ts           # Login/logout
+│   │   ├── project.actions.ts        # Project actions
+│   │   ├── task.actions.ts           # createTaskAction, updateTaskAction
+│   │   └── ...                       # Skeleton actions for future iterations
+│   └── toggl/                        # Isolated Toggl integration (iteration 6)
+│       ├── api.ts
+│       ├── types.ts
+│       └── consts.ts
+├── legacy/                           # Old Toggl workspace code (to be deleted)
+│   ├── [workspaceId]/
+│   ├── create-tag/
+│   └── create-tag-without-permission/
 ├── prisma/
-│   └── schema.prisma                 # Database schema
+│   └── schema.prisma                 # Full data model (8 models, 4 enums)
 ├── auth.ts                           # NextAuth configuration
 ├── auth.config.ts                    # NextAuth base config
 └── proxy.ts                          # NextAuth middleware
 ```
 
-## Current Data Model
-
-The Prisma schema currently has three bare models:
-
-```prisma
-model User {
-    id       String    @id @default(cuid())
-    email    String    @unique
-    password String
-    projects Project[]
-}
-
-model Project {
-    id          String @id @default(cuid())
-    name        String
-    description String
-    ownerId     String
-    owner       User   @relation(fields: [ownerId], references: [id])
-    tasks       Task[]
-}
-
-model Task {
-    id          String   @id @default(cuid())
-    title       String
-    description String
-    project     Project? @relation(fields: [projectId], references: [id])
-    projectId   String?
-}
-```
-
-These models are not yet used for the app's core functionality. The current task management UI talks to the Toggl API directly (legacy code in `lib/util.ts`, `lib/consts.ts`, `lib/types.ts`).
-
 ## What Works Today
 
 - **Auth**: Login, sign-up, logout via NextAuth 5 credentials provider
 - **Protected routing**: Middleware in `proxy.ts` guards `/s/*` routes
+- **Project CRUD**: Create projects, view project list on main page
+- **Task CRUD**: Create root tasks and sub-tasks, edit tasks (title, description, estimates)
+- **Task hierarchy**: Self-referential `parentId` with recursive tree rendering
+- **Client-side validation**: `useTaskForm` hook validates before submit, inline error display
+- **Form state management**: `FormState<T>` with `handleInput` (auto-clears errors on change)
 - **UI component library**: Full set of shared components (button, input, dialog, dropdown, table, sidebar, navbar, card, badge, etc.)
-- **Database**: MariaDB via Docker, Prisma client connected
-- **Toggl integration (legacy)**: API routes for creating tags and starting entries — these will be reorganized
+- **Database**: MariaDB via Docker, Prisma 7 with full schema (8 models, 4 enums)
+- **Service pattern**: `serviceAction()` wrapper for consistent error handling and auth checks
 
 ## Code Conventions
 
-- **File naming**: kebab-case for components (`task-tree.tsx`), camelCase for services/actions (`task.service.ts`)
+- **File naming**: kebab-case for route files (`create-account/`), camelCase for client components and services (`tasksWrapper.tsx`, `task.service.ts`)
 - **Prisma models**: PascalCase (`TaskEvent`), enums: UPPER_SNAKE_CASE (`ESTIMATE_CHANGED`)
-- **UI language**: English (some German strings remain in the codebase — convert these to English)
+- **UI language**: German (this is intentional — the app is used in German)
+- **Validation**: Zod schemas in `lib/schema/` are the server-side authority. Client mirrors key rules in `useTaskForm.validateForm()` for UX. Post-MVP: unify via Zod on client.
+- **Service pattern**: All DB operations go through `lib/services/*.service.ts`, wrapped by `lib/actions/*.actions.ts` (Server Actions). Services use `serviceAction()` from `serviceUtil.ts` for auth + error handling.
 - **No secrets in env for Toggl**: Toggl API tokens are per-user in the database

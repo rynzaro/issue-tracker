@@ -43,14 +43,14 @@ Rewrite the Prisma schema with the full data model and reorganize the codebase.
 Core task management with time tracking. The first usable version of the app.
 
 - [ ] Project CRUD (create, list, edit, delete)
-- [ ] `project.service.ts` + `project.actions.ts`
+- [x] `project.service.ts` + `project.actions.ts`
 - [ ] Project listing selection box in navbar
 - [ ] Task CRUD (create, edit, delete)
-- [ ] `task.service.ts` + `task.actions.ts`
-- [ ] Self-referential task hierarchy (parentId, depth)
-- [ ] Task tree UI (`app/s/[projectId]/page.tsx`)
-- [ ] Inline estimate editing (minutes)
-- [ ] Task description / notes field
+- [x] `task.service.ts` + `task.actions.ts`
+- [x] Self-referential task hierarchy (parentId, depth)
+- [x] Task tree UI (`app/s/project/[project-id]/page.tsx`)
+- [x] Inline estimate editing (minutes)
+- [x] Task description / notes field
 - [ ] Task tags field (M:N, optional)
 - [ ] Task status transitions (bidirectional: any status → any other, `completedAt` set/cleared on COMPLETED transitions)
 - [ ] Time tracking: start/stop timer
@@ -58,9 +58,8 @@ Core task management with time tracking. The first usable version of the app.
 - [ ] Active timer display in navbar
 - [ ] Auto-stop previous timer when starting a new one
 - [ ] Time rollup: parent shows sum of children's tracked time (on-the-fly `SUM()` query, acceptable for <10k tasks)
-- [ ] Replace legacy `app/s/[workspaceId]/` with `app/s/[projectId]/`
+- [x] Replace legacy `app/s/[workspaceId]/` with `app/s/project/[project-id]/`
 - [ ] Delete legacy Toggl API routes (`create-tag/`, `create-tag-without-permission/`, `start-new-entry/`) or move to `app/api/toggl/`
-- [ ] Convert remaining German UI strings to English
 - [ ] optional: Task ordering
 
 ## Iteration 2 — Event Log
@@ -239,6 +238,7 @@ ProjectSettings {
 Task {
   id: String @id @default(cuid())
   projectId: String → Project
+  createdById: String → User (AD-13: immutable creator)
   parentId: String? → Task (self-ref "SubTasks")
   title: String
   description: String?
@@ -254,17 +254,20 @@ Task {
 }
 
 Tag {
-  id: String @id @default(cuid())
+  id: Int @id @default(autoincrement())
   name: String
-  projectId: String → Project
-  tasks: Task[] (M:N)
-  createdAt: DateTime @default(now())
+  userId: String → User (AD-14: per-user tags, cross-project)
+  taskTags: TaskTag[]
+  @@unique([name, userId])
 }
 
 TaskTag {
+  id: String @id @default(cuid())
   taskId: String → Task
-  tagId: String → Tag
-  @@id([taskId, tagId])
+  tagId: Int → Tag
+  userId: String → User (AD-15: who applied the tag)
+  createdAt: DateTime @default(now())
+  @@unique([taskId, tagId])
 }
 
 TimeEntry {

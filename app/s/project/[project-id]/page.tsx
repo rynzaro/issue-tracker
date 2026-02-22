@@ -1,9 +1,7 @@
 import NotFoundError from "@/components/not-found-error";
 import { getUserProjectWithTasksAndChildrenAction } from "@/lib/actions/project.actions";
-import Tasks from "./tasks";
 import { Heading, Subheading } from "@/components/heading";
 import NewRootTask from "./newRootTask";
-import { Button } from "@/components/button";
 import { Divider } from "@/components/divider";
 import TasksWrapper from "./tasksWrapper";
 
@@ -36,7 +34,7 @@ export default async function Page({
             Task Manager
           </Subheading>
         </div>
-        <Button>Neue Aufgabe</Button>
+        <NewRootTask projectId={projectId} />
       </div>
       <Divider className="my-0" />
       <TasksWrapper projectId={projectId} tasks={tasks} />

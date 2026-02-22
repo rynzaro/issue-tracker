@@ -20,6 +20,16 @@ export const CreateTaskSchema = z.object({
 
 export type CreateTaskParams = z.infer<typeof CreateTaskSchema>;
 
+export const UpdateTaskSchema = z.object({
+  id: z.cuid(),
+  title: z.string().min(2).max(100),
+  description: z.string().max(1000).optional(),
+  estimate: z.number().int().min(0).optional(),
+  tagIds: z.array(z.int()).nullable(),
+});
+
+export type UpdateTaskParams = z.infer<typeof UpdateTaskSchema>;
+
 export type TaskNode = Prisma.TaskGetPayload<{
-  include: { todoItems: true; tags: true };
+  include: { todoItems: true; taskTags: { include: { tag: true } } };
 }> & { children: TaskNode[] };

@@ -59,7 +59,7 @@ function ProjectDropdownMenu({
           <DropdownLabel> {project.name}</DropdownLabel>
         </DropdownItem>
       ))}
-      <DropdownDivider />
+      {projects.length > 0 && <DropdownDivider />}
       <DropdownItem href="/s/project/create">
         <PlusIcon />
         <DropdownLabel>Neues Projekt erstellen</DropdownLabel>

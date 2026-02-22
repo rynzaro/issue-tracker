@@ -22,7 +22,7 @@ A task is something you need to do. Every task has:
 - **Title** — what the task is
 - **Description / Notes** — any details, context, or notes you want to keep
 - **Estimate** (optional) — how long you think it'll take, in minutes or hours
-- **Category** (optional) — a label like "frontend", "backend", "design", "devops"
+- **Tags** (optional) — labels like "frontend", "backend", "design", "devops". Each user has their own tag vocabulary.
 - **Status** — Planning, Active, Completed, or Archived
 
 ### Sub-Tasks
@@ -86,7 +86,7 @@ Inside a project, add tasks. For each task:
 - Give it a descriptive title
 - Add an estimate if you have one (don't worry if you don't yet)
 - Add notes in the description field
-- Set a category if you want to analyze accuracy by type of work later
+- Add tags if you want to analyze accuracy by type of work later
 
 ### 4. Break Down Tasks
 
@@ -202,7 +202,7 @@ When you're ready to track time on a todo item, convert it to a sub-task. The co
 
 - Uses the todo's text as the sub-task title
 - Carries over the todo's estimate (if set)
-- Lets you add a category
+- Lets you add tags
 
 The new sub-task becomes a full trackable task. If you've already started working (baseline exists), this triggers a scope change checkpoint — just like adding any other sub-task.
 
