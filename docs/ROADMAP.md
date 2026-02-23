@@ -42,24 +42,24 @@ Rewrite the Prisma schema with the full data model and reorganize the codebase.
 
 Core task management with time tracking. The first usable version of the app.
 
-- [ ] Project CRUD (create, list, edit, delete)
 - [x] `project.service.ts` + `project.actions.ts`
-- [ ] Project listing selection box in navbar
-- [ ] Task CRUD (create, edit, delete)
 - [x] `task.service.ts` + `task.actions.ts`
 - [x] Self-referential task hierarchy (parentId, depth)
 - [x] Task tree UI (`app/s/project/[project-id]/page.tsx`)
 - [x] Inline estimate editing (minutes)
 - [x] Task description / notes field
-- [ ] Task tags field (M:N, optional)
-- [ ] Task status transitions: set/clear `completedAt` (complete/uncomplete), set/clear `archivedAt` (archive/unarchive); add `archivedAt DateTime?` to Task schema
 - [x] Time tracking: start/stop timer (AD-16 + AD-17: ActiveTimer table, single active task)
 - [x] `timeEntry.service.ts` + `timeEntry.actions.ts`
 - [x] ActiveTimer model + migration (AD-17: `@@unique([userId])`, mandatory `stoppedAt`/`duration` on TimeEntry)
-- [ ] Active timer display in navbar
 - [x] Auto-stop previous timer when starting a new one (handled by ActiveTimer swap in transaction)
 - [x] Time rollup: parent shows sum of children's tracked time (on-the-fly `SUM()` query, acceptable for <10k tasks)
 - [x] Replace legacy `app/s/[workspaceId]/` with `app/s/project/[project-id]/`
+- [ ] Project CRUD (create, list, edit, delete)
+- [ ] Project listing selection box in navbar
+- [ ] Task CRUD (create, edit, delete)
+- [ ] Task tags field (M:N, optional)
+- [ ] Task status transitions: set/clear `completedAt` (complete/uncomplete), set/clear `archivedAt` (archive/unarchive); add `archivedAt DateTime?` to Task schema
+- [ ] Active timer display in navbar
 - [ ] Delete legacy Toggl API routes (`create-tag/`, `create-tag-without-permission/`, `start-new-entry/`) or move to `app/api/toggl/`
 - [ ] optional: Task ordering
 
