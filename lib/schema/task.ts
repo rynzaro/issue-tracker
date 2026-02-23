@@ -1,6 +1,8 @@
 import { Prisma } from "@prisma/client";
 import z from "zod";
 
+export type TaskStatus = "OPEN" | "IN_PROGRESS" | "DONE";
+
 export const CreateTaskSchema = z.object({
   projectId: z.cuid(),
   parentId: z.cuid().nullable(),
@@ -32,4 +34,10 @@ export type UpdateTaskParams = z.infer<typeof UpdateTaskSchema>;
 
 export type TaskNode = Prisma.TaskGetPayload<{
   include: { todoItems: true; taskTags: { include: { tag: true } } };
-}> & { children: TaskNode[] };
+}> & {
+  children: TaskNode[];
+  status: TaskStatus;
+  hasActiveDescendant: boolean;
+  totalTimeSpent: number; // seconds
+  activeTimerStartedAt: Date | null;
+};

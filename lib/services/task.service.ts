@@ -107,3 +107,39 @@ export function updateTask({
     return createSuccessResponseWithData(updatedTask);
   }, "Failed to update task");
 }
+
+export function hasActiveTimers({ taskId }: { taskId: string }) {
+  return serviceAction(async () => {
+    const task = await client.task.findUnique({
+      where: { id: taskId },
+      select: { projectId: true },
+    });
+    if (!task) return createServiceErrorResponse("NOT_FOUND", "Task not found");
+
+    const projectTasks = await client.task.findMany({
+      where: { projectId: task.projectId },
+      select: { id: true, parentId: true },
+    });
+
+    const childrenMap = new Map<string, string[]>();
+    for (const t of projectTasks) {
+      if (t.parentId) {
+        if (!childrenMap.has(t.parentId)) childrenMap.set(t.parentId, []);
+        childrenMap.get(t.parentId)!.push(t.id);
+      }
+    }
+    const descendantIds: string[] = [];
+    const queue = [taskId];
+    while (queue.length > 0) {
+      const current = queue.shift()!;
+      descendantIds.push(current);
+      const children = childrenMap.get(current) ?? [];
+      queue.push(...children);
+    }
+
+    const activeTimer = await client.activeTimer.findFirst({
+      where: { taskId: { in: descendantIds } },
+    });
+    return createSuccessResponseWithData(!!activeTimer);
+  }, "Failed to check active timers for task");
+}

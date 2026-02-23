@@ -109,6 +109,7 @@ export function getUserProjectWithTasks({
           include: {
             todoItems: true,
             taskTags: { include: { tag: true } },
+            timeEntries: { select: { duration: true } },
           },
         },
       },
@@ -134,7 +135,7 @@ export function getProjectsByUser(userId: string) {
   return serviceQuery(
     () =>
       client.project.findMany({
-        where: { userId },
+        where: { userId, deletedAt: null },
         orderBy: { createdAt: "desc" },
       }),
     "Failed to fetch projects",

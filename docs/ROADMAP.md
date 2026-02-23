@@ -53,12 +53,12 @@ Core task management with time tracking. The first usable version of the app.
 - [x] Task description / notes field
 - [ ] Task tags field (M:N, optional)
 - [ ] Task status transitions: set/clear `completedAt` (complete/uncomplete), set/clear `archivedAt` (archive/unarchive); add `archivedAt DateTime?` to Task schema
-- [ ] Time tracking: start/stop timer (AD-16 + AD-17: ActiveTimer table, single active task)
-- [ ] `timeEntry.service.ts` + `timeEntry.actions.ts`
-- [ ] ActiveTimer model + migration (AD-17: `@@unique([userId])`, mandatory `stoppedAt`/`duration` on TimeEntry)
+- [x] Time tracking: start/stop timer (AD-16 + AD-17: ActiveTimer table, single active task)
+- [x] `timeEntry.service.ts` + `timeEntry.actions.ts`
+- [x] ActiveTimer model + migration (AD-17: `@@unique([userId])`, mandatory `stoppedAt`/`duration` on TimeEntry)
 - [ ] Active timer display in navbar
-- [ ] Auto-stop previous timer when starting a new one (handled by ActiveTimer swap in transaction)
-- [ ] Time rollup: parent shows sum of children's tracked time (on-the-fly `SUM()` query, acceptable for <10k tasks)
+- [x] Auto-stop previous timer when starting a new one (handled by ActiveTimer swap in transaction)
+- [x] Time rollup: parent shows sum of children's tracked time (on-the-fly `SUM()` query, acceptable for <10k tasks)
 - [x] Replace legacy `app/s/[workspaceId]/` with `app/s/project/[project-id]/`
 - [ ] Delete legacy Toggl API routes (`create-tag/`, `create-tag-without-permission/`, `start-new-entry/`) or move to `app/api/toggl/`
 - [ ] optional: Task ordering

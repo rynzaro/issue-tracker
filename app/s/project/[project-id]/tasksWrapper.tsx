@@ -28,6 +28,7 @@ export default function TasksWrapper({
   const displayNewTaskParent = usePersistentValue(newTaskParent);
   const [taskToEdit, setTaskToEdit] = useState<TaskNode | null>(null);
   const displayTaskToEdit = usePersistentValue(taskToEdit);
+  const [loading, setLoading] = useState(false);
   const {
     values,
     setValues,
@@ -48,22 +49,26 @@ export default function TasksWrapper({
   ) {
     event.preventDefault();
     event.stopPropagation();
+    setLoading(true);
     const result = await submitCreate(parentId);
     if (result.success) {
       setNewTaskParent(null);
     }
     // TODO error handling
+    setLoading(false);
   }
 
   async function handleUpdateTask(event: React.SubmitEvent<HTMLFormElement>) {
     event.preventDefault();
     event.stopPropagation();
+    setLoading(true);
     if (!taskToEdit) return;
     const result = await submitUpdate(taskToEdit.id);
     if (result.success) {
       setTaskToEdit(null);
     }
     // TODO error handling
+    setLoading(false);
   }
 
   return (
@@ -77,6 +82,7 @@ export default function TasksWrapper({
             isRoot={true}
             setNewTaskParent={setNewTaskParent}
             setTaskToEdit={handleEditClick}
+            loading={loading}
           />
         ))}
       <>

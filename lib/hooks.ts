@@ -1,8 +1,34 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { FormState, handleInput as _handleInput } from "./formUtils";
 import { CreateTaskParams, TaskNode, UpdateTaskParams } from "./schema/task";
 import { createTaskAction, updateTaskAction } from "./actions/task.actions";
 import { useRouter } from "next/navigation";
+
+/**
+ * Returns elapsed seconds since `startedAt`, updating every second.
+ * Returns 0 when startedAt is null (no active timer).
+ */
+export function useElapsedTimer(startedAt: Date | null): number {
+  const [elapsed, setElapsed] = useState(0);
+
+  useEffect(() => {
+    if (!startedAt) {
+      setElapsed(0);
+      return;
+    }
+
+    const start = new Date(startedAt).getTime();
+    setElapsed(Math.floor((Date.now() - start) / 1000));
+
+    const interval = setInterval(() => {
+      setElapsed(Math.floor((Date.now() - start) / 1000));
+    }, 1_000);
+
+    return () => clearInterval(interval);
+  }, [startedAt]);
+
+  return elapsed;
+}
 
 /**
  * Returns the last non-null/non-undefined value passed.
@@ -59,8 +85,7 @@ export function useTaskForm(projectId: string) {
       errors.title = "Titel muss mindestens 2 Zeichen lang sein";
     }
     if (values.description.value && values.description.value.length > 1000) {
-      errors.description =
-        "Beschreibung darf maximal 1000 Zeichen lang sein";
+      errors.description = "Beschreibung darf maximal 1000 Zeichen lang sein";
     }
 
     const hasErrors = Object.keys(errors).length > 0;
@@ -79,7 +104,11 @@ export function useTaskForm(projectId: string) {
 
   async function submitCreate(parentId: string | null) {
     if (!validateForm()) {
-      return { success: false as const, error: "VALIDATION_ERROR" as const, message: "Eingabe ungültig" };
+      return {
+        success: false as const,
+        error: "VALIDATION_ERROR" as const,
+        message: "Eingabe ungültig",
+      };
     }
     const body: CreateTaskParams = {
       title: values.title.value,
@@ -100,7 +129,11 @@ export function useTaskForm(projectId: string) {
 
   async function submitUpdate(taskId: string) {
     if (!validateForm()) {
-      return { success: false as const, error: "VALIDATION_ERROR" as const, message: "Eingabe ungültig" };
+      return {
+        success: false as const,
+        error: "VALIDATION_ERROR" as const,
+        message: "Eingabe ungültig",
+      };
     }
     const body: UpdateTaskParams = {
       id: taskId,

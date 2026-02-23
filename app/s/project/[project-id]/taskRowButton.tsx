@@ -6,11 +6,13 @@ export default function TaskRowButton({
   children,
   borderless = false,
   invertedColors = false,
+  disabled = false,
 }: {
   onClick?: () => void;
   children: ReactNode;
   borderless?: boolean;
   invertedColors?: boolean;
+  disabled?: boolean;
 }) {
   const handleClick = (e: React.MouseEvent<HTMLButtonElement>) => {
     e.stopPropagation();
@@ -31,6 +33,7 @@ export default function TaskRowButton({
         invertedColors
           ? "bg-zinc-800 text-white dark:bg-white dark:text-zinc-800 hover:bg-zinc-700 dark:hover:bg-gray-200"
           : "hover:bg-gray-300 dark:hover:bg-zinc-700",
+        disabled && "opacity-25  bg-gray-300 dark:bg-zinc-700",
       )}
       onClick={handleClick}
       onKeyDown={handleKeyDown}

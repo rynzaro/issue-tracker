@@ -57,7 +57,7 @@ No `TaskStatus` enum. Status is derived from nullable datetime fields on `Task`:
 | Archived      | `archivedAt IS NOT NULL`                                         |
 | Deleted       | `deletedAt IS NOT NULL` (soft delete, filtered from all queries) |
 
-`completedAt` and `archivedAt` are set/cleared by service code (not DB triggers). `deletedAt` is set-only (no restore). `archivedAt` is planned — not yet in schema.
+`completedAt` and `archivedAt` are set/cleared by service code (not DB triggers). `deletedAt` is set-only (no restore). `archivedAt` is in the schema but status transition logic (set/clear) is not yet implemented.
 
 ### AF-7: Single Active Timer (ActiveTimer table)
 

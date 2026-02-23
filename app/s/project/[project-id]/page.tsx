@@ -12,7 +12,7 @@ export default async function Page({
 }) {
   const { "project-id": projectId } = await params;
 
-  const project = await getUserProjectWithTasksAndChildrenAction(projectId);
+  const project = await getUserProjectWithTasksAndChildrenAction({ projectId });
 
   if (!project.success) {
     return (

@@ -19,6 +19,7 @@ Tackle after Iteration 1 ships. These are engineering quality investments, not u
 
 Captured from earlier brainstorming. Prioritize when relevant.
 
+- [ ] fix mobile version text sizes and buttons (thinking of a popup menu instead of buttons and just having start and stop visible, so the task + times can be large)
 - [ ] Deletion / Archiving architecture + impact of tasks -- do we need deletion AND archiving?
 - [ ] Notification system (success/error toasts after mutations)
 - [ ] Default project functionality (auto-select on login)

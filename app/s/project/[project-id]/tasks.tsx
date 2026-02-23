@@ -6,7 +6,6 @@ import {
   CheckIcon,
   ChevronDownIcon,
   ChevronUpIcon,
-  PauseIcon,
   PencilIcon,
   PlayIcon,
   PlusIcon,
@@ -18,23 +17,39 @@ import { Dispatch, SetStateAction, useState } from "react";
 import TaskRowButton from "./taskRowButton";
 import { Subheading } from "@/components/heading";
 import { SecondaryText } from "@/components/text";
+import { formatTime } from "@/lib/util";
+import { useElapsedTimer } from "@/lib/hooks";
+import {
+  startTimeEntryAction,
+  stopTimeEntryAction,
+} from "@/lib/actions/timeEntry.actions";
+
+function formatElapsed(elapsed: number, taskStatus: string): string | null {
+  if (elapsed <= 0 && taskStatus !== "IN_PROGRESS") return null;
+  return elapsed < 600
+    ? formatTime(elapsed, "sec", "MM:SS", true)
+    : formatTime(elapsed, "sec", "HH:MM", true);
+}
 
 export default function Tasks({
   projectId,
   task,
   isRoot,
+  loading,
   setNewTaskParent,
   setTaskToEdit,
 }: {
   projectId: string;
   task: TaskNode;
   isRoot: boolean;
+  loading: boolean;
   setNewTaskParent: Dispatch<SetStateAction<TaskNode | null>>;
   setTaskToEdit: (task: TaskNode) => void;
 }) {
-  const [isExpanded, setIsExpanded] = useState(false);
-  //TODO implement running state properly, this is just for testing the button UI
-  const [running, setRunning] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(task.hasActiveDescendant);
+  const elapsed = useElapsedTimer(task.activeTimerStartedAt);
+  const elapsedDisplay =
+    task.status === "IN_PROGRESS" ? formatElapsed(elapsed, task.status) : null;
 
   return (
     <div
@@ -45,14 +60,23 @@ export default function Tasks({
     >
       <div
         role="button"
-        className="flex justify-between gap-2 items-center py-2 pl-4 pr-2 hover:bg-gray-50 dark:hover:bg-zinc-800 rounded-lg border-l-4 border-gray-300 dark:border-zinc-600"
+        className={clsx(
+          "flex justify-between items-start sm:flex-row flex-col gap-2 sm:items-center py-2 pl-4 pr-2 rounded-lg border-l-4 border-gray-300 dark:border-zinc-600",
+          (task.status === "DONE" ||
+            (task.status === "OPEN" && !task.hasActiveDescendant)) &&
+            "hover:bg-gray-50 dark:hover:bg-zinc-800",
+          task.status === "IN_PROGRESS" &&
+            "bg-yellow-100 dark:bg-yellow-900/50 border-yellow-500 hover:bg-yellow-100/60 dark:hover:bg-yellow-900/30",
+          task.hasActiveDescendant &&
+            "bg-blue-100 dark:bg-blue-900/50 border-blue-500 hover:bg-blue-100/75 dark:hover:bg-blue-900/30",
+        )}
         onClick={() => {
           task.children &&
             task.children.length > 0 &&
             setIsExpanded((prev) => !prev);
         }}
       >
-        <div className="flex gap-2 items-baseline">
+        <div className="shrink-0">
           <Subheading level={4} className="flex flex-gap-1 items-center">
             {task.title}
             {isExpanded ? (
@@ -61,18 +85,44 @@ export default function Tasks({
               <ChevronDownIcon className="w-6 h-6" />
             ) : null}
           </Subheading>
-          {task.estimate && (
-            <SecondaryText>Schätzung: {task.estimate} Minuten</SecondaryText>
-          )}
+          <SecondaryText>
+            {(task.totalTimeSpent > 0 || task.estimate) && (
+              <>
+                {task.totalTimeSpent > 0
+                  ? formatTime(task.totalTimeSpent, "sec", "HH:MM", true)
+                  : "\u2014"}
+                {task.estimate != null && (
+                  <>
+                    {" / "}
+                    {formatTime(task.estimate, "min", "HH:MM", true)}
+                  </>
+                )}
+              </>
+            )}
+          </SecondaryText>
         </div>
 
-        <div className="flex justify-end gap-2">
-          {running ? (
-            <TaskRowButton onClick={() => setRunning(false)} invertedColors>
-              <StopIcon className="w-6 h-6" />
-            </TaskRowButton>
+        <div
+          className="flex justify-end gap-2 items-center"
+          onClick={(e) => {
+            e.stopPropagation();
+          }}
+        >
+          {task.status === "IN_PROGRESS" ? (
+            <>
+              {/* ← SWAP TIMER VARIANT HERE — see options A/B/C/D below */}
+              <TimerDisplayD value={elapsedDisplay} />
+              <TaskRowButton
+                onClick={() => stopTimeEntryAction()}
+                invertedColors
+              >
+                <StopIcon className="w-6 h-6" />
+              </TaskRowButton>
+            </>
           ) : (
-            <TaskRowButton onClick={() => setRunning(true)}>
+            <TaskRowButton
+              onClick={() => startTimeEntryAction({ taskId: task.id })}
+            >
               <PlayIcon className="w-6 h-6" />
             </TaskRowButton>
           )}
@@ -87,12 +137,17 @@ export default function Tasks({
             <PencilIcon className="w-5 h-5" />
           </TaskRowButton>
           <TaskRowButton>
-            <CheckIcon className="w-6 h-6" />
-          </TaskRowButton>
-          <TaskRowButton>
             <InformationCircleIcon className="w-5 h-5" />
           </TaskRowButton>
-          <TaskRowButton borderless>
+          <TaskRowButton
+            disabled={task.hasActiveDescendant || task.status === "IN_PROGRESS"}
+          >
+            <CheckIcon className="w-6 h-6" />
+          </TaskRowButton>
+          <TaskRowButton
+            borderless
+            disabled={task.hasActiveDescendant || task.status === "IN_PROGRESS"}
+          >
             <TrashIcon className="w-5 h-5" />
           </TaskRowButton>
         </div>
@@ -108,8 +163,60 @@ export default function Tasks({
             isRoot={false}
             setNewTaskParent={setNewTaskParent}
             setTaskToEdit={setTaskToEdit}
+            loading={loading}
           />
         ))}
     </div>
+  );
+}
+
+// ─── TIMER STYLING OPTIONS ─────────────────────────────────────────────────────
+// Try each one, then delete the rest. Replace <TimerDisplayA> above with your pick.
+
+// A) Minimal — matches SecondaryText tokens, mono digits, no container
+//    Blends with the row. The stop button provides the "active" signal.
+function TimerDisplayA({ value }: { value: string | null }) {
+  if (!value) return null;
+  return (
+    <span className="text-sm font-mono tabular-nums text-zinc-500 dark:text-zinc-400">
+      {value}
+    </span>
+  );
+}
+
+// B) Badge pill — uses your Badge color system (zinc variant)
+//    Self-contained, reads as a status chip. Subtle but distinct.
+function TimerDisplayB({ value }: { value: string | null }) {
+  if (!value) return null;
+  return (
+    <span className="inline-flex items-center rounded-md bg-zinc-600/10 px-1.5 py-0.5 text-sm font-mono font-medium tabular-nums text-zinc-700 dark:bg-white/5 dark:text-zinc-400">
+      {value}
+    </span>
+  );
+}
+
+// C) Badge pill with pulsing dot — Clockify-style live indicator
+//    Most discoverable "something is running" signal. Uses zinc to stay neutral.
+function TimerDisplayC({ value }: { value: string | null }) {
+  if (!value) return null;
+  return (
+    <span className="inline-flex items-center gap-1.5 rounded-md bg-zinc-600/10 px-2 py-0.5 text-sm font-mono font-medium tabular-nums text-zinc-700 dark:bg-white/5 dark:text-zinc-400">
+      <span className="relative flex h-1.5 w-1.5">
+        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-zinc-400 opacity-75 dark:bg-zinc-500" />
+        <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-zinc-500 dark:bg-zinc-400" />
+      </span>
+      {value}
+    </span>
+  );
+}
+
+// D) Bordered chip — ring border only, no fill. Harvest/Notion style.
+//    Uses your existing border tokens (gray-300 / zinc-700).
+function TimerDisplayD({ value }: { value: string | null }) {
+  if (!value) return null;
+  return (
+    <span className="inline-flex items-center rounded-md border border-gray-300 px-1.5 py-0.5 text-sm font-mono tabular-nums text-zinc-700 dark:border-zinc-700 dark:text-zinc-300">
+      {value}
+    </span>
   );
 }

@@ -91,19 +91,22 @@ issue-tracker/
 │   └── forms/                        # Form components (create-project-form.tsx)
 ├── lib/
 │   ├── prisma.ts                     # Prisma client singleton
-│   ├── hooks.ts                      # React hooks (usePersistentValue, useTaskForm)
+│   ├── hooks.ts                      # React hooks (useElapsedTimer, usePersistentValue, useTaskForm)
 │   ├── formUtils.ts                  # Form state management (FormState<T>, handleInput, etc.)
 │   ├── errors.ts                     # Error types (ApiError, ApiErrorResponse)
 │   ├── types.ts                      # App-level types
-│   ├── util.ts                       # Generic utilities (validatePassword, createErrorResponse)
+│   ├── util.ts                       # Generic utilities (validatePassword, createErrorResponse, calculateDurationInSeconds, formatTime)
 │   ├── actions.ts                    # Legacy auth actions (superseded by lib/actions/auth.actions.ts)
 │   ├── consts.ts                     # Legacy Toggl constants (superseded by lib/toggl/consts.ts)
 │   ├── schema/                       # Zod schemas + derived types
-│   │   ├── task.ts                   # CreateTaskSchema, UpdateTaskSchema, TaskNode type
-│   │   └── project.ts               # Project schemas
+│   │   ├── task.ts                   # CreateTaskSchema, UpdateTaskSchema, TaskStatus, TaskNode type
+│   │   ├── project.ts               # Project schemas
+│   │   └── timeEntry.ts             # Time entry schemas (placeholder)
 │   ├── services/                     # Business logic (pure functions, Prisma calls)
 │   │   ├── project.service.ts        # Project reads
-│   │   ├── task.service.ts           # Task CRUD (create, update)
+│   │   ├── task.service.ts           # Task CRUD (create, update, hasActiveTimers)
+│   │   ├── timeEntry.service.ts      # Start/stop timers, duration calc
+│   │   ├── activeTask.service.ts     # Active timer queries (getActiveTimeEntryForUser)
 │   │   ├── serviceUtil.ts            # serviceAction wrapper, error responses
 │   │   └── ...                       # Skeleton services for future iterations
 │   ├── actions/                      # Server Actions ("use server" wrappers around services)
@@ -119,10 +122,19 @@ issue-tracker/
 │   ├── [workspaceId]/
 │   ├── create-tag/
 │   └── create-tag-without-permission/
+├── tests/                            # Test suite (Vitest)
+│   ├── helpers/
+│   │   ├── factories.ts              # Test data factories (buildUser, buildTask, etc.)
+│   │   └── prisma-mock.ts            # Prisma client mock for unit tests
+│   └── unit/
+│       ├── util.test.ts
+│       ├── actions/                   # Server action tests
+│       └── services/                  # Service unit tests
 ├── prisma/
 │   └── schema.prisma                 # Full data model (8 models, 4 enums)
 ├── auth.ts                           # NextAuth configuration
 ├── auth.config.ts                    # NextAuth base config
+├── vitest.config.ts                  # Vitest test configuration
 └── proxy.ts                          # NextAuth middleware
 ```
 
@@ -133,11 +145,15 @@ issue-tracker/
 - **Project create + list**: Create projects, view project list on main page (no edit/delete UI yet)
 - **Task CRUD**: Create root tasks and sub-tasks, edit tasks (title, description, estimates)
 - **Task hierarchy**: Self-referential `parentId` with recursive tree rendering
+- **Time tracking**: Start/stop timer per task, auto-stop previous timer, elapsed time display
+- **Time rollup**: Parent tasks show sum of own + children's tracked time
+- **Task status indicators**: Visual coloring for IN_PROGRESS (yellow) and has-active-descendant (blue) tasks
 - **Client-side validation**: `useTaskForm` hook validates before submit, inline error display
 - **Form state management**: `FormState<T>` with `handleInput` (auto-clears errors on change)
 - **UI component library**: Full set of shared components (button, input, dialog, dropdown, table, sidebar, navbar, card, badge, etc.)
 - **Database**: MariaDB via Docker, Prisma 7 with full schema (8 models, 4 enums)
 - **Service pattern**: `serviceAction()` wrapper for consistent error handling and auth checks
+- **Testing**: Vitest with unit tests for services, actions, schemas, and utilities (`tests/` directory)
 
 ## Code Conventions
 

@@ -14,15 +14,16 @@ datasource db {
 }
 
 model User {
-    id              String      @id @default(cuid())
-    email           String      @unique
+    id              String       @id @default(cuid())
+    email           String       @unique
     password        String
     togglApiToken   String?
     projects        Project[]
     timeEntries     TimeEntry[]
-    createdTasks    Task[]      @relation("CreatedTasks")
+    createdTasks    Task[]       @relation("CreatedTasks")
     tags            Tag[]
-    appliedTaskTags TaskTag[]   @relation("AppliedTaskTags")
+    appliedTaskTags TaskTag[]    @relation("AppliedTaskTags")
+    activeTimer     ActiveTimer?
 }
 
 model Project {
@@ -77,21 +78,31 @@ model Task {
     taskEvents        TaskEvent[]
     checkpoints       Checkpoint[]
     checkpointTasks   CheckpointTask[]
+    activeTimers      ActiveTimer[]
 
     @@index([projectId])
     @@index([createdById])
 }
 
-model TimeEntry {
-    id        String    @id @default(cuid())
-    startedAt DateTime
-    stoppedAt DateTime?
-    duration  Int? // SECONDS, computed on stop
-    createdAt DateTime  @default(now())
+model ActiveTimer {
+    id        String   @id @default(cuid())
+    userId    String   @unique
+    user      User     @relation(fields: [userId], references: [id])
     taskId    String
-    task      Task      @relation(fields: [taskId], references: [id])
+    task      Task     @relation(fields: [taskId], references: [id])
+    startedAt DateTime @default(now())
+}
+
+model TimeEntry {
+    id        String   @id @default(cuid())
+    startedAt DateTime
+    stoppedAt DateTime
+    duration  Int // SECONDS, computed on creation
+    createdAt DateTime @default(now())
+    taskId    String
+    task      Task     @relation(fields: [taskId], references: [id])
     userId    String
-    user      User      @relation(fields: [userId], references: [id])
+    user      User     @relation(fields: [userId], references: [id])
 }
 
 model TaskEvent {
