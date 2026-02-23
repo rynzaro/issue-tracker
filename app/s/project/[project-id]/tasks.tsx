@@ -111,7 +111,7 @@ export default function Tasks({
           {task.status === "IN_PROGRESS" ? (
             <>
               {/* ← SWAP TIMER VARIANT HERE — see options A/B/C/D below */}
-              <TimerDisplayD value={elapsedDisplay} />
+              <TimerDisplay value={elapsedDisplay} />
               <TaskRowButton
                 onClick={() => stopTimeEntryAction()}
                 invertedColors
@@ -170,49 +170,7 @@ export default function Tasks({
   );
 }
 
-// ─── TIMER STYLING OPTIONS ─────────────────────────────────────────────────────
-// Try each one, then delete the rest. Replace <TimerDisplayA> above with your pick.
-
-// A) Minimal — matches SecondaryText tokens, mono digits, no container
-//    Blends with the row. The stop button provides the "active" signal.
-function TimerDisplayA({ value }: { value: string | null }) {
-  if (!value) return null;
-  return (
-    <span className="text-sm font-mono tabular-nums text-zinc-500 dark:text-zinc-400">
-      {value}
-    </span>
-  );
-}
-
-// B) Badge pill — uses your Badge color system (zinc variant)
-//    Self-contained, reads as a status chip. Subtle but distinct.
-function TimerDisplayB({ value }: { value: string | null }) {
-  if (!value) return null;
-  return (
-    <span className="inline-flex items-center rounded-md bg-zinc-600/10 px-1.5 py-0.5 text-sm font-mono font-medium tabular-nums text-zinc-700 dark:bg-white/5 dark:text-zinc-400">
-      {value}
-    </span>
-  );
-}
-
-// C) Badge pill with pulsing dot — Clockify-style live indicator
-//    Most discoverable "something is running" signal. Uses zinc to stay neutral.
-function TimerDisplayC({ value }: { value: string | null }) {
-  if (!value) return null;
-  return (
-    <span className="inline-flex items-center gap-1.5 rounded-md bg-zinc-600/10 px-2 py-0.5 text-sm font-mono font-medium tabular-nums text-zinc-700 dark:bg-white/5 dark:text-zinc-400">
-      <span className="relative flex h-1.5 w-1.5">
-        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-zinc-400 opacity-75 dark:bg-zinc-500" />
-        <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-zinc-500 dark:bg-zinc-400" />
-      </span>
-      {value}
-    </span>
-  );
-}
-
-// D) Bordered chip — ring border only, no fill. Harvest/Notion style.
-//    Uses your existing border tokens (gray-300 / zinc-700).
-function TimerDisplayD({ value }: { value: string | null }) {
+function TimerDisplay({ value }: { value: string | null }) {
   if (!value) return null;
   return (
     <span className="inline-flex items-center rounded-md border border-gray-300 px-1.5 py-0.5 text-sm font-mono tabular-nums text-zinc-700 dark:border-zinc-700 dark:text-zinc-300">
