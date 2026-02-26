@@ -38,13 +38,17 @@ Status is derived from nullable datetime fields (`completedAt`, `archivedAt`, `d
 
 Baseline check = "no baseline on this task." Not "nearest ancestor with children" (ambiguous, unnecessary).
 
-### AD-10: Soft delete = query filtering
+### AD-10: Soft delete with app-level cascade
 
-`deletedAt IS NOT NULL` excluded in queries. No cascade to children, no restore. Children become orphaned.
+Soft delete with application-level cascade. Setting `deletedAt` on a task recursively sets `deletedAt` on all descendants via service code (not DB cascades — see AD-11). All queries filter `deletedAt IS NULL`. No restore functionality. Projects also use soft delete (set `deletedAt`, filter from queries).
+
+**Rationale:** Cascade deletion maintains tree integrity and prevents orphaned tasks that would complicate UI logic. Children with `parentId` pointing to a deleted parent would become invisible in tree-building (not pushed to parent's children array, not pushed to roots). Cascading ensures consistent tree state.
+
+**Implementation:** Service layer collects all descendant IDs via BFS/DFS, then `updateMany({ where: { id: { in: [taskId, ...descendantIds] } }, data: { deletedAt: new Date() } })`.
 
 ### AD-11: No DB cascade deletes
 
-All FKs `onDelete: Restrict`. Service code handles deletion dependencies explicitly.
+All FKs `onDelete: Restrict`. Service code handles deletion dependencies explicitly. AD-10's cascade is application-level only — DB-level cascades remain disabled to prevent accidental data loss and maintain explicit control over deletion logic.
 
 ### AD-12: Task.projectId required
 
@@ -73,11 +77,13 @@ Starting work on a task creates ONE TimeEntry for that task only. Only one task 
 **Decision:** Separate `ActiveTimer` table (`@@unique([userId])`). `TimeEntry.stoppedAt` and `duration` become NOT NULL.
 
 **Rationale:**
+
 - `@@unique([userId])` makes the invariant structurally impossible to violate — no app-level assertions needed.
 - No dual source of truth (vs. pointer approach): ActiveTimer = running, TimeEntry = completed. Complementary, not redundant.
 - Forward-compatible with all future delegation models.
 
 **Schema addition:**
+
 ```prisma
 model ActiveTimer {
   id        String   @id @default(cuid())

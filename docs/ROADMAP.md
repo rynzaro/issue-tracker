@@ -54,9 +54,30 @@ Core task management with time tracking. The first usable version of the app.
 - [x] Auto-stop previous timer when starting a new one (handled by ActiveTimer swap in transaction)
 - [x] Time rollup: parent shows sum of children's tracked time (on-the-fly `SUM()` query, acceptable for <10k tasks)
 - [x] Replace legacy `app/s/[workspaceId]/` with `app/s/project/[project-id]/`
-- [ ] Project CRUD (create, list, edit, delete)
-- [ ] Project listing selection box in navbar
-- [ ] Task CRUD (create, edit, delete)
+- [x] **Project CRUD** (create, list, edit, delete)
+  - [x] Add soft-delete filtering to `getUserProjectById` and `getUserProjectWithTasks` (Phase 0)
+  - [x] `UpdateProjectSchema` in `lib/schema/project.ts`
+  - [x] `updateProject()` service with isDefault transaction logic
+  - [x] Refactor `deleteProject()` to check ownership + active timers
+  - [x] `updateProjectAction()`, `deleteProjectAction()`
+  - [x] Project list page at `/s/main` (server component)
+  - [x] Settings link on project page (Cog icon → `/s/project/[id]/settings`)
+  - [x] Project settings page with update form
+  - [x] Delete project confirmation dialog
+- [x] **Task CRUD** (create, edit, delete)
+  - [x] Add soft-delete filtering (`deletedAt: null`) to tasks in `getUserProjectWithTasks` (Phase 0)
+  - [x] Update AD-10: cascade soft-delete to descendants (app-level, not DB cascade)
+  - [x] `deleteTask()` service with cascade logic + active timer check
+  - [x] `deleteTaskAction()`
+  - [x] Wire delete dialog state in `tasksWrapper.tsx`
+  - [x] Wire TrashIcon onClick in `tasks.tsx`
+- [ ] **Test Coverage** (see [TODO.md](../TODO.md#test-specifications--iteration-1-crud) for detailed spec)
+  - [ ] Project service tests: create, read, update, delete, filtering
+  - [ ] Task service tests: create, update, deleteTask (cascade), hasActiveTimers
+  - [ ] Project action tests: auth, validation, revalidation
+  - [ ] Task action tests: auth, validation, revalidation
+  - [ ] Integration tests: CRUD flows, multi-user isolation, soft-delete filtering
+- [ ] Project listing selection box in navbar (DONE — already implemented in `navbar-app.tsx`)
 - [ ] Task tags field (M:N, optional)
 - [ ] Task status transitions: set/clear `completedAt` (complete/uncomplete), set/clear `archivedAt` (archive/unarchive); add `archivedAt DateTime?` to Task schema
 - [ ] Active timer display in navbar

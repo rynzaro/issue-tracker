@@ -1,5 +1,7 @@
 # VS Code Copilot Agent Suite
 
+> **Superseded**: This 10-agent design is replaced by the skills architecture in `.github/skills/` (LEARN mode) and `.github/skills-fast/` (FAST mode). Skills auto-trigger based on context; agents required manual `@`-switching. Kept for reference only. See `.github/copilot-instructions.md` for the active global defaults.
+
 A collection of 10 specialized AI agents for VS Code Copilot Chat that work together to cover the full development lifecycle — from planning through implementation to review and documentation.
 
 ## Quick Start

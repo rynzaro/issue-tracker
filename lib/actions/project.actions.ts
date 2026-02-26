@@ -3,20 +3,27 @@
 import { auth } from "@/auth";
 import {
   createProject,
+  deleteProject,
+  getProjectTaskTree,
   getUserProjectById,
   getUserProjectWithTasks,
+  updateProject,
 } from "../services/project.service";
 import {
   createServiceErrorResponse,
-  createSuccessResponseWithData,
   ServiceResponseWithData,
   validateInput,
 } from "../services/serviceUtil";
 import { Project } from "@prisma/client";
 import { revalidatePath } from "next/cache";
-import { CreateProjectParams, CreateProjectSchema } from "../schema/project";
-import { TaskNode } from "../schema/task";
-import { getActiveTimeEntryForUser } from "../services/activeTask.service";
+import {
+  CreateProjectParams,
+  CreateProjectSchema,
+  ProjectWithTaskTree,
+  UpdateProjectParams,
+  UpdateProjectSchema,
+} from "../schema/project";
+import { z } from "zod";
 
 export async function createProjectAction(
   params: CreateProjectParams,
@@ -39,7 +46,56 @@ export async function createProjectAction(
     createProjectParams: validated.data,
   });
 
-  revalidatePath("/s/main");
+  if (result.success) revalidatePath("/s", "layout");
+  return result;
+}
+
+export async function updateProjectAction(params: UpdateProjectParams) {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return createServiceErrorResponse(
+      "AUTHORIZATION_ERROR",
+      "Unauthorized user",
+    );
+  }
+
+  const validated = validateInput(UpdateProjectSchema, params);
+  if (!validated.success) {
+    return validated;
+  }
+
+  const { id, ...updates } = validated.data;
+
+  const result = await updateProject({
+    projectId: id,
+    userId: session.user.id,
+    updates,
+  });
+
+  if (result.success) revalidatePath("/s", "layout");
+  return result;
+}
+
+export async function deleteProjectAction(projectId: string) {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return createServiceErrorResponse(
+      "AUTHORIZATION_ERROR",
+      "Unauthorized user",
+    );
+  }
+
+  const validated = z.string().cuid().safeParse(projectId);
+  if (!validated.success) {
+    return createServiceErrorResponse("VALIDATION_ERROR", "Invalid project ID");
+  }
+
+  const result = await deleteProject({
+    projectId: validated.data,
+    userId: session.user.id,
+  });
+
+  if (result.success) revalidatePath("/s", "layout");
   return result;
 }
 
@@ -52,9 +108,14 @@ export async function getUserProjectByIdAction(projectId: string) {
     );
   }
 
+  const validated = z.string().cuid().safeParse(projectId);
+  if (!validated.success) {
+    return createServiceErrorResponse("VALIDATION_ERROR", "Invalid project ID");
+  }
+
   return getUserProjectById({
     userId: session.user.id,
-    projectId,
+    projectId: validated.data,
   });
 }
 
@@ -67,9 +128,14 @@ export async function getUserProjectWithTasksAction(projectId: string) {
     );
   }
 
+  const validated = z.string().cuid().safeParse(projectId);
+  if (!validated.success) {
+    return createServiceErrorResponse("VALIDATION_ERROR", "Invalid project ID");
+  }
+
   return getUserProjectWithTasks({
     userId: session.user.id,
-    projectId,
+    projectId: validated.data,
   });
 }
 
@@ -77,85 +143,22 @@ export async function getUserProjectWithTasksAndChildrenAction({
   projectId,
 }: {
   projectId: string;
-}): Promise<ServiceResponseWithData<Project & { tasks: TaskNode[] }>> {
+}): Promise<ServiceResponseWithData<ProjectWithTaskTree>> {
   const session = await auth();
-  const result = await getUserProjectWithTasksAction(projectId);
-
-  if (!result.success) {
-    return result;
-  }
-
-  if (!session?.user?.id || session.user.id !== result.data.userId) {
+  if (!session?.user?.id) {
     return createServiceErrorResponse(
-      // This is unexpected because getUserProjectWithTasksAction should have already returned an auth error if the user is not authorized
-      "UNEXPECTED_ERROR",
+      "AUTHORIZATION_ERROR",
       "Unauthorized user",
     );
   }
 
-  const activeTasksResult = await getActiveTimeEntryForUser({
-    userId: session?.user?.id ?? "",
+  const validated = z.string().cuid().safeParse(projectId);
+  if (!validated.success) {
+    return createServiceErrorResponse("VALIDATION_ERROR", "Invalid project ID");
+  }
+
+  return getProjectTaskTree({
+    userId: session.user.id,
+    projectId: validated.data,
   });
-
-  if (!activeTasksResult.success) {
-    return createServiceErrorResponse(
-      "UNEXPECTED_ERROR",
-      "Failed to fetch active tasks",
-    );
-  }
-
-  const project = result.data;
-  const activeTaskId = activeTasksResult.data?.taskId ?? null;
-  const activeTimerStartedAt = activeTasksResult.data?.startedAt ?? null;
-
-  const taskMap = new Map<string, TaskNode>();
-  for (const task of project.tasks) {
-    const totalTimeSpent = task.timeEntries.reduce(
-      (sum, te) => sum + te.duration,
-      0,
-    );
-    taskMap.set(task.id, {
-      ...task,
-      children: [],
-      status: "OPEN",
-      hasActiveDescendant: false,
-      totalTimeSpent,
-      activeTimerStartedAt:
-        task.id === activeTaskId ? activeTimerStartedAt : null,
-    });
-  }
-
-  const roots: TaskNode[] = [];
-  for (const task of taskMap.values()) {
-    if (task.parentId) {
-      taskMap.get(task.parentId)?.children.push(task);
-    } else {
-      roots.push(task);
-    }
-  }
-
-  // Post-order traversal: derive status and hasActiveDescendant bottom-up
-  function deriveActivityAndAddDuration(node: TaskNode): void {
-    for (const child of node.children) {
-      deriveActivityAndAddDuration(child);
-    }
-    node.status = node.completedAt
-      ? "DONE"
-      : node.id === activeTaskId
-        ? "IN_PROGRESS"
-        : "OPEN";
-    node.hasActiveDescendant = node.children.some(
-      (c) => c.status === "IN_PROGRESS" || c.hasActiveDescendant,
-    );
-    node.totalTimeSpent = node.children.reduce(
-      (sum, c) => sum + c.totalTimeSpent,
-      node.totalTimeSpent,
-    );
-  }
-
-  for (const root of roots) {
-    deriveActivityAndAddDuration(root);
-  }
-
-  return createSuccessResponseWithData({ ...project, tasks: roots });
 }

@@ -11,8 +11,9 @@ import {
   createServiceErrorResponse,
   validateInput,
 } from "../services/serviceUtil";
-import { createTask, updateTask } from "../services/task.service";
+import { createTask, deleteTask, updateTask } from "../services/task.service";
 import { revalidatePath } from "next/cache";
+import { z } from "zod";
 
 export async function createTaskAction({
   createTaskParams,
@@ -35,7 +36,7 @@ export async function createTaskAction({
     userId: session.user.id,
     createTaskParams: validated.data,
   });
-  revalidatePath("/s/project", "layout");
+  if (result.success) revalidatePath("/s/project", "layout");
   return result;
 }
 
@@ -60,6 +61,29 @@ export async function updateTaskAction({
     userId: session.user.id,
     updateTaskParams: validated.data,
   });
-  revalidatePath("/s/project", "layout");
+  if (result.success) revalidatePath("/s/project", "layout");
+  return result;
+}
+
+export async function deleteTaskAction({ taskId }: { taskId: string }) {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return createServiceErrorResponse(
+      "AUTHORIZATION_ERROR",
+      "Unauthorized user",
+    );
+  }
+
+  const validated = z.string().cuid().safeParse(taskId);
+  if (!validated.success) {
+    return createServiceErrorResponse("VALIDATION_ERROR", "Invalid task ID");
+  }
+
+  const result = await deleteTask({
+    taskId: validated.data,
+    userId: session.user.id,
+  });
+
+  if (result.success) revalidatePath("/s/project", "layout");
   return result;
 }

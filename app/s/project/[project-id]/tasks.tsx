@@ -35,16 +35,16 @@ export default function Tasks({
   projectId,
   task,
   isRoot,
-  loading,
   setNewTaskParent,
   setTaskToEdit,
+  setTaskToDelete,
 }: {
   projectId: string;
   task: TaskNode;
   isRoot: boolean;
-  loading: boolean;
   setNewTaskParent: Dispatch<SetStateAction<TaskNode | null>>;
   setTaskToEdit: (task: TaskNode) => void;
+  setTaskToDelete: Dispatch<SetStateAction<TaskNode | null>>;
 }) {
   const [isExpanded, setIsExpanded] = useState(task.hasActiveDescendant);
   const elapsed = useElapsedTimer(task.activeTimerStartedAt);
@@ -147,6 +147,7 @@ export default function Tasks({
           <TaskRowButton
             borderless
             disabled={task.hasActiveDescendant || task.status === "IN_PROGRESS"}
+            onClick={() => setTaskToDelete(task)}
           >
             <TrashIcon className="w-5 h-5" />
           </TaskRowButton>
@@ -163,7 +164,7 @@ export default function Tasks({
             isRoot={false}
             setNewTaskParent={setNewTaskParent}
             setTaskToEdit={setTaskToEdit}
-            loading={loading}
+            setTaskToDelete={setTaskToDelete}
           />
         ))}
     </div>
