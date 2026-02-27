@@ -25,33 +25,34 @@ Designed a **dual-mode Copilot skill architecture** (FAST mode for speed, LEARN 
 
 #### FAST Mode (7 skills in `skills-fast/`)
 
-| Skill | Purpose |
-|-------|---------|
-| `plan/` | Sequential thinking → decompose into steps → present plan → get approval |
-| `implement/` | Read AGENT.md → deliberate approaches → present decision + rationale → implement |
-| `review/` | Structured code review (correctness, architecture compliance, edge cases) |
-| `test/` | Write tests following vitest patterns in `tests/`, match existing factory/mock setup |
-| `document/` | Update ROADMAP.md, ARCHITECTURE_DECISIONS.md, AGENT.md after changes |
-| `refactor/` | Identify smells → propose changes with tradeoffs → implement after approval |
-| `session-handoff/` | Produce structured handoff summary for new context window |
+| Skill              | Purpose                                                                              |
+| ------------------ | ------------------------------------------------------------------------------------ |
+| `plan/`            | Sequential thinking → decompose into steps → present plan → get approval             |
+| `implement/`       | Read AGENT.md → deliberate approaches → present decision + rationale → implement     |
+| `review/`          | Structured code review (correctness, architecture compliance, edge cases)            |
+| `test/`            | Write tests following vitest patterns in `tests/`, match existing factory/mock setup |
+| `document/`        | Update ROADMAP.md, ARCHITECTURE_DECISIONS.md, AGENT.md after changes                 |
+| `refactor/`        | Identify smells → propose changes with tradeoffs → implement after approval          |
+| `session-handoff/` | Produce structured handoff summary for new context window                            |
 
 #### LEARN Mode (9 skills in `skills-learn/`)
 
-| Skill | Differs from FAST | Categories Scored |
-|-------|-------------------|-------------------|
-| `plan/` | Asks user to attempt decomposition first, then compares | Architecture, System Thinking |
-| `implement/` | "You or me?" — spec/hints/review if user codes; explain + quiz if agent codes | Implementation, Error Handling |
-| `review/` | User does first review pass, agent reveals what they missed | Architecture, Testing, Tradeoffs |
-| `test/` | Asks "what should we test?" before writing — evaluates test strategy thinking | Testing Strategy |
-| `document/` | Asks user to draft decision rationale, refines it | System Thinking |
-| `refactor/` | Presents smell, asks user to propose fix before showing agent's approach | Architecture, Tradeoffs |
-| `session-handoff/` | Same as FAST (no learning dimension) | — |
-| `tradeoff-coach/` | LEARN-only. Surfaces tradeoffs in decisions, asks user to evaluate | Tradeoff Analysis |
-| `learner-profile/` | LEARN-only. Manages PROFILE.md, calibrates ratings, suggests focus areas | — |
+| Skill              | Differs from FAST                                                             | Categories Scored                |
+| ------------------ | ----------------------------------------------------------------------------- | -------------------------------- |
+| `plan/`            | Asks user to attempt decomposition first, then compares                       | Architecture, System Thinking    |
+| `implement/`       | "You or me?" — spec/hints/review if user codes; explain + quiz if agent codes | Implementation, Error Handling   |
+| `review/`          | User does first review pass, agent reveals what they missed                   | Architecture, Testing, Tradeoffs |
+| `test/`            | Asks "what should we test?" before writing — evaluates test strategy thinking | Testing Strategy                 |
+| `document/`        | Asks user to draft decision rationale, refines it                             | System Thinking                  |
+| `refactor/`        | Presents smell, asks user to propose fix before showing agent's approach      | Architecture, Tradeoffs          |
+| `session-handoff/` | Same as FAST (no learning dimension)                                          | —                                |
+| `tradeoff-coach/`  | LEARN-only. Surfaces tradeoffs in decisions, asks user to evaluate            | Tradeoff Analysis                |
+| `learner-profile/` | LEARN-only. Manages PROFILE.md, calibrates ratings, suggests focus areas      | —                                |
 
 ### Rating System
 
 **5 Tiers** (each with .1 beginning, .2 solid, .3 almost-next-level):
+
 - **Junior (1.x)**: Needs guidance on fundamentals
 - **Mid-Level (2.x)**: Can implement with some direction
 - **Senior (3.x)**: Makes sound independent decisions
@@ -59,6 +60,7 @@ Designed a **dual-mode Copilot skill architecture** (FAST mode for speed, LEARN 
 - **Exceptional (5.x)**: Novel solutions, teaches others
 
 **7 Core Assessment Categories**:
+
 1. Architecture & Patterns
 2. Implementation Quality
 3. Tradeoff Analysis
@@ -68,6 +70,7 @@ Designed a **dual-mode Copilot skill architecture** (FAST mode for speed, LEARN 
 7. System Thinking
 
 **3 Optional Categories** (activate when relevant):
+
 - Performance & Optimization
 - Security Awareness
 - Developer Experience / API Design
