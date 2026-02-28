@@ -95,8 +95,14 @@ export function ToastProvider({ children }: { children: ReactNode }) {
               <Transition key={toast.id} show={toast.show}>
                 <div
                   className={clsx(
-                    "pointer-events-auto w-full rounded-lg border-l-4 bg-white shadow-lg outline-1 outline-gray-300 transition data-closed:opacity-0 data-enter:transform data-enter:duration-300 data-enter:ease-out data-closed:data-enter:translate-y-2 data-closed:data-enter:sm:translate-x-2 data-closed:data-enter:sm:translate-y-0 data-leave:duration-100 data-leave:ease-in",
-                    toast.type === "success" && "border-green-400",
+                    "pointer-events-auto w-full rounded-lg border-l-4",
+                    "bg-white shadow-lg outline-1 outline-gray-300",
+                    "dark:bg-zinc-900 dark:outline-white/10",
+                    "transition data-closed:opacity-0",
+                    "data-enter:transform data-enter:duration-300 data-enter:ease-out",
+                    "data-closed:data-enter:translate-y-2 data-closed:data-enter:sm:translate-x-2 data-closed:data-enter:sm:translate-y-0",
+                    "data-leave:duration-100 data-leave:ease-in",
+                    toast.type === "success" && "border-green-400 ",
                     toast.type === "error" && "border-red-400",
                     toast.type === "info" && "border-blue-400",
                     !toast.type && "border-gray-300  dark:border-zinc-600",
