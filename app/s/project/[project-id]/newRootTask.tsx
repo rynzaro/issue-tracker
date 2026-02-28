@@ -14,8 +14,15 @@ import { ErrorMessage, Field, FieldGroup, Label } from "@/components/fieldset";
 import { Input } from "@/components/input";
 import { Textarea } from "@/components/textarea";
 import { handleInput } from "@/lib/formUtils";
+import {
+  ErrorToast,
+  InfoToast,
+  SuccessToast,
+  useToast,
+} from "@/lib/notification/toastProvider";
 
 export default function NewRootTask({ projectId }: { projectId: string }) {
+  const { showToast } = useToast();
   const [open, setOpen] = useState(false);
   const { values, setValues, resetForm, submitCreate } = useTaskForm(projectId);
 
@@ -29,8 +36,30 @@ export default function NewRootTask({ projectId }: { projectId: string }) {
     // TODO error handling
   }
 
+  function triggerNotification() {
+    showToast(
+      <SuccessToast
+        title="Neue Aufgabe erstellt"
+        description="Die Aufgabe wurde erfolgreich erstellt."
+      />,
+    );
+    showToast(
+      <ErrorToast
+        title="Fehler"
+        description="Die Aufgabe konnte nicht erstellt werden."
+      />,
+    );
+    showToast(
+      <InfoToast
+        title="Info"
+        description="Dies ist eine informative Nachricht."
+      />,
+    );
+  }
+
   return (
     <>
+      <Button onClick={() => triggerNotification()}>Benachrichtigung</Button>
       <Button onClick={() => setOpen(true)}>Neue Aufgabe</Button>
       <Dialog
         open={open}
