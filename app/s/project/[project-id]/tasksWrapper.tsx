@@ -23,6 +23,12 @@ import { Input } from "@/components/input";
 import { Textarea } from "@/components/textarea";
 import { handleInput } from "@/lib/formUtils";
 import { deleteTaskAction } from "@/lib/actions/task.actions";
+import {
+  ErrorToast,
+  InfoToast,
+  SuccessToast,
+  useToast,
+} from "@/lib/notification/toastProvider";
 
 export default function TasksWrapper({
   projectId,
@@ -38,10 +44,7 @@ export default function TasksWrapper({
   const [taskToDelete, setTaskToDelete] = useState<TaskNode | null>(null);
   const displayTaskToDelete = usePersistentValue(taskToDelete);
   const [loading, setLoading] = useState(false);
-  const [createError, setCreateError] = useState<string | null>(null);
-  const [updateError, setUpdateError] = useState<string | null>(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
-  const [deleteError, setDeleteError] = useState<string | null>(null);
   const {
     values,
     setValues,
@@ -56,6 +59,8 @@ export default function TasksWrapper({
     prefillForm(task);
   }
 
+  const { showToast } = useToast();
+
   async function handleCreateTask(
     event: React.SubmitEvent<HTMLFormElement>,
     parentId: string | null,
@@ -63,14 +68,26 @@ export default function TasksWrapper({
     event.preventDefault();
     event.stopPropagation();
     setLoading(true);
-    setCreateError(null);
     const result = await submitCreate(parentId);
     if (result.success) {
       setNewTaskParent(null);
+      showToast(
+        <SuccessToast
+          title="Neue Aufgabe erstellt"
+          description="Die Aufgabe wurde erfolgreich erstellt."
+        />,
+      );
     } else {
-      const msg =
-        typeof result.error === "string" ? result.error : result.error.message;
-      setCreateError(msg);
+      showToast(
+        <ErrorToast
+          title="Fehler"
+          description={
+            typeof result.error === "string"
+              ? result.error
+              : result.error.message
+          }
+        />,
+      );
     }
     setLoading(false);
   }
@@ -80,14 +97,26 @@ export default function TasksWrapper({
     event.stopPropagation();
     if (!taskToEdit) return;
     setLoading(true);
-    setUpdateError(null);
     const result = await submitUpdate(taskToEdit.id);
     if (result.success) {
+      showToast(
+        <SuccessToast
+          title="Aufgabe aktualisiert"
+          description="Die Aufgabe wurde erfolgreich aktualisiert."
+        />,
+      );
       setTaskToEdit(null);
     } else {
-      const msg =
-        typeof result.error === "string" ? result.error : result.error.message;
-      setUpdateError(msg);
+      showToast(
+        <ErrorToast
+          title="Fehler"
+          description={
+            result.error instanceof Error
+              ? result.error.message
+              : "Die Aufgabe konnte nicht aktualisiert werden."
+          }
+        />,
+      );
     }
     setLoading(false);
   }
@@ -95,16 +124,48 @@ export default function TasksWrapper({
   async function handleDeleteTask() {
     if (!taskToDelete) return;
     setDeleteLoading(true);
-    setDeleteError(null);
 
     const result = await deleteTaskAction({ taskId: taskToDelete.id });
 
     if (result.success) {
+      showToast(
+        <SuccessToast
+          title="Aufgabe gelöscht"
+          description="Die Aufgabe wurde erfolgreich gelöscht."
+        />,
+      );
       setTaskToDelete(null);
     } else {
-      setDeleteError(result.error.message);
+      showToast(
+        <ErrorToast
+          title="Fehler"
+          description="Die Aufgabe konnte nicht gelöscht werden."
+        />,
+      );
     }
     setDeleteLoading(false);
+  }
+
+  function triggerNotification() {
+    showToast(
+      <SuccessToast
+        title="Neue Aufgabe erstellt"
+        description="Die Aufgabe wurde erfolgreich erstellt."
+      />,
+      2000,
+    );
+    showToast(
+      <ErrorToast
+        title="Fehler"
+        description="Die Aufgabe konnte nicht erstellt werden."
+      />,
+    );
+    showToast(
+      <InfoToast
+        title="Info"
+        description="Dies ist eine informative Nachricht."
+      />,
+    );
   }
 
   return (
@@ -126,7 +187,6 @@ export default function TasksWrapper({
           open={!!newTaskParent}
           onClose={() => {
             setNewTaskParent(null);
-            setCreateError(null);
             resetForm();
           }}
         >
@@ -179,17 +239,15 @@ export default function TasksWrapper({
                   )}
                 </Field>
               </FieldGroup>
-              {createError && (
-                <p className="mt-2 text-sm text-red-600 dark:text-red-400">
-                  {createError}
-                </p>
-              )}
+
               <DialogActions>
+                <Button onClick={() => triggerNotification()}>
+                  Benachrichtigung
+                </Button>
                 <Button
                   plain
                   onClick={() => {
                     setNewTaskParent(null);
-                    setCreateError(null);
                     resetForm();
                   }}
                 >
@@ -205,7 +263,6 @@ export default function TasksWrapper({
           open={!!taskToEdit}
           onClose={() => {
             setTaskToEdit(null);
-            setUpdateError(null);
             resetForm();
           }}
         >
@@ -256,17 +313,11 @@ export default function TasksWrapper({
                   )}
                 </Field>
               </FieldGroup>
-              {updateError && (
-                <p className="mt-2 text-sm text-red-600 dark:text-red-400">
-                  {updateError}
-                </p>
-              )}
               <DialogActions>
                 <Button
                   plain
                   onClick={() => {
                     setTaskToEdit(null);
-                    setUpdateError(null);
                     resetForm();
                   }}
                 >
@@ -282,7 +333,6 @@ export default function TasksWrapper({
           open={!!taskToDelete}
           onClose={() => {
             setTaskToDelete(null);
-            setDeleteError(null);
           }}
         >
           <AlertTitle>
@@ -293,17 +343,11 @@ export default function TasksWrapper({
               ? `Aufgabe „${displayTaskToDelete.title}" und alle Unteraufgaben werden gelöscht.`
               : `Aufgabe „${displayTaskToDelete?.title}" wird gelöscht.`}
           </AlertDescription>
-          {deleteError && (
-            <p className="mt-2 text-sm text-red-600 dark:text-red-400">
-              {deleteError}
-            </p>
-          )}
           <AlertActions>
             <Button
               plain
               onClick={() => {
                 setTaskToDelete(null);
-                setDeleteError(null);
               }}
               disabled={deleteLoading}
             >

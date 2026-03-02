@@ -17,7 +17,7 @@ import { Dispatch, SetStateAction, useState } from "react";
 import TaskRowButton from "./taskRowButton";
 import { Subheading } from "@/components/heading";
 import { SecondaryText } from "@/components/text";
-import { formatTime } from "@/lib/util";
+import { formatTime, getActiveDescendantStartedAt } from "@/lib/util";
 import { useElapsedTimer } from "@/lib/hooks";
 import {
   startTimeEntryAction,
@@ -26,7 +26,7 @@ import {
 
 function formatElapsed(elapsed: number, taskStatus: string): string | null {
   if (elapsed <= 0 && taskStatus !== "IN_PROGRESS") return null;
-  return elapsed < 600
+  return elapsed < 3600
     ? formatTime(elapsed, "sec", "MM:SS", true)
     : formatTime(elapsed, "sec", "HH:MM", true);
 }
@@ -47,9 +47,16 @@ export default function Tasks({
   setTaskToDelete: Dispatch<SetStateAction<TaskNode | null>>;
 }) {
   const [isExpanded, setIsExpanded] = useState(task.hasActiveDescendant);
-  const elapsed = useElapsedTimer(task.activeTimerStartedAt);
-  const elapsedDisplay =
-    task.status === "IN_PROGRESS" ? formatElapsed(elapsed, task.status) : null;
+
+  const timerStartedAt =
+    task.status === "IN_PROGRESS"
+      ? task.activeTimerStartedAt
+      : task.hasActiveDescendant
+        ? getActiveDescendantStartedAt(task)
+        : null;
+
+  const elapsed = useElapsedTimer(timerStartedAt);
+  const displayTotal = task.totalTimeSpent + elapsed;
 
   return (
     <div
@@ -61,14 +68,13 @@ export default function Tasks({
       <div
         role="button"
         className={clsx(
-          "flex justify-between items-start sm:flex-row flex-col gap-2 sm:items-center py-2 pl-4 pr-2 rounded-lg border-l-4 border-gray-300 dark:border-zinc-600",
+          "flex justify-between items-start sm:flex-row flex-col gap-2 sm:items-center py-2 pl-4 pr-2 rounded-lg border-l-4",
           (task.status === "DONE" ||
             (task.status === "OPEN" && !task.hasActiveDescendant)) &&
             "hover:bg-gray-50 dark:hover:bg-zinc-800",
-          task.status === "IN_PROGRESS" &&
-            "bg-yellow-100 dark:bg-yellow-900/50 border-yellow-500 hover:bg-yellow-100/60 dark:hover:bg-yellow-900/30",
-          task.hasActiveDescendant &&
-            "bg-blue-100 dark:bg-blue-900/50 border-blue-500 hover:bg-blue-100/75 dark:hover:bg-blue-900/30",
+          task.status === "IN_PROGRESS" || task.hasActiveDescendant
+            ? "border-gray-600 dark:border-gray-300"
+            : "border-gray-300 dark:border-gray-600",
         )}
         onClick={() => {
           task.children &&
@@ -78,6 +84,9 @@ export default function Tasks({
       >
         <div className="shrink-0">
           <Subheading level={4} className="flex flex-gap-1 items-center">
+            {(task.status === "IN_PROGRESS" || task.hasActiveDescendant) && (
+              <span className="inline-block w-2 h-2 rounded-full bg-zinc-700 dark:bg-zinc-300 mr-2 animate-pulse-dot" />
+            )}
             {task.title}
             {isExpanded ? (
               <ChevronUpIcon className="w-6 h-6" />
@@ -86,10 +95,10 @@ export default function Tasks({
             ) : null}
           </Subheading>
           <SecondaryText>
-            {(task.totalTimeSpent > 0 || task.estimate) && (
+            {(displayTotal > 0 || task.estimate) && (
               <>
-                {task.totalTimeSpent > 0
-                  ? formatTime(task.totalTimeSpent, "sec", "HH:MM", true)
+                {displayTotal > 0
+                  ? formatTime(displayTotal, "sec", "HH:MM", true)
                   : "\u2014"}
                 {task.estimate != null && (
                   <>
@@ -110,8 +119,7 @@ export default function Tasks({
         >
           {task.status === "IN_PROGRESS" ? (
             <>
-              {/* ← SWAP TIMER VARIANT HERE — see options A/B/C/D below */}
-              <TimerDisplay value={elapsedDisplay} />
+              <TimerDisplay value={formatElapsed(elapsed, task.status)} />
               <TaskRowButton
                 onClick={() => stopTimeEntryAction()}
                 invertedColors

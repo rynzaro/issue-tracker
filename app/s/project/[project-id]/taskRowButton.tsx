@@ -37,6 +37,7 @@ export default function TaskRowButton({
       )}
       onClick={handleClick}
       onKeyDown={handleKeyDown}
+      disabled={disabled}
     >
       {children}
     </button>

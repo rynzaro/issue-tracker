@@ -77,12 +77,27 @@ Core task management with time tracking. The first usable version of the app.
   - [ ] Project action tests: auth, validation, revalidation
   - [ ] Task action tests: auth, validation, revalidation
   - [ ] Integration tests: CRUD flows, multi-user isolation, soft-delete filtering
-- [ ] Project listing selection box in navbar (DONE — already implemented in `navbar-app.tsx`)
+- [ ] Task CRUD
 - [ ] Task tags field (M:N, optional)
+- [ ] Only one task PER project
+- [ ] Track time
+- [ ] Finish task key binding
+- [ ] Task information
+- [ ] different time selector
 - [ ] Task status transitions: set/clear `completedAt` (complete/uncomplete), set/clear `archivedAt` (archive/unarchive); add `archivedAt DateTime?` to Task schema
-- [ ] Active timer display in navbar
-- [ ] Delete legacy Toggl API routes (`create-tag/`, `create-tag-without-permission/`, `start-new-entry/`) or move to `app/api/toggl/`
-- [ ] optional: Task ordering
+- [ ] Active timer indicator
+- [ ] accumulative and / or own estimate when creating or updating task (add database field(s))
+- [ ] indicator, when sum of sub-tasks is larger than the parents' estimate
+- [ ] task search
+- [ ] archived section
+- [ ] deleted section
+- [ ] accessibility
+
+## Iteration 1.5 - Integrations
+
+- [ ] Toggl
+- [ ] Github
+  - [ ] show and edit issues in OnTrack
 
 ## Iteration 2 — Event Log
 

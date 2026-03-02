@@ -31,35 +31,26 @@ export default function NewRootTask({ projectId }: { projectId: string }) {
     event.stopPropagation();
     const result = await submitCreate(null);
     if (result.success) {
+      showToast(
+        <SuccessToast
+          title="Neue Aufgabe erstellt"
+          description="Die Aufgabe wurde erfolgreich erstellt."
+        />,
+        2000,
+      );
       setOpen(false);
+    } else {
+      showToast(
+        <ErrorToast
+          title="Fehler"
+          description="Die Aufgabe konnte nicht erstellt werden."
+        />,
+      );
     }
-    // TODO error handling
-  }
-
-  function triggerNotification() {
-    showToast(
-      <SuccessToast
-        title="Neue Aufgabe erstellt"
-        description="Die Aufgabe wurde erfolgreich erstellt."
-      />,
-    );
-    showToast(
-      <ErrorToast
-        title="Fehler"
-        description="Die Aufgabe konnte nicht erstellt werden."
-      />,
-    );
-    showToast(
-      <InfoToast
-        title="Info"
-        description="Dies ist eine informative Nachricht."
-      />,
-    );
   }
 
   return (
     <>
-      <Button onClick={() => triggerNotification()}>Benachrichtigung</Button>
       <Button onClick={() => setOpen(true)}>Neue Aufgabe</Button>
       <Dialog
         open={open}

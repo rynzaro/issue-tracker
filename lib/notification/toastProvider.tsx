@@ -28,13 +28,7 @@ type ToastData = {
 };
 
 type ToastContextType = {
-  showToast: (content: ReactNode, options?: { duration?: number }) => void;
-};
-
-const iconColorMap: Record<ToastType, string> = {
-  success: "text-green-400",
-  error: "text-red-400",
-  info: "text-blue-400",
+  showToast: (content: ReactNode, duration?: number, replace?: boolean) => void;
 };
 
 function getToastType(content: ReactNode): ToastType {
@@ -64,18 +58,27 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const showToast = useCallback(
-    (content: ReactNode, options?: { duration?: number }) => {
+    (content: ReactNode, duration?: number, replace?: boolean) => {
       const id = Math.random().toString(36).slice(2, 9);
       const type = getToastType(content);
-      const duration = options?.duration ?? 5000;
-      console.log("Showing toast:", { id, type, content, duration });
-      setToasts((prev) => [
-        ...prev,
-        { id, type, content, duration, show: true },
-      ]);
+      const toast = {
+        id,
+        type,
+        content,
+        duration: duration ?? 5000,
+        show: true,
+        replace: replace ?? false,
+      };
+
+      setToasts((prev) => {
+        if (toast.replace) {
+          return [toast];
+        }
+        return [...prev, toast];
+      });
 
       if (duration !== Infinity) {
-        setTimeout(() => removeToast(id), duration);
+        setTimeout(() => removeToast(id), duration ?? 5000);
       }
     },
     [removeToast],

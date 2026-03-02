@@ -1,2 +1,21 @@
 @import "tailwindcss";
 @source "../lib";
+
+/* Pulsing dot animation for active tasks */
+@keyframes pulse-dot {
+  0%,
+  100% {
+    opacity: 0.4;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.3);
+  }
+}
+
+.animate-pulse-dot {
+  animation: pulse-dot 1.5s ease-in-out infinite;
+}
+
+/* Updated Cooking SVG - Better colors and steam positioning */
