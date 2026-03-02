@@ -71,12 +71,6 @@ Core task management with time tracking. The first usable version of the app.
   - [x] `deleteTaskAction()`
   - [x] Wire delete dialog state in `tasksWrapper.tsx`
   - [x] Wire TrashIcon onClick in `tasks.tsx`
-- [ ] **Test Coverage** (see [TODO.md](../TODO.md#test-specifications--iteration-1-crud) for detailed spec)
-  - [ ] Project service tests: create, read, update, delete, filtering
-  - [ ] Task service tests: create, update, deleteTask (cascade), hasActiveTimers
-  - [ ] Project action tests: auth, validation, revalidation
-  - [ ] Task action tests: auth, validation, revalidation
-  - [ ] Integration tests: CRUD flows, multi-user isolation, soft-delete filtering
 - [ ] Task CRUD
 - [ ] Task tags field (M:N, optional)
 - [ ] Only one task PER project
@@ -88,10 +82,20 @@ Core task management with time tracking. The first usable version of the app.
 - [ ] Active timer indicator
 - [ ] accumulative and / or own estimate when creating or updating task (add database field(s))
 - [ ] indicator, when sum of sub-tasks is larger than the parents' estimate
+- [ ] mobile version
+  - [ ] show / hide options for mobile
+- [ ] move settings etc on taskWrapper to a more mobile-friendly area (or use popup)
 - [ ] task search
 - [ ] archived section
 - [ ] deleted section
 - [ ] accessibility
+
+- [ ] **Test Coverage** (see [TODO.md](../TODO.md#test-specifications--iteration-1-crud) for detailed spec)
+  - [ ] Project service tests: create, read, update, delete, filtering
+  - [ ] Task service tests: create, update, deleteTask (cascade), hasActiveTimers
+  - [ ] Project action tests: auth, validation, revalidation
+  - [ ] Task action tests: auth, validation, revalidation
+  - [ ] Integration tests: CRUD flows, multi-user isolation, soft-delete filtering
 
 ## Iteration 1.5 - Integrations
 

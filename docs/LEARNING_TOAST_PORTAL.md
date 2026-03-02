@@ -40,11 +40,11 @@ Each toast in the array is an object:
 
 ```ts
 type ToastData = {
-  id: string;       // random ID for keying in the list
-  type: ToastType;  // "success" | "error" | "info" — determines icon & border color
+  id: string; // random ID for keying in the list
+  type: ToastType; // "success" | "error" | "info" — determines icon & border color
   content: ReactNode; // the JSX passed to showToast (e.g. <SuccessToast title="Saved!" />)
-  duration?: number;  // auto-dismiss time in ms (default 5000)
-  show: boolean;      // controls the Transition animation (true = visible, false = exiting)
+  duration?: number; // auto-dismiss time in ms (default 5000)
+  show: boolean; // controls the Transition animation (true = visible, false = exiting)
 };
 ```
 
@@ -94,7 +94,7 @@ function getToastType(content: ReactNode): ToastType {
 This inspects the React element you pass to `showToast`. When you write:
 
 ```tsx
-showToast(<SuccessToast title="Gespeichert!" />)
+showToast(<SuccessToast title="Gespeichert!" />);
 ```
 
 React creates an element object where `.type` is the `SuccessToast` function reference. `getToastType` checks that reference to determine the toast type, which controls the icon and border color. If you pass plain text or an unknown component, it defaults to `"info"`.
@@ -138,7 +138,7 @@ This is what the DOM actually looks like when a Dialog is open:
   │   └────────────────────────────────────┘  │
   │                                           │
   └───────────────────────────────────────────┘
-  
+
   ┌─ Dialog Portal (direct child of <body>) ──┐
   │                                            │
   │   ┌─ Backdrop (covers everything) ──────┐  │
@@ -229,22 +229,22 @@ The fix: `useEffect` only runs on the **client** (never on the server). So `moun
 Instead of rendering the toast container inline in the JSX return, extract it:
 
 ```tsx
-  const toastContainer = (
-    <div
-      aria-live="assertive"
-      className="pointer-events-none fixed inset-0 z-99999 flex items-start justify-end px-4 py-6 sm:p-6"
-    >
-      <div className="flex w-full max-w-sm flex-col items-end space-y-3">
-        {toasts.map((toast) => {
-          return (
-            <Transition key={toast.id} show={toast.show}>
-              {/* ... same toast rendering as before ... */}
-            </Transition>
-          );
-        })}
-      </div>
+const toastContainer = (
+  <div
+    aria-live="assertive"
+    className="pointer-events-none fixed inset-0 z-99999 flex items-start justify-end px-4 py-6 sm:p-6"
+  >
+    <div className="flex w-full max-w-sm flex-col items-end space-y-3">
+      {toasts.map((toast) => {
+        return (
+          <Transition key={toast.id} show={toast.show}>
+            {/* ... same toast rendering as before ... */}
+          </Transition>
+        );
+      })}
     </div>
-  );
+  </div>
+);
 ```
 
 This is the same JSX that was inline before — just stored in a variable so we can pass it to `createPortal`.
@@ -362,13 +362,13 @@ export function ToastProvider({ children }: { children: ReactNode }) {
 
 ## Key Takeaways
 
-| Concept | One-liner |
-|---|---|
-| **React Context** | Share state (like `showToast`) across the component tree without prop drilling |
-| **Stacking Context** | A z-index only competes with siblings in the same stacking context — children can't escape their parent |
-| **React Portal** | `createPortal(jsx, domNode)` renders JSX into a different DOM location while keeping React state/context intact |
-| **SSR Guard** | Use `useEffect` + a `mounted` flag to safely access `document` only on the client |
-| **The fix** | Portal the toast container to `<body>` so it's a sibling of (not nested inside) the Dialog portal, with a high z-index |
+| Concept              | One-liner                                                                                                              |
+| -------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| **React Context**    | Share state (like `showToast`) across the component tree without prop drilling                                         |
+| **Stacking Context** | A z-index only competes with siblings in the same stacking context — children can't escape their parent                |
+| **React Portal**     | `createPortal(jsx, domNode)` renders JSX into a different DOM location while keeping React state/context intact        |
+| **SSR Guard**        | Use `useEffect` + a `mounted` flag to safely access `document` only on the client                                      |
+| **The fix**          | Portal the toast container to `<body>` so it's a sibling of (not nested inside) the Dialog portal, with a high z-index |
 
 ---
 

@@ -68,7 +68,7 @@ export default function Tasks({
       <div
         role="button"
         className={clsx(
-          "flex justify-between items-start sm:flex-row flex-col gap-2 sm:items-center py-2 pl-4 pr-2 rounded-lg border-l-4",
+          "flex justify-between items-start sm:flex-row flex-col gap-2 sm:items-center py-2 pl-4 pr-2 rounded-lg border-l-4 select-none",
           (task.status === "DONE" ||
             (task.status === "OPEN" && !task.hasActiveDescendant)) &&
             "hover:bg-gray-50 dark:hover:bg-zinc-800",
