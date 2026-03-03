@@ -105,8 +105,8 @@ issue-tracker/
 │   ├── services/                     # Business logic (pure functions, Prisma calls)
 │   │   ├── project.service.ts        # Project reads
 │   │   ├── task.service.ts           # Task CRUD (create, update, hasActiveTimers)
-│   │   ├── timeEntry.service.ts      # Start/stop timers, duration calc
-│   │   ├── activeTask.service.ts     # Active timer queries (getActiveTimeEntryForUser)
+│   │   ├── timeEntry.service.ts      # Historical time entry queries (future)
+│   │   ├── activeTask.service.ts     # Active timer management (start, stop, get, change)
 │   │   ├── serviceUtil.ts            # serviceAction wrapper, error responses
 │   │   └── ...                       # Skeleton services for future iterations
 │   ├── actions/                      # Server Actions ("use server" wrappers around services)

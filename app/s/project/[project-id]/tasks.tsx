@@ -20,9 +20,9 @@ import { SecondaryText } from "@/components/text";
 import { formatTime, getActiveDescendantStartedAt } from "@/lib/util";
 import { useElapsedTimer } from "@/lib/hooks";
 import {
-  startTimeEntryAction,
-  stopTimeEntryAction,
-} from "@/lib/actions/timeEntry.actions";
+  startActiveTimerAction,
+  stopActiveTimerAction,
+} from "@/lib/actions/activeTask.actions";
 
 function formatElapsed(elapsed: number, taskStatus: string): string | null {
   if (elapsed <= 0 && taskStatus !== "IN_PROGRESS") return null;
@@ -121,7 +121,7 @@ export default function Tasks({
             <>
               <TimerDisplay value={formatElapsed(elapsed, task.status)} />
               <TaskRowButton
-                onClick={() => stopTimeEntryAction()}
+                onClick={() => stopActiveTimerAction()}
                 invertedColors
               >
                 <StopIcon className="w-6 h-6" />
@@ -129,7 +129,7 @@ export default function Tasks({
             </>
           ) : (
             <TaskRowButton
-              onClick={() => startTimeEntryAction({ taskId: task.id })}
+              onClick={() => startActiveTimerAction({ taskId: task.id })}
             >
               <PlayIcon className="w-6 h-6" />
             </TaskRowButton>

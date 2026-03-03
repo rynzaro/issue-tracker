@@ -71,24 +71,31 @@ Core task management with time tracking. The first usable version of the app.
   - [x] `deleteTaskAction()`
   - [x] Wire delete dialog state in `tasksWrapper.tsx`
   - [x] Wire TrashIcon onClick in `tasks.tsx`
-- [ ] Task CRUD
-- [ ] Task tags field (M:N, optional)
-- [ ] Only one task PER project
-- [ ] Track time
-- [ ] Finish task key binding
-- [ ] Task information
-- [ ] different time selector
-- [ ] Task status transitions: set/clear `completedAt` (complete/uncomplete), set/clear `archivedAt` (archive/unarchive); add `archivedAt DateTime?` to Task schema
-- [ ] Active timer indicator
-- [ ] accumulative and / or own estimate when creating or updating task (add database field(s))
-- [ ] indicator, when sum of sub-tasks is larger than the parents' estimate
-- [ ] mobile version
-  - [ ] show / hide options for mobile
-- [ ] move settings etc on taskWrapper to a more mobile-friendly area (or use popup)
-- [ ] task search
-- [ ] archived section
-- [ ] deleted section
-- [ ] accessibility
+- [x] Active timer indicator
+- [ ] **Time Entry CRUD** (show, create, edit, delete)
+  - [ ] Show TimeEntries on task detail view
+  - [ ] Create manual time entries
+  - [ ] Edit existing time entries (start/stop times, duration)
+  - [ ] Edit running entry's start time
+  - [ ] Time input selector component (replace raw minutes input)
+- [ ] **Task Status Transitions** (complete, uncomplete, archive, unarchive)
+  - [ ] Set/clear `completedAt` (complete/uncomplete)
+  - [ ] Add `archivedAt DateTime?` to Task schema
+  - [ ] Set/clear `archivedAt` (archive/unarchive)
+  - [ ] Archived tasks section (filterable view)
+  - [ ] Deleted tasks section (soft-deleted, read-only view)
+- [ ] **Timer Behavior**
+  - [ ] Only one active task per PROJECT per user (currently global per-user)
+  - [ ] Keyboard shortcut to stop active task
+- [ ] **Estimates**
+  - [ ] Accumulative and/or own estimate field on Task (add database field(s))
+  - [ ] Indicator when sum of sub-task estimates exceeds parent's estimate
+- [ ] **Task Tags** (M:N, optional via `Tag`/`TaskTag` models)
+- [ ] **Task Search** (filter/search tasks within a project)
+- [ ] **Mobile Layout**
+  - [ ] Responsive show/hide for task options
+  - [ ] Move tasksWrapper settings to mobile-friendly area (dropdown or bottom sheet)
+- [ ] **Accessibility** (keyboard navigation, ARIA labels, focus management)
 
 - [ ] **Test Coverage** (see [TODO.md](../TODO.md#test-specifications--iteration-1-crud) for detailed spec)
   - [ ] Project service tests: create, read, update, delete, filtering

@@ -5,3 +5,7 @@
 # Features
 
 - task ordering
+
+# Settings
+
+- stop timer after x hours

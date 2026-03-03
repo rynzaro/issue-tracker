@@ -15,17 +15,15 @@ vi.mock("@/lib/prisma", () => {
 // ─── Mock activeTask.service (external dependency of getProjectTaskTree) ──────
 
 vi.mock("@/lib/services/activeTask.service", () => ({
-  getActiveTimeEntryForUser: vi.fn(),
+  getActiveTimer: vi.fn(),
 }));
 
 import { getProjectTaskTree } from "@/lib/services/project.service";
-import { getActiveTimeEntryForUser } from "@/lib/services/activeTask.service";
+import { getActiveTimer } from "@/lib/services/activeTask.service";
 import prisma from "@/lib/prisma";
 
 const db = prisma as unknown as MockPrismaClient;
-const mockGetActiveTimer = getActiveTimeEntryForUser as ReturnType<
-  typeof vi.fn
->;
+const mockGetActiveTimer = getActiveTimer as ReturnType<typeof vi.fn>;
 
 // ─── Helper: build a task row as returned by Prisma's include query ──────────
 
@@ -367,7 +365,7 @@ describe("getProjectTaskTree", () => {
     }
   });
 
-  it("returns UNEXPECTED_ERROR when getActiveTimeEntryForUser fails", async () => {
+  it("returns UNEXPECTED_ERROR when getActiveTimer fails", async () => {
     mockProjectWithTasks([]);
     mockGetActiveTimer.mockResolvedValue({
       success: false,

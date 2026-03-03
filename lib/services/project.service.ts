@@ -8,9 +8,13 @@ import {
   ServiceResponseWithData,
 } from "./serviceUtil";
 import { Project } from "@prisma/client";
-import { CreateProjectParams, ProjectWithTaskTree, UpdateProjectParams } from "../schema/project";
+import {
+  CreateProjectParams,
+  ProjectWithTaskTree,
+  UpdateProjectParams,
+} from "../schema/project";
 import { TaskNode } from "../schema/task";
-import { getActiveTimeEntryForUser } from "./activeTask.service";
+import { getActiveTimer } from "./activeTask.service";
 
 export async function createProject({
   userId,
@@ -253,7 +257,7 @@ export function getProjectTaskTree({
     const projectResult = await getUserProjectWithTasks({ userId, projectId });
     if (!projectResult.success) return projectResult;
 
-    const activeTimerResult = await getActiveTimeEntryForUser({ userId });
+    const activeTimerResult = await getActiveTimer({ userId });
     if (!activeTimerResult.success) {
       return createServiceErrorResponse(
         "UNEXPECTED_ERROR",

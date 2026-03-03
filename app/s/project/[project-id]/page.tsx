@@ -43,9 +43,6 @@ export default async function Page({
       <div className="flex justify-between">
         <div className="flex items-baseline gap-4">
           <Heading>{project.data.name}</Heading>
-          <Subheading level={1} className="text-gray-500">
-            Aufgabenverwaltung
-          </Subheading>
         </div>
         <div className="flex items-center gap-2">
           {!project.data.isDefault && (
