@@ -6,15 +6,22 @@ import { Link } from "./link";
 const styles = {
   base: [
     // Base
-    "relative isolate inline-flex items-baseline justify-center gap-x-2 rounded-lg border text-base/6 font-semibold",
-    // Sizing
-    "px-[calc(--spacing(3.5)-1px)] py-[calc(--spacing(2.5)-1px)] sm:px-[calc(--spacing(3)-1px)] sm:py-[calc(--spacing(1.5)-1px)] sm:text-sm/6",
+    "relative isolate inline-flex items-baseline justify-center gap-x-2 rounded-lg border font-semibold",
     // Focus
     "focus:not-data-focus:outline-hidden data-focus:outline-2 data-focus:outline-offset-2 data-focus:outline-blue-500",
     // Disabled
     "data-disabled:opacity-50",
-    // Icon
+  ],
+  // Responsive sizing (larger on mobile, smaller on desktop for touch-friendly stacked buttons)
+  responsiveSizing: [
+    "px-[calc(--spacing(3.5)-1px)] py-[calc(--spacing(2.5)-1px)] text-base/6",
+    "sm:px-[calc(--spacing(3)-1px)] sm:py-[calc(--spacing(1.5)-1px)] sm:text-sm/6",
     "*:data-[slot=icon]:-mx-0.5 *:data-[slot=icon]:my-0.5 *:data-[slot=icon]:size-5 *:data-[slot=icon]:shrink-0 *:data-[slot=icon]:self-center *:data-[slot=icon]:text-(--btn-icon) sm:*:data-[slot=icon]:my-1 sm:*:data-[slot=icon]:size-4 forced-colors:[--btn-icon:ButtonText] forced-colors:data-hover:[--btn-icon:ButtonText]",
+  ],
+  // Fixed sizing (consistent across all screen sizes)
+  fixedSizing: [
+    "px-[calc(--spacing(3)-1px)] py-[calc(--spacing(1.5)-1px)] text-sm/6",
+    "*:data-[slot=icon]:-mx-0.5 *:data-[slot=icon]:my-1 *:data-[slot=icon]:size-4 *:data-[slot=icon]:shrink-0 *:data-[slot=icon]:self-center *:data-[slot=icon]:text-(--btn-icon) forced-colors:[--btn-icon:ButtonText] forced-colors:data-hover:[--btn-icon:ButtonText]",
   ],
   solid: [
     // Optical border, implemented as the button background to avoid corner artifacts
@@ -162,7 +169,12 @@ type ButtonProps = (
   | { color?: keyof typeof styles.colors; outline?: never; plain?: never }
   | { color?: never; outline: true; plain?: never }
   | { color?: never; outline?: never; plain: true }
-) & { className?: string; children: React.ReactNode } & (
+) & {
+  className?: string;
+  children: React.ReactNode;
+  /** Whether button size should be responsive (larger on mobile). Defaults to true. */
+  responsive?: boolean;
+} & (
     | ({ href?: never } & Omit<Headless.ButtonProps, "as" | "className">)
     | ({ href: string } & Omit<
         React.ComponentPropsWithoutRef<typeof Link>,
@@ -171,12 +183,21 @@ type ButtonProps = (
   );
 
 export const Button = forwardRef(function Button(
-  { color, outline, plain, className, children, ...props }: ButtonProps,
+  {
+    color,
+    outline,
+    plain,
+    className,
+    children,
+    responsive = true,
+    ...props
+  }: ButtonProps,
   ref: React.ForwardedRef<HTMLElement>,
 ) {
   let classes = clsx(
     className,
     styles.base,
+    responsive ? styles.responsiveSizing : styles.fixedSizing,
     outline
       ? styles.outline
       : plain

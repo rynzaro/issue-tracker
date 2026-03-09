@@ -30,6 +30,10 @@ import {
   SuccessToast,
   useToast,
 } from "@/lib/notification/toastProvider";
+import { CheckIcon, PlusIcon, XMarkIcon } from "@heroicons/react/16/solid";
+import IconButton from "./iconButton";
+import { set } from "zod";
+import { useRouter } from "next/navigation";
 
 type TimeEntry = {
   id: string;
@@ -56,17 +60,17 @@ export default function TimeEntryDialog({
   if (task) displayTask.current = task;
 
   const [entries, setEntries] = useState<TimeEntry[]>([]);
+  const [fetching, setFetching] = useState(false);
   const [loading, setLoading] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editStart, setEditStart] = useState<Date>(new Date());
   const [editEnd, setEditEnd] = useState<Date>(new Date());
-  const [editSaving, setEditSaving] = useState(false);
-  const [creatingNew, setCreatingNew] = useState(false);
+  const [creatingNewBottom, setCreatingNewBottom] = useState(false);
   const [newStart, setNewStart] = useState<Date>(new Date());
   const [newEnd, setNewEnd] = useState<Date>(new Date());
-  const [createSaving, setCreateSaving] = useState(false);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
-  const [deleteLoading, setDeleteLoading] = useState(false);
+  const [creatingNewTop, setCreatingNewTop] = useState(false);
+  const router = useRouter();
 
   const { showToast } = useToast();
 
@@ -80,7 +84,10 @@ export default function TimeEntryDialog({
   }
 
   const editError = editingId ? validateTimeRange(editStart, editEnd) : null;
-  const createError = creatingNew ? validateTimeRange(newStart, newEnd) : null;
+  const createError =
+    creatingNewBottom || creatingNewTop
+      ? validateTimeRange(newStart, newEnd)
+      : null;
 
   function getErrorMessage(result: {
     success: false;
@@ -101,7 +108,7 @@ export default function TimeEntryDialog({
   }
 
   const fetchEntries = useCallback(async (taskId: string) => {
-    setLoading(true);
+    setFetching(true);
     const result = await getTimeEntriesForTaskAction({ taskId });
     if (result.success) {
       setEntries(
@@ -113,7 +120,7 @@ export default function TimeEntryDialog({
         })),
       );
     }
-    setLoading(false);
+    setFetching(false);
   }, []);
 
   useEffect(() => {
@@ -121,7 +128,8 @@ export default function TimeEntryDialog({
       fetchEntries(task.id);
       // Reset sub-states when opening for a new task
       setEditingId(null);
-      setCreatingNew(false);
+      setCreatingNewBottom(false);
+      setCreatingNewTop(false);
       setDeleteConfirmId(null);
     }
   }, [task, fetchEntries]);
@@ -136,7 +144,7 @@ export default function TimeEntryDialog({
 
   async function handleEditSave() {
     if (!editingId || !task) return;
-    setEditSaving(true);
+    setLoading(true);
     const result = await updateTimeEntryAction({
       timeEntryId: editingId,
       startedAt: editStart,
@@ -156,14 +164,15 @@ export default function TimeEntryDialog({
         <ErrorToast title="Fehler" description={getErrorMessage(result)} />,
       );
     }
-    setEditSaving(false);
+    setLoading(false);
+    router.refresh();
   }
 
   // ─── Delete handlers ───────────────────────────────────────────────────
 
   async function handleDelete(entryId: string) {
     if (!task) return;
-    setDeleteLoading(true);
+    setLoading(true);
     const result = await deleteTimeEntryAction({ timeEntryId: entryId });
     if (result.success) {
       showToast(
@@ -179,22 +188,33 @@ export default function TimeEntryDialog({
         <ErrorToast title="Fehler" description={getErrorMessage(result)} />,
       );
     }
-    setDeleteLoading(false);
+    setLoading(false);
+    router.refresh();
   }
 
   // ─── Create handlers ──────────────────────────────────────────────────
 
-  function openCreateForm() {
+  function openCreateFormBottom() {
     const now = new Date();
     const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
     setNewStart(oneHourAgo);
     setNewEnd(now);
-    setCreatingNew(true);
+    setCreatingNewTop(false);
+    setCreatingNewBottom(true);
+  }
+
+  function openCreateFormTop() {
+    const now = new Date();
+    const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
+    setNewStart(oneHourAgo);
+    setNewEnd(now);
+    setCreatingNewBottom(false);
+    setCreatingNewTop(true);
   }
 
   async function handleCreate() {
     if (!task) return;
-    setCreateSaving(true);
+    setLoading(true);
     const result = await createManualTimeEntryAction({
       taskId: task.id,
       startedAt: newStart,
@@ -207,29 +227,79 @@ export default function TimeEntryDialog({
           description="Der Zeiteintrag wurde erfolgreich erstellt."
         />,
       );
-      setCreatingNew(false);
+      setCreatingNewBottom(false);
+      setCreatingNewTop(false);
       await fetchEntries(task.id);
     } else {
       showToast(
         <ErrorToast title="Fehler" description={getErrorMessage(result)} />,
       );
     }
-    setCreateSaving(false);
+    setLoading(false);
+    router.refresh();
   }
 
   // ─── Render ────────────────────────────────────────────────────────────
 
   return (
     <Dialog open={!!task} onClose={onClose} size="3xl">
-      <DialogTitle>
-        Zeiteinträge für &ldquo;{displayTask.current?.title}&rdquo;
-      </DialogTitle>
+      <div className="flex justify-between">
+        <div className="flex gap-6 items-baseline">
+          <DialogTitle>
+            Zeiteinträge für &ldquo;{displayTask.current?.title}&rdquo;
+          </DialogTitle>
+          <Button responsive={false} onClick={openCreateFormTop}>
+            Neuer Eintrag
+          </Button>
+        </div>
+        <IconButton borderless onClick={onClose}>
+          <XMarkIcon className="dark:text-white h-6 w-6 -translate-y-5 translate-x-3" />
+        </IconButton>
+      </div>
+      {creatingNewTop && (
+        <div className="mt-4 rounded-lg border border-zinc-200 dark:border-zinc-700 p-4">
+          <p className="text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-3">
+            Neuen Eintrag erstellen
+          </p>
+          <div className="flex items-center justify-between ">
+            <div className="flex flex-col gap-2">
+              <DateTimeInput
+                value={newStart}
+                onChange={setNewStart}
+                label="Start:"
+              />
+              <DateTimeInput
+                value={newEnd}
+                onChange={setNewEnd}
+                label="Ende:"
+              />
+            </div>
+
+            <div className="flex gap-2 mt-3">
+              <IconButton
+                onClick={handleCreate}
+                disabled={loading || !!createError}
+              >
+                <CheckIcon className="dark:text-white h-5 w-5" />
+              </IconButton>
+              <IconButton onClick={() => setCreatingNewTop(false)}>
+                <XMarkIcon className="dark:text-white h-5 w-5" />
+              </IconButton>
+            </div>
+          </div>
+          {createError && (
+            <p className="text-xs text-red-600 dark:text-red-400 mt-2">
+              {createError}
+            </p>
+          )}
+        </div>
+      )}
       <DialogBody>
-        {loading ? (
+        {fetching ? (
           <p className="text-sm text-zinc-500 dark:text-zinc-400 py-4">
             Lade Zeiteinträge…
           </p>
-        ) : entries.length === 0 && !creatingNew ? (
+        ) : entries.length === 0 && !creatingNewBottom && !creatingNewTop ? (
           <p className="text-sm text-zinc-500 dark:text-zinc-400 py-4">
             Keine Zeiteinträge vorhanden.
           </p>
@@ -240,7 +310,6 @@ export default function TimeEntryDialog({
                 <TableRow>
                   <TableHeader>Datum</TableHeader>
                   <TableHeader>Start</TableHeader>
-                  <TableHeader>Ende</TableHeader>
                   <TableHeader>Dauer</TableHeader>
                   <TableHeader className="text-right">Aktionen</TableHeader>
                 </TableRow>
@@ -250,33 +319,36 @@ export default function TimeEntryDialog({
                   editingId === entry.id ? (
                     <TableRow key={entry.id}>
                       <TableCell colSpan={5}>
-                        <div className="flex flex-wrap items-center gap-3 py-1">
-                          <DateTimeInput
-                            value={editStart}
-                            onChange={setEditStart}
-                            label="Start:"
-                          />
-                          <DateTimeInput
-                            value={editEnd}
-                            onChange={setEditEnd}
-                            label="Ende:"
-                          />
+                        <div className="flex flex-wrap items-center  justify-between  py-1">
+                          <div className="flex flex-col gap-2">
+                            <DateTimeInput
+                              value={editStart}
+                              onChange={setEditStart}
+                              label="Start:"
+                            />
+                            <DateTimeInput
+                              value={editEnd}
+                              onChange={setEditEnd}
+                              label="Ende:"
+                            />
+                          </div>
+
                           <div className="flex flex-col gap-1 ml-auto">
                             {editError && (
                               <p className="text-xs text-red-600 dark:text-red-400">
                                 {editError}
                               </p>
                             )}
-                            <div className="flex gap-2">
-                              <Button
+                            <div className="flex gap-2 dark:text-white font-bold">
+                              <IconButton
                                 onClick={handleEditSave}
-                                disabled={editSaving || !!editError}
+                                disabled={loading || !!editError}
                               >
-                                {editSaving ? "Speichern…" : "Speichern"}
-                              </Button>
-                              <Button plain onClick={() => setEditingId(null)}>
-                                Abbrechen
-                              </Button>
+                                <CheckIcon className="dark:text-white h-6 w-6" />
+                              </IconButton>
+                              <IconButton onClick={() => setEditingId(null)}>
+                                <XMarkIcon className="dark:text-white h-5 w-5" />
+                              </IconButton>
                             </div>
                           </div>
                         </div>
@@ -289,20 +361,21 @@ export default function TimeEntryDialog({
                           <span className="text-sm text-zinc-700 dark:text-zinc-300">
                             Eintrag wirklich löschen?
                           </span>
-                          <div className="flex gap-2">
+                          <div className="flex gap-2 items-center">
                             <Button
                               color="red"
                               onClick={() => handleDelete(entry.id)}
-                              disabled={deleteLoading}
+                              disabled={loading}
+                              responsive={false}
                             >
-                              {deleteLoading ? "Löschen…" : "Löschen"}
+                              Löschen
                             </Button>
-                            <Button
-                              plain
+                            <IconButton
                               onClick={() => setDeleteConfirmId(null)}
+                              size="sm"
                             >
-                              Abbrechen
-                            </Button>
+                              <XMarkIcon className="dark:text-white h-4 w-4" />
+                            </IconButton>
                           </div>
                         </div>
                       </TableCell>
@@ -311,7 +384,6 @@ export default function TimeEntryDialog({
                     <TableRow key={entry.id}>
                       <TableCell>{formatDateDE(entry.startedAt)}</TableCell>
                       <TableCell>{formatTimeHHMM(entry.startedAt)}</TableCell>
-                      <TableCell>{formatTimeHHMM(entry.stoppedAt)}</TableCell>
                       <TableCell>
                         {formatTime(entry.duration, "sec", "HH:MM:SS", true)}
                       </TableCell>
@@ -342,20 +414,20 @@ export default function TimeEntryDialog({
         )}
 
         {/* Create new entry */}
-        {creatingNew ? (
+        {creatingNewBottom && (
           <div className="mt-4 rounded-lg border border-zinc-200 dark:border-zinc-700 p-4">
             <p className="text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-3">
               Neuen Eintrag erstellen
             </p>
-            <div className="flex flex-wrap items-center gap-3">
+            <div className="flex flex-col gap-2">
               <DateTimeInput
-                value={newStart}
-                onChange={setNewStart}
+                value={editStart}
+                onChange={setEditStart}
                 label="Start:"
               />
               <DateTimeInput
-                value={newEnd}
-                onChange={setNewEnd}
+                value={editEnd}
+                onChange={setEditEnd}
                 label="Ende:"
               />
             </div>
@@ -367,24 +439,22 @@ export default function TimeEntryDialog({
             <div className="flex gap-2 mt-3">
               <Button
                 onClick={handleCreate}
-                disabled={createSaving || !!createError}
+                disabled={loading || !!createError}
               >
-                {createSaving ? "Erstellen…" : "Erstellen"}
+                Erstellen
               </Button>
-              <Button plain onClick={() => setCreatingNew(false)}>
+              <Button plain onClick={() => setCreatingNewBottom(false)}>
                 Abbrechen
               </Button>
             </div>
           </div>
-        ) : (
-          <div className="mt-4">
-            <Button outline onClick={openCreateForm}>
-              + Manuellen Eintrag erstellen
-            </Button>
-          </div>
         )}
       </DialogBody>
       <DialogActions>
+        <Button outline onClick={openCreateFormBottom}>
+          <PlusIcon className="dark:text-white" />
+          Manuellen Eintrag erstellen
+        </Button>
         <Button plain onClick={onClose}>
           Schließen
         </Button>

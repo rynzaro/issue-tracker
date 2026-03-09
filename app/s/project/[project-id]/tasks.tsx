@@ -14,7 +14,7 @@ import {
 } from "@heroicons/react/16/solid";
 import clsx from "clsx";
 import { Dispatch, SetStateAction, useState } from "react";
-import TaskRowButton from "./taskRowButton";
+import IconButton from "../../../../components/iconButton";
 import { Subheading } from "@/components/heading";
 import { SecondaryText } from "@/components/text";
 import { formatTime, getActiveDescendantStartedAt } from "@/lib/util";
@@ -23,6 +23,14 @@ import {
   startActiveTimerAction,
   stopActiveTimerAction,
 } from "@/lib/actions/activeTask.actions";
+import { Bars3Icon } from "@heroicons/react/20/solid";
+import {
+  Dropdown,
+  DropdownButton,
+  DropdownDivider,
+  DropdownItem,
+  DropdownMenu,
+} from "@/components/dropdown";
 
 function formatElapsed(elapsed: number, taskStatus: string): string | null {
   if (elapsed <= 0 && taskStatus !== "IN_PROGRESS") return null;
@@ -51,6 +59,7 @@ export default function Tasks({
   >;
 }) {
   const [isExpanded, setIsExpanded] = useState(task.hasActiveDescendant);
+  const [showMenu, setShowMenu] = useState(false);
 
   const timerStartedAt =
     task.status === "IN_PROGRESS"
@@ -69,10 +78,11 @@ export default function Tasks({
         !isRoot ? "ml-4  " : "mt-4  font-semibold",
       )}
     >
+      <div className="flex sm:flex-col"></div>
       <div
         role="button"
         className={clsx(
-          "flex justify-between items-start sm:flex-row flex-col gap-2 sm:items-center py-2 pl-4 pr-2 rounded-lg border-l-4 select-none",
+          "flex justify-between items-start gap-2 sm:items-center py-2 pl-4 pr-2 rounded-lg border-l-4 select-none",
           (task.status === "DONE" ||
             (task.status === "OPEN" && !task.hasActiveDescendant)) &&
             "hover:bg-gray-50 dark:hover:bg-zinc-800",
@@ -124,51 +134,112 @@ export default function Tasks({
           {task.status === "IN_PROGRESS" ? (
             <>
               <TimerDisplay value={formatElapsed(elapsed, task.status)} />
-              <TaskRowButton
+              <IconButton
                 onClick={() => stopActiveTimerAction()}
                 invertedColors
               >
                 <StopIcon className="w-6 h-6" />
-              </TaskRowButton>
+              </IconButton>
             </>
           ) : (
-            <TaskRowButton
+            <IconButton
               onClick={() => startActiveTimerAction({ taskId: task.id })}
             >
               <PlayIcon className="w-6 h-6" />
-            </TaskRowButton>
+            </IconButton>
           )}
-          <TaskRowButton
-            onClick={() => {
-              setNewTaskParent(task);
-            }}
-          >
-            <PlusIcon className="w-6 h-6" />
-          </TaskRowButton>
-          <TaskRowButton onClick={() => setTaskToEdit(task)}>
-            <PencilIcon className="w-5 h-5" />
-          </TaskRowButton>
-          <TaskRowButton
-            onClick={() =>
-              setTaskForTimeEntries({ id: task.id, title: task.title })
-            }
-          >
-            <InformationCircleIcon className="w-5 h-5" />
-          </TaskRowButton>
-          <TaskRowButton
-            disabled={task.hasActiveDescendant || task.status === "IN_PROGRESS"}
-          >
-            <CheckIcon className="w-6 h-6" />
-          </TaskRowButton>
-          <TaskRowButton
-            borderless
-            disabled={task.hasActiveDescendant || task.status === "IN_PROGRESS"}
-            onClick={() => setTaskToDelete(task)}
-          >
-            <TrashIcon className="w-5 h-5" />
-          </TaskRowButton>
+          <div className="hidden sm:flex gap-2 ">
+            <IconButton
+              onClick={() => {
+                setNewTaskParent(task);
+              }}
+            >
+              <PlusIcon className="w-6 h-6" />
+            </IconButton>
+            <IconButton onClick={() => setTaskToEdit(task)}>
+              <PencilIcon className="w-5 h-5" />
+            </IconButton>
+            <IconButton
+              onClick={() =>
+                setTaskForTimeEntries({ id: task.id, title: task.title })
+              }
+            >
+              <InformationCircleIcon className="w-5 h-5" />
+            </IconButton>
+            <IconButton
+              disabled={
+                task.hasActiveDescendant || task.status === "IN_PROGRESS"
+              }
+            >
+              <CheckIcon className="w-6 h-6" />
+            </IconButton>
+            <IconButton
+              borderless
+              disabled={
+                task.hasActiveDescendant || task.status === "IN_PROGRESS"
+              }
+              onClick={() => setTaskToDelete(task)}
+            >
+              <TrashIcon className="w-5 h-5" />
+            </IconButton>
+          </div>
+          <div className="sm:hidden">
+            <Dropdown>
+              <DropdownButton
+                plain
+                onClick={() => setShowMenu((prev) => !prev)}
+              >
+                <Bars3Icon className="w-5 h-5" />
+              </DropdownButton>
+              <DropdownMenu>
+                <DropdownItem
+                  onClick={() => {
+                    setNewTaskParent(task);
+                  }}
+                >
+                  <PlusIcon className="w-6 h-6" />
+                  Neue Unteraufgabe
+                </DropdownItem>
+                <DropdownItem onClick={() => setTaskToEdit(task)}>
+                  <PencilIcon className="w-5 h-5" />
+                  Aufgabe bearbeiten
+                </DropdownItem>
+                <DropdownItem
+                  onClick={() =>
+                    setTaskForTimeEntries({ id: task.id, title: task.title })
+                  }
+                >
+                  <InformationCircleIcon className="w-5 h-5" />
+                  Details
+                </DropdownItem>
+                <DropdownItem
+                  disabled={
+                    task.hasActiveDescendant || task.status === "IN_PROGRESS"
+                  }
+                >
+                  <CheckIcon className="w-6 h-6" />
+                  Als erledigt markieren
+                </DropdownItem>
+                <DropdownDivider />
+                <DropdownItem
+                  disabled={
+                    task.hasActiveDescendant || task.status === "IN_PROGRESS"
+                  }
+                  onClick={() => setTaskToDelete(task)}
+                >
+                  <span className="text-red-500 dark:text-red-400">
+                    <TrashIcon className="w-5 h-5" />
+                  </span>
+                  <span className="text-red-500 dark:text-red-400">
+                    Löschen
+                  </span>
+                </DropdownItem>
+              </DropdownMenu>
+            </Dropdown>
+          </div>
         </div>
       </div>
+
       {isExpanded &&
         task.children &&
         task.children.length > 0 &&

@@ -1,18 +1,20 @@
 import clsx from "clsx";
 import { ReactNode } from "react";
 
-export default function TaskRowButton({
+export default function IconButton({
   onClick,
   children,
   borderless = false,
   invertedColors = false,
   disabled = false,
+  size = "md",
 }: {
   onClick?: () => void;
   children: ReactNode;
   borderless?: boolean;
   invertedColors?: boolean;
   disabled?: boolean;
+  size?: "sm" | "md" | "lg";
 }) {
   const handleClick = (e: React.MouseEvent<HTMLButtonElement>) => {
     e.stopPropagation();
@@ -28,7 +30,10 @@ export default function TaskRowButton({
   return (
     <button
       className={clsx(
-        "w-10 h-10 rounded flex items-center justify-center",
+        "rounded flex items-center justify-center",
+        size === "sm" && "w-8 h-8",
+        size === "md" && "w-10 h-10",
+        size === "lg" && "w-12 h-12",
         !borderless && "border border-gray-300 dark:border-zinc-700",
         invertedColors
           ? "bg-zinc-800 text-white dark:bg-white dark:text-zinc-800 hover:bg-zinc-700 dark:hover:bg-gray-200"

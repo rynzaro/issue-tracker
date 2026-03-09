@@ -51,7 +51,9 @@ export default function NewRootTask({ projectId }: { projectId: string }) {
 
   return (
     <>
-      <Button onClick={() => setOpen(true)}>Neue Aufgabe</Button>
+      <Button onClick={() => setOpen(true)} responsive={false}>
+        Neue Aufgabe
+      </Button>
       <Dialog
         open={open}
         onClose={() => {
