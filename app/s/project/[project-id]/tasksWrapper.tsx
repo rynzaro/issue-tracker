@@ -2,6 +2,7 @@
 
 import { TaskNode } from "@/lib/schema/task";
 import Tasks from "./tasks";
+import TimeEntryDialog from "@/components/time-entry-dialog";
 import { useState } from "react";
 import { usePersistentValue, useTaskForm } from "@/lib/hooks";
 import { Button } from "@/components/button";
@@ -43,6 +44,10 @@ export default function TasksWrapper({
   const displayTaskToEdit = usePersistentValue(taskToEdit);
   const [taskToDelete, setTaskToDelete] = useState<TaskNode | null>(null);
   const displayTaskToDelete = usePersistentValue(taskToDelete);
+  const [taskForTimeEntries, setTaskForTimeEntries] = useState<{
+    id: string;
+    title: string;
+  } | null>(null);
   const [loading, setLoading] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(false);
   const {
@@ -180,6 +185,7 @@ export default function TasksWrapper({
             setNewTaskParent={setNewTaskParent}
             setTaskToEdit={handleEditClick}
             setTaskToDelete={setTaskToDelete}
+            setTaskForTimeEntries={setTaskForTimeEntries}
           />
         ))}
       <>
@@ -362,6 +368,11 @@ export default function TasksWrapper({
             </Button>
           </AlertActions>
         </Alert>
+
+        <TimeEntryDialog
+          task={taskForTimeEntries}
+          onClose={() => setTaskForTimeEntries(null)}
+        />
       </>
     </>
   );

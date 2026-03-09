@@ -38,6 +38,7 @@ export default function Tasks({
   setNewTaskParent,
   setTaskToEdit,
   setTaskToDelete,
+  setTaskForTimeEntries,
 }: {
   projectId: string;
   task: TaskNode;
@@ -45,6 +46,9 @@ export default function Tasks({
   setNewTaskParent: Dispatch<SetStateAction<TaskNode | null>>;
   setTaskToEdit: (task: TaskNode) => void;
   setTaskToDelete: Dispatch<SetStateAction<TaskNode | null>>;
+  setTaskForTimeEntries: Dispatch<
+    SetStateAction<{ id: string; title: string } | null>
+  >;
 }) {
   const [isExpanded, setIsExpanded] = useState(task.hasActiveDescendant);
 
@@ -144,7 +148,11 @@ export default function Tasks({
           <TaskRowButton onClick={() => setTaskToEdit(task)}>
             <PencilIcon className="w-5 h-5" />
           </TaskRowButton>
-          <TaskRowButton>
+          <TaskRowButton
+            onClick={() =>
+              setTaskForTimeEntries({ id: task.id, title: task.title })
+            }
+          >
             <InformationCircleIcon className="w-5 h-5" />
           </TaskRowButton>
           <TaskRowButton
@@ -173,6 +181,7 @@ export default function Tasks({
             setNewTaskParent={setNewTaskParent}
             setTaskToEdit={setTaskToEdit}
             setTaskToDelete={setTaskToDelete}
+            setTaskForTimeEntries={setTaskForTimeEntries}
           />
         ))}
     </div>

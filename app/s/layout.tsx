@@ -4,6 +4,7 @@ import NoAccessError from "@/components/no-access-error";
 import { ReactNode } from "react";
 import { SessionProvider } from "next-auth/react";
 import { getProjectsByUser } from "@/lib/services/project.service";
+import { getActiveTimer } from "@/lib/services/activeTask.service";
 
 export default async function Layout({ children }: { children: ReactNode }) {
   const session = await auth();
@@ -21,7 +22,19 @@ export default async function Layout({ children }: { children: ReactNode }) {
     );
   }
 
-  const projectsRes = await getProjectsByUser(session.user.id);
+  const [projectsRes, activeTimerRes] = await Promise.all([
+    getProjectsByUser(session.user.id),
+    getActiveTimer({ userId: session.user.id }),
+  ]);
+
+  const activeTimer =
+    activeTimerRes.success && activeTimerRes.data
+      ? {
+          taskId: activeTimerRes.data.taskId,
+          taskTitle: activeTimerRes.data.task.title,
+          startedAt: activeTimerRes.data.startedAt,
+        }
+      : null;
 
   // TODO proper error handling
   if (!projectsRes.success) {
@@ -42,6 +55,7 @@ export default async function Layout({ children }: { children: ReactNode }) {
       <NavbarApp
         emailAddress={session?.user?.email || "Unknown User"}
         projects={projectsRes.data}
+        activeTimer={activeTimer}
       >
         {children}
       </NavbarApp>

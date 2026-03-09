@@ -2,8 +2,6 @@
 
 > Iteration work lives in [ROADMAP.md](docs/ROADMAP.md). This file tracks cross-cutting improvements and ideas.
 
----
-
 ## Test Specifications — Iteration 1 CRUD
 
 Comprehensive test coverage for Project and Task CRUD operations. Tests follow existing vitest patterns in `tests/` directory.
@@ -191,10 +189,28 @@ Tackle after Iteration 1 ships. These are engineering quality investments, not u
 
 ---
 
+## Code Review Findings — Branch `9-time-entry-crud` (2026-03-09)
+
+Review pass after Time Entry CRUD implementation. Mandatory 5 checks all pass.
+
+### MODERATE
+
+- [x] **`updateTimeEntry`/`deleteTimeEntry` don't check parent task `deletedAt`** — Fixed: added `task.findUnique({ where: { id: existing.taskId, deletedAt: null } })` check in both functions. Tests updated.
+- [x] **`pb-56` unconditional mobile padding** — Fixed: `mobileBottomPadding` prop on StackedLayout, passed conditionally from NavbarApp when activeTimer exists.
+
+### MINOR
+
+- [x] **Unconditional `revalidatePath` in timer actions** — Fixed: added `if (result.success)` guard in both `startActiveTimerAction` and `stopActiveTimerAction`.
+- [x] **Dead `headerExtra` prop on `StackedLayout`** — Fixed: removed prop and its rendering.
+- [x] **`closePanel` raw setTimeout without cleanup** — Fixed: uses `useRef` for timeout ID with cleanup on unmount, `closePanel` wrapped in `useCallback`.
+
+---
+
 ## UX Ideas
 
 Captured from earlier brainstorming. Prioritize when relevant.
 
+- [ ] stack projects in sidenavbar
 - [ ] fix mobile version text sizes and buttons (thinking of a popup menu instead of buttons and just having start and stop visible, so the task + times can be large)
 - [ ] Deletion / Archiving architecture + impact of tasks -- do we need deletion AND archiving?
 - [ ] Notification system (success/error toasts after mutations) — replace inline error text blobs with proper toast notifications (e.g. `react-hot-toast` or custom). Cover all server action calls.
