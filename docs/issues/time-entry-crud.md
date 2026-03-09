@@ -116,70 +116,99 @@ Any valid datetime allowed, including past dates. To be replaced with a custom p
 
 ## Data Flow
 
-| Component         | Source                                                                                                                                            |
-| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Navbar timer      | `getActiveTimeEntryForUser()` fetched in `app/s/layout.tsx` (server), passed to client `<ActiveTimerNavbar>`. Ticking via `useElapsedTimer` hook. |
-| Mobile pill       | Same data, same client component, responsive CSS to toggle layout.                                                                                |
-| Time entry dialog | Entry list loaded on dialog open via server action.                                                                                               |
+| Component         | Source                                                                                                                                 |
+| ----------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| Navbar timer      | `getActiveTimer()` fetched in `app/s/layout.tsx` (server), passed to client `<ActiveTimerNavbar>`. Ticking via `useElapsedTimer` hook. |
+| Mobile pill       | Same data, same client component, responsive CSS to toggle layout.                                                                     |
+| Time entry dialog | Entry list loaded on dialog open via server action.                                                                                    |
 
 ## Implementation Tasks
 
 ### Backend (service + action layer)
 
-- [ ] Complete `changeActiveTimeEntryStart()` in `lib/services/activeTask.service.ts` (currently half-written)
-- [ ] Add `changeActiveTimerStartAction()` in `lib/actions/timeEntry.actions.ts`
-- [ ] Add `getTimeEntriesForTask()` in `lib/services/timeEntry.service.ts`
-- [ ] Add `createManualTimeEntry()` in `lib/services/timeEntry.service.ts`
-- [ ] Add `updateTimeEntry()` in `lib/services/timeEntry.service.ts`
-- [ ] Add `deleteTimeEntry()` in `lib/services/timeEntry.service.ts`
-- [ ] Add corresponding server actions in `lib/actions/timeEntry.actions.ts`
-- [ ] Add Zod schemas in `lib/schema/timeEntry.ts` (CreateManualTimeEntrySchema, UpdateTimeEntrySchema)
+- [x] `changeActiveTimerStart()` in `lib/services/activeTask.service.ts` (done)
+- [x] `changeActiveTimerStartAction()` in `lib/actions/activeTask.actions.ts` (done)
+- [x] Add `getTimeEntriesForTask()` in `lib/services/timeEntry.service.ts`
+- [x] Add `createManualTimeEntry()` in `lib/services/timeEntry.service.ts`
+- [x] Add `updateTimeEntry()` in `lib/services/timeEntry.service.ts`
+- [x] Add `deleteTimeEntry()` in `lib/services/timeEntry.service.ts`
+- [x] Add corresponding server actions in `lib/actions/timeEntry.actions.ts`
+- [x] Add Zod schemas in `lib/schema/timeEntry.ts` (CreateManualTimeEntrySchema, UpdateTimeEntrySchema)
 
 ### Frontend — Active Timer (navbar + mobile pill)
 
-- [ ] Create `<ActiveTimerNavbar>` client component (navbar inline display)
-- [ ] Fetch active timer data in `app/s/layout.tsx`, pass to `NavbarApp`
-- [ ] Wire edit button → expanding row below navbar with date + time inputs
-- [ ] Wire stop button → `stopTimeEntryAction()`
-- [ ] Wire save → `changeActiveTimerStartAction()`
-- [ ] Create `<ActiveTimerPill>` client component (mobile floating pill)
-- [ ] Collapsed state: pulsing dot + elapsed time
-- [ ] Expanded state: task name + elapsed + start time editing + stop
-- [ ] Hide both components when no timer is running
+- [x] Create `<ActiveTimerNavbar>` client component (navbar inline display)
+- [x] Fetch active timer data in `app/s/layout.tsx`, pass to `NavbarApp`
+- [x] Wire edit button → expanding row below navbar with date + time inputs
+- [x] Wire stop button → `stopActiveTimerAction()`
+- [x] Wire save → `changeActiveTimerStartAction()`
+- [x] Create `<ActiveTimerPill>` client component (mobile floating pill)
+- [x] Collapsed state: pulsing dot + elapsed time
+- [x] Expanded state: task name + elapsed + start time editing + stop
+- [x] Hide both components when no timer is running
 
 ### Frontend — Time Entry Dialog
 
-- [ ] Wire ℹ️ button in `tasks.tsx` to open time entry dialog
-- [ ] Add dialog state management in `tasksWrapper.tsx` (same pattern as create/edit/delete)
-- [ ] Entry list view (sorted by date desc, showing start/end/duration)
-- [ ] Edit entry inline (date + time inputs for start and end)
-- [ ] Delete entry with confirmation
-- [ ] Create manual entry form (date + start + end inputs)
-- [ ] Recalculate duration on save (from start/end times)
+- [x] Wire ℹ️ button in `tasks.tsx` to open time entry dialog
+- [x] Add dialog state management in `tasksWrapper.tsx` (same pattern as create/edit/delete)
+- [x] Entry list view (sorted by date desc, showing start/end/duration)
+- [x] Edit entry inline (date + time inputs for start and end)
+- [x] Delete entry with confirmation
+- [x] Create manual entry form (date + start + end inputs)
+- [x] Recalculate duration on save (from start/end times)
 
 ### Shared
 
-- [ ] Build reusable `<DateTimeInput>` component (date input + time input pair)
-- [ ] Validation: end must be after start, duration auto-computed
+- [x] Build reusable `<DateTimeInput>` component (date input + time input pair)
+- [x] Validation: end must be after start, duration auto-computed
 
 ## Files Touched
 
-| File                                          | Change                                |
-| --------------------------------------------- | ------------------------------------- |
-| `lib/services/activeTask.service.ts`          | Complete `changeActiveTimeEntryStart` |
-| `lib/services/timeEntry.service.ts`           | Add CRUD functions                    |
-| `lib/actions/timeEntry.actions.ts`            | Add CRUD actions                      |
-| `lib/schema/timeEntry.ts`                     | Add Zod schemas                       |
-| `components/navbar-app.tsx`                   | Accept + render active timer data     |
-| `app/s/layout.tsx`                            | Fetch active timer, pass to navbar    |
-| `app/s/project/[project-id]/tasks.tsx`        | Wire ℹ️ button to dialog              |
-| `app/s/project/[project-id]/tasksWrapper.tsx` | Add time entry dialog state           |
-| New: `components/active-timer-navbar.tsx`     | Desktop active timer component        |
-| New: `components/active-timer-pill.tsx`       | Mobile floating pill component        |
-| New: `components/datetime-input.tsx`          | Reusable date + time input pair       |
-| New: `components/time-entry-dialog.tsx`       | Time entry list + CRUD dialog         |
+| File                                          | Change                                                                            | Status |
+| --------------------------------------------- | --------------------------------------------------------------------------------- | ------ |
+| `lib/services/activeTask.service.ts`          | `getActiveTimer`, `changeActiveTimerStart`, `startActiveTimer`, `stopActiveTimer` | ✅     |
+| `lib/services/timeEntry.service.ts`           | Add historical CRUD functions (get, create, update, delete)                       | ✅     |
+| `lib/actions/timeEntry.actions.ts`            | Add historical CRUD actions                                                       | ✅     |
+| `lib/actions/activeTask.actions.ts`           | Timer start/stop/edit actions                                                     | ✅     |
+| `lib/schema/timeEntry.ts`                     | Add Zod schemas                                                                   | ✅     |
+| `components/navbar-app.tsx`                   | Accept + render active timer data                                                 | ✅     |
+| `app/s/layout.tsx`                            | Fetch active timer, pass to navbar                                                | ✅     |
+| `app/s/project/[project-id]/tasks.tsx`        | Wire ℹ️ button to dialog                                                          | ✅     |
+| `app/s/project/[project-id]/tasksWrapper.tsx` | Add time entry dialog state                                                       | ✅     |
+| New: `components/active-timer-navbar.tsx`     | Desktop active timer component                                                    | ✅     |
+| New: `components/active-timer-pill.tsx`       | Mobile floating pill component                                                    | ✅     |
+| New: `components/datetime-input.tsx`          | Reusable date + time input pair                                                   | ✅     |
+| New: `components/time-entry-dialog.tsx`       | Time entry list + CRUD dialog                                                     | ✅     |
 
 ## Open Questions
 
-- Should editing an entry's times trigger `revalidatePath` on the project page (to update totals in the task tree)? → Likely yes.
+- Should editing an entry's times trigger `revalidatePath` on the project page (to update totals in the task tree)? → **RESOLVED: Yes, implemented.**
 - Should the time entry dialog also show the currently running timer as a special "in progress" row? → Nice to have, not required for v1.
+
+---
+
+## Implementation Complete — Review Findings (2026-03-03)
+
+Feature fully implemented. Four review passes completed. Code review identified **1 important**, **5 moderate**, and **5 minor** issues plus **3 important client-side validation gaps** — all actionable items resolved in the same session (tracked in [TODO.md](../../TODO.md#code-review-findings--time-entry-crud-2026-03-03)).
+
+**Files changed during fix passes:**
+
+- `lib/services/activeTask.service.ts` — added `deletedAt: null` guard to `startActiveTimer`, changed `changeActiveTimerStart` to `serviceQueryOrNotFound`, normalized import path
+- `lib/schema/timeEntry.ts` — added `GetTimeEntriesForTaskSchema`, `DeleteTimeEntrySchema`
+- `lib/actions/timeEntry.actions.ts` — Zod validation on all 4 actions
+- `lib/actions/activeTask.actions.ts` — Zod validation on start + change actions, `revalidatePath` on start change
+- `components/time-entry-dialog.tsx` — added `getErrorMessage()` helper, applied consistently to all error paths, added `validateTimeRange()` client-side validation with inline errors\n- `components/active-timer-navbar.tsx` — added future-start-time client-side validation\n- `components/active-timer-pill.tsx` — added future-start-time client-side validation
+
+**Branch ready to merge.**
+
+---
+
+## Post-Merge Review (2026-03-09)
+
+Additional review pass on the complete branch. **Mandatory 5 checks all pass** (auth, Zod, deletedAt, error handling, service-only logic). Deep dive found 2 moderate and 3 minor items — tracked in [TODO.md](../../TODO.md#code-review-findings--branch-9-time-entry-crud-2026-03-09).
+
+Key findings:
+
+- `updateTimeEntry`/`deleteTimeEntry` don't verify parent task's `deletedAt` (defense-in-depth gap)
+- Unconditional `pb-56` mobile padding wastes space when no timer is active
+- Dead `headerExtra` prop on StackedLayout, unconditional revalidatePath in timer actions, raw setTimeout in closePanel

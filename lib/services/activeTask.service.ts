@@ -1,9 +1,10 @@
-import client from "../prisma";
+import client from "@/lib/prisma";
 import {
   createServiceErrorResponse,
   createSuccessResponseWithData,
   serviceAction,
   serviceQuery,
+  serviceQueryOrNotFound,
 } from "./serviceUtil";
 import { calculateDurationInSeconds } from "../util";
 
@@ -12,6 +13,7 @@ export function getActiveTimer({ userId }: { userId: string }) {
     () =>
       client.activeTimer.findUnique({
         where: { userId },
+        include: { task: { select: { title: true } } },
       }),
     "Failed to fetch active timer",
   );
@@ -24,12 +26,13 @@ export function changeActiveTimerStart({
   userId: string;
   newStart: Date;
 }) {
-  return serviceQuery(
+  return serviceQueryOrNotFound(
     () =>
       client.activeTimer.update({
         where: { userId },
         data: { startedAt: newStart },
       }),
+    "No active timer found",
     "Failed to change active timer start",
   );
 }
@@ -44,7 +47,7 @@ export function startActiveTimer({
   return serviceAction(async () => {
     // TODO: Replace with project membership/role check when collaboration is implemented
     const task = await client.task.findUnique({
-      where: { id: taskId },
+      where: { id: taskId, deletedAt: null },
       select: { createdById: true },
     });
     if (!task) return createServiceErrorResponse("NOT_FOUND", "Task not found");

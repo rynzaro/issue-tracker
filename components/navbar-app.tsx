@@ -32,11 +32,13 @@ import {
   Cog8ToothIcon,
   PlusIcon,
 } from "@heroicons/react/16/solid";
-import clsx from "clsx";
 import { ReactNode } from "react";
+import ActiveTimerNavbar from "@/components/active-timer-navbar";
+import ActiveTimerPill from "@/components/active-timer-pill";
+import clsx from "clsx";
 
 const navItems = [{ label: "Home", url: "/" }];
-1;
+
 function ProjectDropdownMenu({
   projects,
 }: {
@@ -68,80 +70,93 @@ function ProjectDropdownMenu({
   );
 }
 
+export type ActiveTimerData = {
+  taskId: string;
+  taskTitle: string;
+  startedAt: Date;
+} | null;
+
 export function NavbarApp({
   children,
   emailAddress,
   projects,
+  activeTimer,
 }: {
   children: ReactNode;
   emailAddress: string;
   projects: { id: string; name: string }[];
+  activeTimer: ActiveTimerData;
 }) {
   return (
-    <StackedLayout
-      navbar={
-        <Navbar>
-          <Dropdown>
-            <DropdownButton as={NavbarItem} className="max-lg:hidden">
-              <NavbarLabel>OnTrack</NavbarLabel>
-              <ChevronDownIcon />
-            </DropdownButton>
-            <ProjectDropdownMenu projects={projects} />
-          </Dropdown>
-          <NavbarDivider className="max-lg:hidden" />
-          <NavbarSection className="max-lg:hidden">
-            {navItems.map(({ label, url }) => (
-              <NavbarItem key={label} href={url}>
-                {label}
-              </NavbarItem>
-            ))}
-          </NavbarSection>
-          <NavbarSpacer />
-          <NavbarSection>
+    <>
+      <StackedLayout
+        mobileBottomPadding={!!activeTimer}
+        navbar={
+          <Navbar>
             <Dropdown>
-              <DropdownButton as={NavbarItem}>
-                {emailAddress}
-                <ChevronDownIcon />
-              </DropdownButton>
-              <DropdownMenu className="min-w-64" anchor="bottom end">
-                <DropdownItem href="/settings">
-                  <Cog8ToothIcon />
-                  <DropdownLabel>Settings</DropdownLabel>
-                </DropdownItem>
-                <DropdownItem href="/s/logout">
-                  <ArrowRightStartOnRectangleIcon />
-                  <DropdownLabel>Sign out</DropdownLabel>
-                </DropdownItem>
-              </DropdownMenu>
-            </Dropdown>
-          </NavbarSection>
-        </Navbar>
-      }
-      sidebar={
-        <Sidebar>
-          <SidebarHeader>
-            <Dropdown>
-              <DropdownButton as={SidebarItem} className="lg:mb-2.5">
-                <Avatar initials="EF" />
-                <SidebarLabel>OnTrack</SidebarLabel>
+              <DropdownButton as={NavbarItem} className="max-lg:hidden">
+                <NavbarLabel>OnTrack</NavbarLabel>
                 <ChevronDownIcon />
               </DropdownButton>
               <ProjectDropdownMenu projects={projects} />
             </Dropdown>
-          </SidebarHeader>
-          <SidebarBody>
-            <SidebarSection>
+            <NavbarDivider className="max-lg:hidden" />
+            <NavbarSection className="max-lg:hidden">
               {navItems.map(({ label, url }) => (
-                <SidebarItem key={label} href={url}>
+                <NavbarItem key={label} href={url}>
                   {label}
-                </SidebarItem>
+                </NavbarItem>
               ))}
-            </SidebarSection>
-          </SidebarBody>
-        </Sidebar>
-      }
-    >
-      {children}
-    </StackedLayout>
+            </NavbarSection>
+            <NavbarSpacer />
+            {activeTimer && <ActiveTimerNavbar timer={activeTimer} />}
+            <NavbarSection>
+              <Dropdown>
+                <DropdownButton as={NavbarItem}>
+                  {emailAddress}
+                  <ChevronDownIcon />
+                </DropdownButton>
+                <DropdownMenu className="min-w-64" anchor="bottom end">
+                  <DropdownItem href="/settings">
+                    <Cog8ToothIcon />
+                    <DropdownLabel>Settings</DropdownLabel>
+                  </DropdownItem>
+                  <DropdownItem href="/s/logout">
+                    <ArrowRightStartOnRectangleIcon />
+                    <DropdownLabel>Sign out</DropdownLabel>
+                  </DropdownItem>
+                </DropdownMenu>
+              </Dropdown>
+            </NavbarSection>
+          </Navbar>
+        }
+        sidebar={
+          <Sidebar>
+            <SidebarHeader>
+              <Dropdown>
+                <DropdownButton as={SidebarItem} className="lg:mb-2.5">
+                  <Avatar initials="EF" />
+                  <SidebarLabel>OnTrack</SidebarLabel>
+                  <ChevronDownIcon />
+                </DropdownButton>
+                <ProjectDropdownMenu projects={projects} />
+              </Dropdown>
+            </SidebarHeader>
+            <SidebarBody>
+              <SidebarSection>
+                {navItems.map(({ label, url }) => (
+                  <SidebarItem key={label} href={url}>
+                    {label}
+                  </SidebarItem>
+                ))}
+              </SidebarSection>
+            </SidebarBody>
+          </Sidebar>
+        }
+      >
+        {children}
+      </StackedLayout>
+      {activeTimer && <ActiveTimerPill timer={activeTimer} />}
+    </>
   );
 }

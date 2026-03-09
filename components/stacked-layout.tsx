@@ -1,6 +1,7 @@
 "use client";
 
 import * as Headless from "@headlessui/react";
+import clsx from "clsx";
 import React, { useState } from "react";
 import { NavbarItem } from "./navbar";
 
@@ -51,10 +52,12 @@ function MobileSidebar({
 export function StackedLayout({
   navbar,
   sidebar,
+  mobileBottomPadding = false,
   children,
 }: React.PropsWithChildren<{
   navbar: React.ReactNode;
   sidebar: React.ReactNode;
+  mobileBottomPadding?: boolean;
 }>) {
   let [showSidebar, setShowSidebar] = useState(false);
 
@@ -79,7 +82,12 @@ export function StackedLayout({
       </header>
 
       {/* Content */}
-      <main className="flex flex-1 flex-col pb-2 lg:px-2">
+      <main
+        className={clsx(
+          "flex flex-1 flex-col lg:px-2",
+          mobileBottomPadding ? "pb-56 lg:pb-2" : "pb-2",
+        )}
+      >
         <div className="grow p-6 lg:rounded-lg lg:bg-white lg:p-10 lg:shadow-xs lg:ring-1 lg:ring-zinc-950/5 dark:lg:bg-zinc-900 dark:lg:ring-white/10">
           <div className="mx-auto max-w-6xl">{children}</div>
         </div>

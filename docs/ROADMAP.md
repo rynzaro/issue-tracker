@@ -72,15 +72,15 @@ Core task management with time tracking. The first usable version of the app.
   - [x] Wire delete dialog state in `tasksWrapper.tsx`
   - [x] Wire TrashIcon onClick in `tasks.tsx`
 - [x] Active timer indicator
-- [ ] **Time Entry CRUD** (show, create, edit, delete)
-  - [ ] Show TimeEntries on task detail view
-  - [ ] Create manual time entries
-  - [ ] Edit existing time entries (start/stop times, duration)
-  - [ ] Edit running entry's start time
-  - [ ] Time input selector component (replace raw minutes input)
+- [x] **Time Entry CRUD** (show, create, edit, delete)
+  - [x] Show TimeEntries on task detail view (dialog via ℹ️ button)
+  - [x] Create manual time entries
+  - [x] Edit existing time entries (start/stop times, duration)
+  - [x] Edit running entry's start time (navbar + mobile pill)
+  - [x] Time input selector component (date + time native inputs — `<DateTimeInput>`)
 - [ ] **Task Status Transitions** (complete, uncomplete, archive, unarchive)
   - [ ] Set/clear `completedAt` (complete/uncomplete)
-  - [ ] Add `archivedAt DateTime?` to Task schema
+  - [x] Add `archivedAt DateTime?` to Task schema (already in schema from Iteration 0)
   - [ ] Set/clear `archivedAt` (archive/unarchive)
   - [ ] Archived tasks section (filterable view)
   - [ ] Deleted tasks section (soft-deleted, read-only view)

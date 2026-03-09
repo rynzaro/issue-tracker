@@ -38,6 +38,8 @@ Server Actions must:
 4. Call `revalidatePath()` for affected pages
 5. Return the result
 
+**Security Boundary (AD-18):** Server Actions are the authorization layer. Service functions are internal utilities that assume the caller has already verified permissions. Auth checks belong in actions and server components, NOT in services.
+
 ```typescript
 "use server";
 import { auth } from "@/auth";
@@ -57,11 +59,19 @@ export async function someAction(params: SomeParams) {
 
 Server Components fetch data by calling service functions directly. No API routes needed for reads.
 
+**Auth Responsibility:** Server Components must verify the session (via `auth()`) before calling services, just like Server Actions. The component layer is part of the security boundary (AD-18).
+
 ```typescript
 // app/s/[projectId]/page.tsx (Server Component)
+import { auth } from "@/auth";
 import { getTaskTree } from "@/lib/services/task.service";
 
 export default async function Page({ params }) {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return <NoAccessError />;
+  }
+
   const tasks = await getTaskTree((await params).projectId);
   return <TaskTreeClient tasks={tasks} />;
 }
