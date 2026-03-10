@@ -1,9 +1,31 @@
 import { Project } from "@prisma/client";
 import z from "zod";
-import { TaskNode } from "./task";
+import { SerializableTaskNode, serializeTaskNode, TaskNode } from "./task";
 
-/** Project with its full task tree — returned by getProjectTaskTree */
+/** Project with its full task tree — returned by getProjectTaskTree (server-side) */
 export type ProjectWithTaskTree = Project & { tasks: TaskNode[] };
+
+/** Serializable project with task tree for client consumption */
+export type SerializableProjectWithTaskTree = Omit<
+  Project,
+  "createdAt" | "deletedAt"
+> & {
+  createdAt: string;
+  deletedAt: string | null;
+  tasks: SerializableTaskNode[];
+};
+
+/** Convert ProjectWithTaskTree to SerializableProjectWithTaskTree for client transmission */
+export function serializeProjectWithTaskTree(
+  project: ProjectWithTaskTree,
+): SerializableProjectWithTaskTree {
+  return {
+    ...project,
+    createdAt: project.createdAt.toISOString(),
+    deletedAt: project.deletedAt?.toISOString() || null,
+    tasks: project.tasks.map(serializeTaskNode),
+  };
+}
 
 export const CreateProjectSchema = z.object({
   name: z.string().min(2).max(100),

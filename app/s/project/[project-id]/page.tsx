@@ -6,9 +6,10 @@ import NewRootTask from "./newRootTask";
 import { Divider } from "@/components/divider";
 import TasksWrapper from "./tasksWrapper";
 import { Link } from "@/components/link";
-import { Cog8ToothIcon } from "@heroicons/react/24/outline";
+import { ArchiveBoxIcon, Cog8ToothIcon } from "@heroicons/react/24/outline";
 import { redirect } from "next/navigation";
 import SetDefaultButton from "./setDefaultButton";
+import { serializeProjectWithTaskTree } from "@/lib/schema/project";
 
 export default async function Page({
   params,
@@ -36,21 +37,29 @@ export default async function Page({
     );
   }
 
-  const tasks = project.data.tasks;
+  const serializedProject = serializeProjectWithTaskTree(project.data);
+  const tasks = serializedProject.tasks;
 
   return (
     <div className="flex flex-col gap-4">
       <div className="flex justify-between">
         <div className="flex items-baseline gap-4">
-          <Heading>{project.data.name}</Heading>
+          <Heading>{serializedProject.name}</Heading>
         </div>
         <div className="flex items-center gap-2">
-          {!project.data.isDefault && (
+          {!serializedProject.isDefault && (
             <SetDefaultButton
               projectId={projectId}
-              projectName={project.data.name}
+              projectName={serializedProject.name}
             />
           )}
+          <Link
+            href={`/s/project/${projectId}/archive`}
+            className="inline-flex items-center justify-center w-10 h-10 rounded hover:bg-gray-100 dark:hover:bg-zinc-800 transition-colors"
+            aria-label="Archiv"
+          >
+            <ArchiveBoxIcon className="w-5 h-5 text-zinc-500 dark:text-zinc-400" />
+          </Link>
           <Link
             href={`/s/project/${projectId}/settings`}
             className="inline-flex items-center justify-center w-10 h-10 rounded hover:bg-gray-100 dark:hover:bg-zinc-800 transition-colors"

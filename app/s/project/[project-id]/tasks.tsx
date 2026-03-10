@@ -1,6 +1,6 @@
 "use client";
 
-import { TaskNode } from "@/lib/schema/task";
+import { SerializableTaskNode } from "@/lib/schema/task";
 import { InformationCircleIcon } from "@heroicons/react/24/outline";
 import {
   CheckIcon,
@@ -11,7 +11,10 @@ import {
   PlusIcon,
   StopIcon,
   TrashIcon,
+  Bars3Icon,
+  ArrowUturnLeftIcon,
 } from "@heroicons/react/16/solid";
+import { ExclamationTriangleIcon } from "@heroicons/react/24/outline";
 import clsx from "clsx";
 import { Dispatch, SetStateAction, useState } from "react";
 import IconButton from "../../../../components/iconButton";
@@ -23,7 +26,10 @@ import {
   startActiveTimerAction,
   stopActiveTimerAction,
 } from "@/lib/actions/activeTask.actions";
-import { Bars3Icon } from "@heroicons/react/20/solid";
+import {
+  completeTaskAction,
+  uncompleteTaskAction,
+} from "@/lib/actions/task.actions";
 import {
   Dropdown,
   DropdownButton,
@@ -31,6 +37,7 @@ import {
   DropdownItem,
   DropdownMenu,
 } from "@/components/dropdown";
+import { ArchiveBoxIcon } from "@heroicons/react/16/solid";
 
 function formatElapsed(elapsed: number, taskStatus: string): string | null {
   if (elapsed <= 0 && taskStatus !== "IN_PROGRESS") return null;
@@ -46,20 +53,24 @@ export default function Tasks({
   setNewTaskParent,
   setTaskToEdit,
   setTaskToDelete,
+  setTaskToArchive,
   setTaskForTimeEntries,
 }: {
   projectId: string;
-  task: TaskNode;
+  task: SerializableTaskNode;
   isRoot: boolean;
-  setNewTaskParent: Dispatch<SetStateAction<TaskNode | null>>;
-  setTaskToEdit: (task: TaskNode) => void;
-  setTaskToDelete: Dispatch<SetStateAction<TaskNode | null>>;
+  setNewTaskParent: Dispatch<SetStateAction<SerializableTaskNode | null>>;
+  setTaskToEdit: (task: SerializableTaskNode) => void;
+  setTaskToDelete: Dispatch<SetStateAction<SerializableTaskNode | null>>;
+  setTaskToArchive: Dispatch<SetStateAction<SerializableTaskNode | null>>;
   setTaskForTimeEntries: Dispatch<
     SetStateAction<{ id: string; title: string } | null>
   >;
 }) {
+  const isCompleted = task.status === "DONE";
+  const isTimerActive =
+    task.hasActiveDescendant || task.status === "IN_PROGRESS";
   const [isExpanded, setIsExpanded] = useState(task.hasActiveDescendant);
-  const [showMenu, setShowMenu] = useState(false);
 
   const timerStartedAt =
     task.status === "IN_PROGRESS"
@@ -96,17 +107,25 @@ export default function Tasks({
             setIsExpanded((prev) => !prev);
         }}
       >
-        <div className="shrink-0">
+        <div className={clsx("shrink-0", isCompleted && "opacity-50")}>
           <Subheading level={4} className="flex flex-gap-1 items-center">
             {(task.status === "IN_PROGRESS" || task.hasActiveDescendant) && (
               <span className="inline-block w-2 h-2 rounded-full bg-zinc-700 dark:bg-zinc-300 mr-2 animate-pulse-dot" />
             )}
-            {task.title}
+            {isCompleted ? (
+              <span className="line-through">{task.title}</span>
+            ) : (
+              task.title
+            )}
             {isExpanded ? (
               <ChevronUpIcon className="w-6 h-6" />
             ) : task.children.length > 0 ? (
               <ChevronDownIcon className="w-6 h-6" />
             ) : null}
+            {task.hasEstimateOverflow && (
+              // TODO add hover tooltip what this means
+              <ExclamationTriangleIcon className="text-red-500 dark:text-red-400 h-8 w-8 ml-4" />
+            )}
           </Subheading>
           <SecondaryText>
             {(displayTotal > 0 || task.estimate) && (
@@ -131,131 +150,221 @@ export default function Tasks({
             e.stopPropagation();
           }}
         >
-          {task.status === "IN_PROGRESS" ? (
-            <>
-              <TimerDisplay value={formatElapsed(elapsed, task.status)} />
-              <IconButton
-                onClick={() => stopActiveTimerAction()}
-                invertedColors
-              >
-                <StopIcon className="w-6 h-6" />
-              </IconButton>
-            </>
+          {isCompleted ? (
+            <IconButton
+              onClick={() => uncompleteTaskAction({ taskId: task.id })}
+            >
+              <ArrowUturnLeftIcon className="w-6 h-6" />
+            </IconButton>
           ) : (
-            <IconButton
-              onClick={() => startActiveTimerAction({ taskId: task.id })}
-            >
-              <PlayIcon className="w-6 h-6" />
-            </IconButton>
-          )}
-          <div className="hidden sm:flex gap-2 ">
-            <IconButton
-              onClick={() => {
-                setNewTaskParent(task);
-              }}
-            >
-              <PlusIcon className="w-6 h-6" />
-            </IconButton>
-            <IconButton onClick={() => setTaskToEdit(task)}>
-              <PencilIcon className="w-5 h-5" />
-            </IconButton>
-            <IconButton
-              onClick={() =>
-                setTaskForTimeEntries({ id: task.id, title: task.title })
-              }
-            >
-              <InformationCircleIcon className="w-5 h-5" />
-            </IconButton>
-            <IconButton
-              disabled={
-                task.hasActiveDescendant || task.status === "IN_PROGRESS"
-              }
-            >
-              <CheckIcon className="w-6 h-6" />
-            </IconButton>
-            <IconButton
-              borderless
-              disabled={
-                task.hasActiveDescendant || task.status === "IN_PROGRESS"
-              }
-              onClick={() => setTaskToDelete(task)}
-            >
-              <TrashIcon className="w-5 h-5" />
-            </IconButton>
-          </div>
-          <div className="sm:hidden">
-            <Dropdown>
-              <DropdownButton
-                plain
-                onClick={() => setShowMenu((prev) => !prev)}
-              >
-                <Bars3Icon className="w-5 h-5" />
-              </DropdownButton>
-              <DropdownMenu>
-                <DropdownItem
+            <>
+              {task.status === "IN_PROGRESS" ? (
+                <>
+                  <TimerDisplay value={formatElapsed(elapsed, task.status)} />
+                  <IconButton
+                    onClick={() => stopActiveTimerAction()}
+                    invertedColors
+                  >
+                    <StopIcon className="w-6 h-6" />
+                  </IconButton>
+                </>
+              ) : (
+                <IconButton
+                  onClick={() => startActiveTimerAction({ taskId: task.id })}
+                >
+                  <PlayIcon className="w-6 h-6" />
+                </IconButton>
+              )}
+              <div className="hidden sm:flex gap-2 ">
+                <IconButton
                   onClick={() => {
                     setNewTaskParent(task);
                   }}
                 >
                   <PlusIcon className="w-6 h-6" />
-                  Neue Unteraufgabe
-                </DropdownItem>
-                <DropdownItem onClick={() => setTaskToEdit(task)}>
+                </IconButton>
+                <IconButton onClick={() => setTaskToEdit(task)}>
                   <PencilIcon className="w-5 h-5" />
-                  Aufgabe bearbeiten
-                </DropdownItem>
-                <DropdownItem
+                </IconButton>
+                <IconButton
                   onClick={() =>
                     setTaskForTimeEntries({ id: task.id, title: task.title })
                   }
                 >
                   <InformationCircleIcon className="w-5 h-5" />
-                  Details
-                </DropdownItem>
-                <DropdownItem
-                  disabled={
-                    task.hasActiveDescendant || task.status === "IN_PROGRESS"
+                </IconButton>
+                <IconButton
+                  disabled={isTimerActive}
+                  onClick={() =>
+                    isCompleted
+                      ? uncompleteTaskAction({ taskId: task.id })
+                      : completeTaskAction({ taskId: task.id })
                   }
                 >
-                  <CheckIcon className="w-6 h-6" />
-                  Als erledigt markieren
-                </DropdownItem>
-                <DropdownDivider />
-                <DropdownItem
-                  disabled={
-                    task.hasActiveDescendant || task.status === "IN_PROGRESS"
-                  }
+                  {isCompleted ? (
+                    <ArrowUturnLeftIcon className="w-6 h-6" />
+                  ) : (
+                    <CheckIcon className="w-6 h-6" />
+                  )}
+                </IconButton>
+                <IconButton
+                  disabled={isTimerActive}
+                  onClick={() => setTaskToArchive(task)}
+                >
+                  <ArchiveBoxIcon className="w-5 h-5" />
+                </IconButton>
+                <IconButton
+                  borderless
+                  disabled={isTimerActive}
                   onClick={() => setTaskToDelete(task)}
                 >
-                  <span className="text-red-500 dark:text-red-400">
-                    <TrashIcon className="w-5 h-5" />
-                  </span>
-                  <span className="text-red-500 dark:text-red-400">
-                    Löschen
-                  </span>
-                </DropdownItem>
-              </DropdownMenu>
-            </Dropdown>
-          </div>
+                  <TrashIcon className="w-5 h-5" />
+                </IconButton>
+              </div>
+              <div className="sm:hidden">
+                <Dropdown>
+                  <DropdownButton plain>
+                    <Bars3Icon className="w-5 h-5 dark:text-white" />
+                  </DropdownButton>
+                  <DropdownMenu>
+                    <DropdownItem
+                      onClick={() => {
+                        setNewTaskParent(task);
+                      }}
+                    >
+                      <PlusIcon className="w-6 h-6" />
+                      Neue Unteraufgabe
+                    </DropdownItem>
+                    <DropdownItem onClick={() => setTaskToEdit(task)}>
+                      <PencilIcon className="w-5 h-5" />
+                      Aufgabe bearbeiten
+                    </DropdownItem>
+                    <DropdownItem
+                      onClick={() =>
+                        setTaskForTimeEntries({
+                          id: task.id,
+                          title: task.title,
+                        })
+                      }
+                    >
+                      <InformationCircleIcon className="w-5 h-5" />
+                      Details
+                    </DropdownItem>
+                    <DropdownItem
+                      disabled={isTimerActive}
+                      onClick={() =>
+                        isCompleted
+                          ? uncompleteTaskAction({ taskId: task.id })
+                          : completeTaskAction({ taskId: task.id })
+                      }
+                    >
+                      <CheckIcon className="w-6 h-6" />
+                      {isCompleted
+                        ? "Erledigung aufheben"
+                        : "Als erledigt markieren"}
+                    </DropdownItem>
+                    <DropdownItem
+                      disabled={isTimerActive}
+                      onClick={() => setTaskToArchive(task)}
+                    >
+                      <ArchiveBoxIcon className="w-5 h-5" />
+                      Archivieren
+                    </DropdownItem>
+                    <DropdownDivider />
+                    <DropdownItem
+                      disabled={isTimerActive}
+                      onClick={() => setTaskToDelete(task)}
+                    >
+                      <span className="text-red-500 dark:text-red-400">
+                        <TrashIcon className="w-5 h-5" />
+                      </span>
+                      <span className="text-red-500 dark:text-red-400">
+                        Löschen
+                      </span>
+                    </DropdownItem>
+                  </DropdownMenu>
+                </Dropdown>
+              </div>
+            </>
+          )}
         </div>
       </div>
 
-      {isExpanded &&
-        task.children &&
-        task.children.length > 0 &&
-        task.children.map((child) => (
-          <Tasks
-            key={child.id}
-            projectId={projectId}
-            task={child}
-            isRoot={false}
-            setNewTaskParent={setNewTaskParent}
-            setTaskToEdit={setTaskToEdit}
-            setTaskToDelete={setTaskToDelete}
-            setTaskForTimeEntries={setTaskForTimeEntries}
-          />
-        ))}
+      {isExpanded && task.children && task.children.length > 0 && (
+        <ExpandedChildren
+          task={task}
+          projectId={projectId}
+          setNewTaskParent={setNewTaskParent}
+          setTaskToEdit={setTaskToEdit}
+          setTaskToDelete={setTaskToDelete}
+          setTaskToArchive={setTaskToArchive}
+          setTaskForTimeEntries={setTaskForTimeEntries}
+        />
+      )}
     </div>
+  );
+}
+
+function ExpandedChildren({
+  task,
+  projectId,
+  setNewTaskParent,
+  setTaskToEdit,
+  setTaskToDelete,
+  setTaskToArchive,
+  setTaskForTimeEntries,
+}: {
+  task: SerializableTaskNode;
+  projectId: string;
+  setNewTaskParent: Dispatch<SetStateAction<SerializableTaskNode | null>>;
+  setTaskToEdit: (task: SerializableTaskNode) => void;
+  setTaskToDelete: Dispatch<SetStateAction<SerializableTaskNode | null>>;
+  setTaskToArchive: Dispatch<SetStateAction<SerializableTaskNode | null>>;
+  setTaskForTimeEntries: Dispatch<
+    SetStateAction<{ id: string; title: string } | null>
+  >;
+}) {
+  const activeChildren = task.children.filter((c) => c.status !== "DONE");
+  const completedChildren = task.children.filter((c) => c.status === "DONE");
+  const [showCompleted, setShowCompleted] = useState(false);
+
+  return (
+    <>
+      {activeChildren.map((child) => (
+        <Tasks
+          key={child.id}
+          projectId={projectId}
+          task={child}
+          isRoot={false}
+          setNewTaskParent={setNewTaskParent}
+          setTaskToEdit={setTaskToEdit}
+          setTaskToDelete={setTaskToDelete}
+          setTaskToArchive={setTaskToArchive}
+          setTaskForTimeEntries={setTaskForTimeEntries}
+        />
+      ))}
+      {completedChildren.length > 0 && (
+        <CompletedSection
+          count={completedChildren.length}
+          open={showCompleted}
+          onToggle={() => setShowCompleted((p) => !p)}
+        >
+          {completedChildren.map((child) => (
+            <Tasks
+              key={child.id}
+              projectId={projectId}
+              task={child}
+              isRoot={false}
+              setNewTaskParent={setNewTaskParent}
+              setTaskToEdit={setTaskToEdit}
+              setTaskToDelete={setTaskToDelete}
+              setTaskToArchive={setTaskToArchive}
+              setTaskForTimeEntries={setTaskForTimeEntries}
+            />
+          ))}
+        </CompletedSection>
+      )}
+    </>
   );
 }
 
@@ -265,5 +374,35 @@ function TimerDisplay({ value }: { value: string | null }) {
     <span className="inline-flex items-center rounded-md border border-gray-300 px-1.5 py-0.5 text-sm font-mono tabular-nums text-zinc-700 dark:border-zinc-700 dark:text-zinc-300">
       {value}
     </span>
+  );
+}
+
+export function CompletedSection({
+  count,
+  open,
+  onToggle,
+  children,
+}: {
+  count: number;
+  open: boolean;
+  onToggle: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="mt-4">
+      <button
+        type="button"
+        onClick={onToggle}
+        className="flex items-center gap-1 text-sm text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 select-none"
+      >
+        {open ? (
+          <ChevronUpIcon className="w-4 h-4" />
+        ) : (
+          <ChevronDownIcon className="w-4 h-4" />
+        )}
+        Erledigte ({count})
+      </button>
+      {open && children}
+    </div>
   );
 }

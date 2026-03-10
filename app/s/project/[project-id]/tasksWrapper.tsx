@@ -1,7 +1,7 @@
 "use client";
 
-import { TaskNode } from "@/lib/schema/task";
-import Tasks from "./tasks";
+import { SerializableTaskNode } from "@/lib/schema/task";
+import Tasks, { CompletedSection } from "./tasks";
 import TimeEntryDialog from "@/components/time-entry-dialog";
 import { useState } from "react";
 import { usePersistentValue, useTaskForm } from "@/lib/hooks";
@@ -23,7 +23,10 @@ import { ErrorMessage, Field, FieldGroup, Label } from "@/components/fieldset";
 import { Input } from "@/components/input";
 import { Textarea } from "@/components/textarea";
 import { handleInput } from "@/lib/formUtils";
-import { deleteTaskAction } from "@/lib/actions/task.actions";
+import {
+  archiveTaskAction,
+  deleteTaskAction,
+} from "@/lib/actions/task.actions";
 import {
   ErrorToast,
   InfoToast,
@@ -36,20 +39,29 @@ export default function TasksWrapper({
   tasks,
 }: {
   projectId: string;
-  tasks: TaskNode[];
+  tasks: SerializableTaskNode[];
 }) {
-  const [newTaskParent, setNewTaskParent] = useState<TaskNode | null>(null);
+  const [newTaskParent, setNewTaskParent] =
+    useState<SerializableTaskNode | null>(null);
   const displayNewTaskParent = usePersistentValue(newTaskParent);
-  const [taskToEdit, setTaskToEdit] = useState<TaskNode | null>(null);
+  const [taskToEdit, setTaskToEdit] = useState<SerializableTaskNode | null>(
+    null,
+  );
   const displayTaskToEdit = usePersistentValue(taskToEdit);
-  const [taskToDelete, setTaskToDelete] = useState<TaskNode | null>(null);
+  const [taskToDelete, setTaskToDelete] = useState<SerializableTaskNode | null>(
+    null,
+  );
   const displayTaskToDelete = usePersistentValue(taskToDelete);
+  const [taskToArchive, setTaskToArchive] =
+    useState<SerializableTaskNode | null>(null);
+  const displayTaskToArchive = usePersistentValue(taskToArchive);
   const [taskForTimeEntries, setTaskForTimeEntries] = useState<{
     id: string;
     title: string;
   } | null>(null);
   const [loading, setLoading] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(false);
+  const [archiveLoading, setArchiveLoading] = useState(false);
   const {
     values,
     setValues,
@@ -59,7 +71,7 @@ export default function TasksWrapper({
     submitUpdate,
   } = useTaskForm(projectId);
 
-  function handleEditClick(task: TaskNode) {
+  function handleEditClick(task: SerializableTaskNode) {
     setTaskToEdit(task);
     prefillForm(task);
   }
@@ -151,6 +163,31 @@ export default function TasksWrapper({
     setDeleteLoading(false);
   }
 
+  async function handleArchiveTask() {
+    if (!taskToArchive) return;
+    setArchiveLoading(true);
+
+    const result = await archiveTaskAction({ taskId: taskToArchive.id });
+
+    if (result.success) {
+      showToast(
+        <SuccessToast
+          title="Aufgabe archiviert"
+          description="Die Aufgabe wurde erfolgreich archiviert."
+        />,
+      );
+      setTaskToArchive(null);
+    } else {
+      showToast(
+        <ErrorToast
+          title="Fehler"
+          description="Die Aufgabe konnte nicht archiviert werden."
+        />,
+      );
+    }
+    setArchiveLoading(false);
+  }
+
   function triggerNotification() {
     showToast(
       <SuccessToast
@@ -173,21 +210,46 @@ export default function TasksWrapper({
     );
   }
 
+  const activeTasks = tasks.filter((t) => t.status !== "DONE");
+  const completedTasks = tasks.filter((t) => t.status === "DONE");
+  const [showCompleted, setShowCompleted] = useState(false);
+
   return (
     <>
-      {tasks.length > 0 &&
-        tasks.map((task) => (
-          <Tasks
-            key={task.id}
-            projectId={projectId}
-            task={task}
-            isRoot={true}
-            setNewTaskParent={setNewTaskParent}
-            setTaskToEdit={handleEditClick}
-            setTaskToDelete={setTaskToDelete}
-            setTaskForTimeEntries={setTaskForTimeEntries}
-          />
-        ))}
+      {activeTasks.map((task) => (
+        <Tasks
+          key={task.id}
+          projectId={projectId}
+          task={task}
+          isRoot={true}
+          setNewTaskParent={setNewTaskParent}
+          setTaskToEdit={handleEditClick}
+          setTaskToDelete={setTaskToDelete}
+          setTaskToArchive={setTaskToArchive}
+          setTaskForTimeEntries={setTaskForTimeEntries}
+        />
+      ))}
+      {completedTasks.length > 0 && (
+        <CompletedSection
+          count={completedTasks.length}
+          open={showCompleted}
+          onToggle={() => setShowCompleted((p) => !p)}
+        >
+          {completedTasks.map((task) => (
+            <Tasks
+              key={task.id}
+              projectId={projectId}
+              task={task}
+              isRoot={true}
+              setNewTaskParent={setNewTaskParent}
+              setTaskToEdit={handleEditClick}
+              setTaskToDelete={setTaskToDelete}
+              setTaskToArchive={setTaskToArchive}
+              setTaskForTimeEntries={setTaskForTimeEntries}
+            />
+          ))}
+        </CompletedSection>
+      )}
       <>
         <Dialog
           open={!!newTaskParent}
@@ -365,6 +427,36 @@ export default function TasksWrapper({
               disabled={deleteLoading}
             >
               {deleteLoading ? "Löschen…" : "Löschen"}
+            </Button>
+          </AlertActions>
+        </Alert>
+
+        <Alert
+          open={!!taskToArchive}
+          onClose={() => {
+            setTaskToArchive(null);
+          }}
+        >
+          <AlertTitle>
+            Aufgabe „{displayTaskToArchive?.title}“ archivieren?
+          </AlertTitle>
+          <AlertDescription>
+            {displayTaskToArchive && displayTaskToArchive.children.length > 0
+              ? `Aufgabe „${displayTaskToArchive.title}“ und alle Unteraufgaben werden archiviert.`
+              : `Aufgabe „${displayTaskToArchive?.title}“ wird archiviert.`}
+          </AlertDescription>
+          <AlertActions>
+            <Button
+              plain
+              onClick={() => {
+                setTaskToArchive(null);
+              }}
+              disabled={archiveLoading}
+            >
+              Abbrechen
+            </Button>
+            <Button onClick={handleArchiveTask} disabled={archiveLoading}>
+              {archiveLoading ? "Archivieren…" : "Archivieren"}
             </Button>
           </AlertActions>
         </Alert>

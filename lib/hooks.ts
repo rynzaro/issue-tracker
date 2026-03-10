@@ -1,14 +1,20 @@
 import { useEffect, useRef, useState } from "react";
 import { FormState, handleInput as _handleInput } from "./formUtils";
-import { CreateTaskParams, TaskNode, UpdateTaskParams } from "./schema/task";
+import {
+  CreateTaskParams,
+  TaskNode,
+  SerializableTaskNode,
+  UpdateTaskParams,
+} from "./schema/task";
 import { createTaskAction, updateTaskAction } from "./actions/task.actions";
 import { useRouter } from "next/navigation";
 
 /**
  * Returns elapsed seconds since `startedAt`, updating every second.
  * Returns 0 when startedAt is null (no active timer).
+ * Accepts both Date objects and ISO date strings.
  */
-export function useElapsedTimer(startedAt: Date | null): number {
+export function useElapsedTimer(startedAt: Date | string | null): number {
   const [elapsed, setElapsed] = useState(0);
 
   useEffect(() => {
@@ -66,7 +72,7 @@ export function useTaskForm(projectId: string) {
     setValues(initialFormState);
   }
 
-  function prefillForm(task: TaskNode) {
+  function prefillForm(task: TaskNode | SerializableTaskNode) {
     setValues((prev) => ({
       ...prev,
       title: { ...prev.title, value: task.title ?? "" },

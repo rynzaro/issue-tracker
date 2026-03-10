@@ -28,14 +28,14 @@ export default function ActiveTimerPill({
   timer: { taskId: string; taskTitle: string; startedAt: Date };
 }) {
   const [expanded, setExpanded] = useState(false);
-  const [newStart, setNewStart] = useState<Date>(new Date(timer.startedAt));
+  const [newStart, setNewStart] = useState<Date>(timer.startedAt);
   const [loading, setLoading] = useState(false);
   const elapsed = useElapsedTimer(timer.startedAt);
   const { showToast } = useToast();
 
   // Reset newStart when opening or when the timer changes (e.g. after a successful save)
   useEffect(() => {
-    if (expanded) setNewStart(new Date(timer.startedAt));
+    if (expanded) setNewStart(timer.startedAt);
   }, [expanded, timer.startedAt]);
 
   const isFutureStart = newStart.getTime() > Date.now() + 1000;

@@ -13,7 +13,7 @@ type DbClient = Pick<typeof client, "task">;
 
 /**
  * BFS to collect a task and all its descendants within a project.
- * Only traverses non-deleted tasks.
+ * Only traverses non-deleted and non-archived tasks.
  * Accepts an optional `db` client to run inside an interactive transaction.
  */
 async function collectDescendantIds(
@@ -22,7 +22,7 @@ async function collectDescendantIds(
   db: DbClient = client,
 ): Promise<string[]> {
   const projectTasks = await db.task.findMany({
-    where: { projectId, deletedAt: null },
+    where: { projectId, deletedAt: null, archivedAt: null },
     select: { id: true, parentId: true },
   });
 
@@ -69,13 +69,14 @@ export function createTask({
       );
     }
 
-    // Verify parent task exists, belongs to the same project, and is not soft-deleted
+    // Verify parent task exists, belongs to the same project, and is not soft-deleted or archived
     if (createTaskParams.parentId) {
       const parentTask = await client.task.findUnique({
         where: {
           id: createTaskParams.parentId,
           projectId: createTaskParams.projectId,
           deletedAt: null,
+          archivedAt: null,
         },
         select: { id: true },
       });
@@ -203,7 +204,7 @@ export function deleteTask({
       if (activeTimer) {
         return createServiceErrorResponse(
           "VALIDATION_ERROR",
-          "Aufgabe mit aktivem Timer kann nicht gelöscht werden",
+          "Task with active Timer cannot be deleted",
         );
       }
 
@@ -220,7 +221,7 @@ export function deleteTask({
   }, "Failed to delete task");
 }
 
-export function hasActiveTimers({ taskId }: { taskId: string }) {
+export function hasActiveDescendants({ taskId }: { taskId: string }) {
   return serviceAction(async () => {
     const task = await client.task.findUnique({
       where: { id: taskId, deletedAt: null },
@@ -235,4 +236,235 @@ export function hasActiveTimers({ taskId }: { taskId: string }) {
     });
     return createSuccessResponseWithData(!!activeTimer);
   }, "Failed to check active timers for task");
+}
+
+// ─── Complete / Uncomplete ─────────────────────────────────────────────────────
+
+export function completeTask({
+  taskId,
+  userId,
+}: {
+  taskId: string;
+  userId: string;
+}) {
+  return serviceAction(async () => {
+    const task = await client.task.findUnique({
+      where: { id: taskId, deletedAt: null },
+      select: {
+        id: true,
+        projectId: true,
+        completedAt: true,
+        project: { select: { userId: true } },
+      },
+    });
+
+    if (!task) {
+      return createServiceErrorResponse("NOT_FOUND", "Task not found");
+    }
+    if (task.project.userId !== userId) {
+      return createServiceErrorResponse(
+        "AUTHORIZATION_ERROR",
+        "User does not have access to this task",
+      );
+    }
+
+    return await client.$transaction(async (tx) => {
+      const allIds = await collectDescendantIds(taskId, task.projectId, tx);
+
+      const activeTimer = await tx.activeTimer.findFirst({
+        where: { taskId: { in: allIds } },
+      });
+      if (activeTimer) {
+        return createServiceErrorResponse(
+          "VALIDATION_ERROR",
+          "Task with active Timer cannot be marked as complete",
+        );
+      }
+
+      const now = new Date();
+      await tx.task.updateMany({
+        where: { id: { in: allIds }, completedAt: null },
+        data: { completedAt: now },
+      });
+
+      return createSuccessResponseWithData({
+        id: taskId,
+        completedCount: allIds.length,
+      });
+    });
+  }, "Failed to complete task");
+}
+
+export function uncompleteTask({
+  taskId,
+  userId,
+}: {
+  taskId: string;
+  userId: string;
+}) {
+  return serviceAction(async () => {
+    const task = await client.task.findUnique({
+      where: { id: taskId, deletedAt: null },
+      select: {
+        id: true,
+        parentId: true,
+        completedAt: true,
+        project: { select: { userId: true } },
+      },
+    });
+
+    if (!task) {
+      return createServiceErrorResponse("NOT_FOUND", "Task not found");
+    }
+    if (task.project.userId !== userId) {
+      return createServiceErrorResponse(
+        "AUTHORIZATION_ERROR",
+        "User does not have access to this task",
+      );
+    }
+
+    // Transaction: clear completedAt on task + parent atomically
+    return await client.$transaction(async (tx) => {
+      await tx.task.update({
+        where: { id: taskId },
+        data: { completedAt: null },
+      });
+
+      // Also clear direct parent's completedAt if set
+      if (task.parentId) {
+        await tx.task.updateMany({
+          where: { id: task.parentId, completedAt: { not: null } },
+          data: { completedAt: null },
+        });
+      }
+
+      return createSuccessResponseWithData({ id: taskId });
+    });
+  }, "Failed to uncomplete task");
+}
+
+// ─── Archive / Unarchive / Restore ─────────────────────────────────────────────
+
+export function archiveTask({
+  taskId,
+  userId,
+}: {
+  taskId: string;
+  userId: string;
+}) {
+  return serviceAction(async () => {
+    const task = await client.task.findUnique({
+      where: { id: taskId, deletedAt: null, archivedAt: null },
+      select: {
+        id: true,
+        projectId: true,
+        project: { select: { userId: true } },
+      },
+    });
+
+    if (!task) {
+      return createServiceErrorResponse("NOT_FOUND", "Task not found");
+    }
+    if (task.project.userId !== userId) {
+      return createServiceErrorResponse(
+        "AUTHORIZATION_ERROR",
+        "User does not have access to this task",
+      );
+    }
+
+    return await client.$transaction(async (tx) => {
+      const allIds = await collectDescendantIds(taskId, task.projectId, tx);
+
+      const activeTimer = await tx.activeTimer.findFirst({
+        where: { taskId: { in: allIds } },
+      });
+      if (activeTimer) {
+        return createServiceErrorResponse(
+          "VALIDATION_ERROR",
+          "Task with active Timer cannot be archived",
+        );
+      }
+
+      const now = new Date();
+      await tx.task.updateMany({
+        where: { id: { in: allIds } },
+        data: { archivedAt: now },
+      });
+
+      return createSuccessResponseWithData({
+        id: taskId,
+        archivedCount: allIds.length,
+      });
+    });
+  }, "Failed to archive task");
+}
+
+export function unarchiveTask({
+  taskId,
+  userId,
+}: {
+  taskId: string;
+  userId: string;
+}) {
+  return serviceAction(async () => {
+    const task = await client.task.findUnique({
+      where: { id: taskId, archivedAt: { not: null }, deletedAt: null },
+      select: {
+        id: true,
+        project: { select: { userId: true } },
+      },
+    });
+
+    if (!task) {
+      return createServiceErrorResponse("NOT_FOUND", "Task not found");
+    }
+    if (task.project.userId !== userId) {
+      return createServiceErrorResponse(
+        "AUTHORIZATION_ERROR",
+        "User does not have access to this task",
+      );
+    }
+
+    await client.task.update({
+      where: { id: taskId },
+      data: { archivedAt: null },
+    });
+
+    return createSuccessResponseWithData({ id: taskId });
+  }, "Failed to unarchive task");
+}
+
+export function restoreDeletedTask({
+  taskId,
+  userId,
+}: {
+  taskId: string;
+  userId: string;
+}) {
+  return serviceAction(async () => {
+    const task = await client.task.findUnique({
+      where: { id: taskId, deletedAt: { not: null } },
+      select: {
+        id: true,
+        project: { select: { userId: true } },
+      },
+    });
+
+    if (!task) {
+      return createServiceErrorResponse("NOT_FOUND", "Task not found");
+    }
+    if (task.project.userId !== userId) {
+      return createServiceErrorResponse(
+        "AUTHORIZATION_ERROR",
+        "User does not have access to this task",
+      );
+    }
+
+    await client.task.update({
+      where: { id: taskId },
+      data: { deletedAt: null },
+    });
+
+    return createSuccessResponseWithData({ id: taskId });
+  }, "Failed to restore task");
 }

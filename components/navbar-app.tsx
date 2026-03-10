@@ -85,7 +85,7 @@ export function NavbarApp({
   children: ReactNode;
   emailAddress: string;
   projects: { id: string; name: string }[];
-  activeTimer: ActiveTimerData;
+  activeTimer: ActiveTimerData | null;
 }) {
   return (
     <>

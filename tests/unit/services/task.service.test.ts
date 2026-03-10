@@ -10,7 +10,7 @@ vi.mock("@/lib/prisma", () => {
   return { default: mock };
 });
 
-import { hasActiveTimers } from "@/lib/services/task.service";
+import { hasActiveDescendants } from "@/lib/services/task.service";
 import prisma from "@/lib/prisma";
 
 const db = prisma as unknown as MockPrismaClient;
@@ -23,7 +23,7 @@ describe("hasActiveTimers", () => {
   it("returns NOT_FOUND when task does not exist", async () => {
     db.task.findUnique.mockResolvedValue(null);
 
-    const result = await hasActiveTimers({ taskId: "nonexistent" });
+    const result = await hasActiveDescendants({ taskId: "nonexistent" });
 
     expect(result.success).toBe(false);
     if (!result.success) {
@@ -39,7 +39,7 @@ describe("hasActiveTimers", () => {
     ]);
     db.activeTimer.findFirst.mockResolvedValue(null);
 
-    const result = await hasActiveTimers({ taskId: "task-1" });
+    const result = await hasActiveDescendants({ taskId: "task-1" });
 
     expect(result.success).toBe(true);
     if (result.success) {
@@ -54,7 +54,7 @@ describe("hasActiveTimers", () => {
       buildActiveTimer({ taskId: "task-1" }),
     );
 
-    const result = await hasActiveTimers({ taskId: "task-1" });
+    const result = await hasActiveDescendants({ taskId: "task-1" });
 
     expect(result.success).toBe(true);
     if (result.success) {
@@ -74,7 +74,7 @@ describe("hasActiveTimers", () => {
       buildActiveTimer({ taskId: "task-3" }),
     );
 
-    const result = await hasActiveTimers({ taskId: "task-1" });
+    const result = await hasActiveDescendants({ taskId: "task-1" });
 
     expect(result.success).toBe(true);
     if (result.success) {
@@ -97,7 +97,7 @@ describe("hasActiveTimers", () => {
     ]);
     db.activeTimer.findFirst.mockResolvedValue(null);
 
-    await hasActiveTimers({ taskId: "task-1" });
+    await hasActiveDescendants({ taskId: "task-1" });
 
     // Should NOT include task-4 (not a descendant of task-1)
     expect(db.activeTimer.findFirst).toHaveBeenCalledWith({

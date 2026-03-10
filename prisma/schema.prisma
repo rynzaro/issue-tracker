@@ -52,33 +52,34 @@ model ProjectSettings {
 }
 
 model Task {
-    id                String           @id @default(cuid())
-    projectId         String
-    createdById       String
-    createdBy         User             @relation("CreatedTasks", fields: [createdById], references: [id])
-    title             String
-    description       String?
-    estimate          Int? // in minutes
-    depth             Int? // for nested tasks
-    togglTagId        Int?
-    togglTagName      String?
-    createdAt         DateTime         @default(now())
-    updatedAt         DateTime         @updatedAt
-    completedAt       DateTime?
-    archivedAt        DateTime?
-    deletedAt         DateTime? // soft delete
-    parentId          String? // for nested tasks
-    project           Project          @relation(fields: [projectId], references: [id])
-    parent            Task?            @relation("TaskChildren", fields: [parentId], references: [id])
-    children          Task[]           @relation("TaskChildren")
-    taskTags          TaskTag[]
-    timeEntries       TimeEntry[]
-    todoItems         TodoItem[]
-    convertedTodoItem TodoItem?        @relation("ConvertedTodoItem")
-    taskEvents        TaskEvent[]
-    checkpoints       Checkpoint[]
-    checkpointTasks   CheckpointTask[]
-    activeTimers      ActiveTimer[]
+    id                         String           @id @default(cuid())
+    projectId                  String
+    createdById                String
+    createdBy                  User             @relation("CreatedTasks", fields: [createdById], references: [id])
+    title                      String
+    description                String?
+    estimate                   Int? // in minutes
+    addSumOfChildrenToEstimate Boolean          @default(false) // if true, the task's estimate includes the sum of its children's estimates
+    depth                      Int? // for nested tasks
+    togglTagId                 Int?
+    togglTagName               String?
+    createdAt                  DateTime         @default(now())
+    updatedAt                  DateTime         @updatedAt
+    completedAt                DateTime?
+    archivedAt                 DateTime?
+    deletedAt                  DateTime? // soft delete
+    parentId                   String? // for nested tasks
+    project                    Project          @relation(fields: [projectId], references: [id])
+    parent                     Task?            @relation("TaskChildren", fields: [parentId], references: [id])
+    children                   Task[]           @relation("TaskChildren")
+    taskTags                   TaskTag[]
+    timeEntries                TimeEntry[]
+    todoItems                  TodoItem[]
+    convertedTodoItem          TodoItem?        @relation("ConvertedTodoItem")
+    taskEvents                 TaskEvent[]
+    checkpoints                Checkpoint[]
+    checkpointTasks            CheckpointTask[]
+    activeTimers               ActiveTimer[]
 
     @@index([projectId])
     @@index([createdById])

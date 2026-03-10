@@ -28,7 +28,9 @@ export default async function Layout({ children }: { children: ReactNode }) {
   ]);
 
   const activeTimer =
-    activeTimerRes.success && activeTimerRes.data
+    activeTimerRes.success &&
+    activeTimerRes.data &&
+    activeTimerRes.data.startedAt
       ? {
           taskId: activeTimerRes.data.taskId,
           taskTitle: activeTimerRes.data.task.title,

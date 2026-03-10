@@ -178,6 +178,224 @@ Comprehensive test coverage for Project and Task CRUD operations. Tests follow e
 
 ---
 
+## Test Specifications — Task Status Transitions
+
+Tests for complete/uncomplete, archive/unarchive, and restore-deleted functionality. Follows existing vitest patterns. Notation: ✓ = happy path, ✗ = rejection/error path.
+
+### Prerequisites
+
+- [ ] Add `updateMany` to `mockMethods()` in `tests/helpers/prisma-mock.ts` (needed for cascade operations)
+
+### Service Layer Tests
+
+#### `tests/unit/services/task.service.test.ts` (expand existing)
+
+**completeTask**
+
+_Happy paths:_
+
+- [ ] ✓ sets `completedAt` on a leaf task with no children
+- [ ] ✓ cascade-completes task + all descendants (A→B→C: all get `completedAt`)
+- [ ] ✓ skips already-completed descendants (leaves their `completedAt` unchanged)
+- [ ] ✓ works on deep hierarchy (4+ levels)
+- [ ] ✓ returns success with count of affected tasks
+
+_Rejection paths:_
+
+- [ ] ✗ returns NOT_FOUND when task does not exist
+- [ ] ✗ returns NOT_FOUND when task is soft-deleted (`deletedAt` set)
+- [ ] ✗ returns AUTHORIZATION_ERROR when user does not own the project
+- [ ] ✗ returns VALIDATION_ERROR when the task itself has an active timer
+- [ ] ✗ returns VALIDATION_ERROR when a descendant has an active timer
+- [ ] ✗ no-op success when task is already completed (idempotent)
+
+_Interaction with other states:_
+
+- [ ] ✓ can complete an archived task (archive and complete are orthogonal)
+- [ ] ✗ cannot complete a task when any descendant has an active timer, even if descendants are partially completed
+
+**uncompleteTask**
+
+_Happy paths:_
+
+- [ ] ✓ clears `completedAt` on the target task
+- [ ] ✓ also clears `completedAt` on direct parent if parent was completed
+- [ ] ✓ does NOT clear `completedAt` on grandparent (stops at direct parent)
+- [ ] ✓ does NOT touch children's `completedAt` (children remain completed)
+- [ ] ✓ works when parent is not completed (only clears target)
+- [ ] ✓ works on root task with no parent
+
+_Rejection paths:_
+
+- [ ] ✗ returns NOT_FOUND when task does not exist
+- [ ] ✗ returns NOT_FOUND when task is soft-deleted
+- [ ] ✗ returns AUTHORIZATION_ERROR when user does not own the project
+- [ ] ✗ no-op success when task is not completed (`completedAt` is null)
+
+_Edge cases:_
+
+- [ ] ✓ uncomplete child → parent was completed + grandparent was completed → only child + parent cleared, grandparent untouched
+
+**archiveTask**
+
+_Happy paths:_
+
+- [ ] ✓ sets `archivedAt` on task and all descendants (cascade)
+- [ ] ✓ works for leaf task with no children
+- [ ] ✓ works for deep hierarchy (4+ levels)
+- [ ] ✓ can archive an OPEN task (no completion prerequisite)
+- [ ] ✓ can archive a completed (DONE) task
+
+_Rejection paths:_
+
+- [ ] ✗ returns NOT_FOUND when task does not exist
+- [ ] ✗ returns NOT_FOUND when task is soft-deleted
+- [ ] ✗ returns AUTHORIZATION_ERROR when user does not own the project
+- [ ] ✗ returns VALIDATION_ERROR when the task itself has an active timer
+- [ ] ✗ returns VALIDATION_ERROR when a descendant has an active timer
+- [ ] ✗ no-op success when task is already archived (idempotent)
+
+**unarchiveTask**
+
+_Happy paths:_
+
+- [ ] ✓ clears `archivedAt` on target task only (single-task restore)
+- [ ] ✓ does NOT cascade to children (children remain archived)
+- [ ] ✓ restored task may be a root if parent is still archived
+
+_Rejection paths:_
+
+- [ ] ✗ returns NOT_FOUND when task does not exist
+- [ ] ✗ returns NOT_FOUND when task is not archived (`archivedAt` is null)
+- [ ] ✗ returns AUTHORIZATION_ERROR when user does not own the project
+
+**restoreDeletedTask**
+
+_Happy paths:_
+
+- [ ] ✓ clears `deletedAt` on target task only (single-task restore)
+- [ ] ✓ does NOT cascade to descendants (they remain deleted)
+- [ ] ✓ restored task becomes root if parent is still deleted
+
+_Rejection paths:_
+
+- [ ] ✗ returns NOT_FOUND when task is not deleted (`deletedAt` is null)
+- [ ] ✗ returns AUTHORIZATION_ERROR when user does not own the project
+
+#### `tests/unit/services/project.service.test.ts` (expand existing)
+
+**getUserProjectWithTasks — archive filtering**
+
+- [ ] ✓ excludes tasks where `archivedAt IS NOT NULL` from the result
+- [ ] ✓ includes tasks where `archivedAt IS NULL` (normal tasks)
+- [ ] ✓ children of archived parents do not appear as orphan roots (because children are also cascade-archived)
+
+**getProjectTaskTree — status with completedAt**
+
+- [ ] ✓ task with `completedAt` set → `status: "DONE"`
+- [ ] ✓ task with `completedAt: null` and no active timer → `status: "OPEN"`
+- [ ] ✓ task with active timer → `status: "IN_PROGRESS"` (regardless of `completedAt`)
+- [ ] ✓ completed parent with in-progress descendant → `hasActiveDescendant: true`
+
+**getArchivedTasksForProject** (new function)
+
+- [ ] ✓ returns only tasks where `archivedAt IS NOT NULL` and `deletedAt IS NULL`
+- [ ] ✓ excludes non-archived tasks
+- [ ] ✓ excludes deleted tasks (even if archived)
+- [ ] ✓ preserves parent-child relationships among archived tasks (tree structure)
+- [ ] ✓ includes time entry sums for each task
+- [ ] ✗ returns NOT_FOUND when project does not exist
+- [ ] ✗ returns NOT_FOUND when user does not own the project
+
+**getDeletedTasksForProject** (new function)
+
+- [ ] ✓ returns only tasks where `deletedAt IS NOT NULL`
+- [ ] ✓ excludes non-deleted tasks
+- [ ] ✓ preserves parent-child relationships among deleted tasks (tree structure)
+- [ ] ✓ includes time entry sums for each task
+- [ ] ✗ returns NOT_FOUND when project does not exist
+- [ ] ✗ returns NOT_FOUND when user does not own the project
+
+### Action Layer Tests
+
+#### `tests/unit/actions/task.actions.test.ts` (expand or create)
+
+**All new actions** (cross-cutting, applies to each of the 5 below)
+
+- [ ] ✗ returns AUTHORIZATION_ERROR when session is null
+- [ ] ✗ returns AUTHORIZATION_ERROR when `session.user.id` is undefined
+- [ ] ✗ returns VALIDATION_ERROR when `taskId` is not a valid CUID
+
+**completeTaskAction**
+
+- [ ] ✓ validates `taskId` with schema
+- [ ] ✓ calls `completeTask` service with `userId` from session
+- [ ] ✓ calls `revalidatePath('/s/project', 'layout')` on success
+- [ ] ✗ does NOT call `revalidatePath` on service failure
+
+**uncompleteTaskAction**
+
+- [ ] ✓ calls `uncompleteTask` service with `userId` from session
+- [ ] ✓ calls `revalidatePath` on success
+- [ ] ✗ does NOT call `revalidatePath` on failure
+
+**archiveTaskAction**
+
+- [ ] ✓ calls `archiveTask` service with `userId` from session
+- [ ] ✓ calls `revalidatePath` on success
+- [ ] ✗ does NOT call `revalidatePath` on failure
+
+**unarchiveTaskAction**
+
+- [ ] ✓ calls `unarchiveTask` service with `userId` from session
+- [ ] ✓ calls `revalidatePath` on success
+- [ ] ✗ does NOT call `revalidatePath` on failure
+
+**restoreDeletedTaskAction**
+
+- [ ] ✓ calls `restoreDeletedTask` service with `userId` from session
+- [ ] ✓ calls `revalidatePath` on success
+- [ ] ✗ does NOT call `revalidatePath` on failure
+
+### Integration Tests
+
+#### `tests/integration/task-status-transitions.test.ts` (new file)
+
+**Complete/Uncomplete lifecycle**
+
+- [ ] ✓ create hierarchy A→B→C → complete A → all three have `completedAt` set → verify tree shows all as DONE
+- [ ] ✓ complete A (cascades to B, C) → uncomplete C → C and B (parent) get `completedAt` cleared, A stays completed
+- [ ] ✓ complete leaf task → uncomplete it → task returns to OPEN, no parent affected
+- [ ] ✓ start timer on C → attempt complete A → blocked (active timer) → stop timer → complete A → success
+
+**Archive/Unarchive lifecycle**
+
+- [ ] ✓ archive A (cascades to B, C) → main tree excludes all three → archive view shows all three
+- [ ] ✓ archive A → unarchive B (single task) → B appears as root in main tree, A and C remain in archive
+- [ ] ✓ archive task → verify `getArchivedTasksForProject` includes it → unarchive → verify excluded from archive, included in main tree
+
+**Delete/Restore lifecycle**
+
+- [ ] ✓ delete A (cascades to B, C) → restore B → B appears as root in main tree (parent A still deleted) → C remains deleted
+- [ ] ✓ delete task → verify `getDeletedTasksForProject` includes it → restore → verify excluded from deleted view, included in main tree
+
+**Cross-state interactions**
+
+- [ ] ✓ complete task → archive it → verify shows in archive as completed → unarchive → still completed in main tree
+- [ ] ✓ archive task → delete it → verify deleted view includes it, archive view excludes it → restore → back in archive view (still archived)
+- [ ] ✓ complete hierarchy → archive hierarchy → unarchive child → child appears as root in main tree, still completed
+
+**Timer guards**
+
+- [ ] ✗ start timer → attempt complete → error → attempt archive → error → stop timer → both succeed
+- [ ] ✗ start timer on descendant → attempt complete ancestor → error (descendant timer blocks it)
+
+**Multi-user isolation**
+
+- [ ] ✓ user A completes/archives tasks → user B's tasks in separate project unaffected
+
+---
+
 ## Post-MVP Technical Improvements
 
 Tackle after Iteration 1 ships. These are engineering quality investments, not user-facing features.

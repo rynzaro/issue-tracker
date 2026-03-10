@@ -88,12 +88,13 @@ Core task management with time tracking. The first usable version of the app.
   - [ ] Only one active task per PROJECT per user (currently global per-user)
   - [ ] Keyboard shortcut to stop active task
 - [ ] **Estimates**
-  - [ ] Accumulative and/or own estimate field on Task (add database field(s))
+  - [x] Accumulative and/or own estimate field on Task (add database field(s))
+    - [ ] change display / sum calculation
   - [ ] Indicator when sum of sub-task estimates exceeds parent's estimate
 - [ ] **Task Tags** (M:N, optional via `Tag`/`TaskTag` models)
 - [ ] **Task Search** (filter/search tasks within a project)
 - [ ] **Mobile Layout**
-  - [ ] Responsive show/hide for task options
+  - [x] Responsive show/hide for task options
   - [ ] Move tasksWrapper settings to mobile-friendly area (dropdown or bottom sheet)
 - [ ] **Accessibility** (keyboard navigation, ARIA labels, focus management)
 

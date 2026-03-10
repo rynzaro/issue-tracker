@@ -6,14 +6,28 @@ import {
   CreateTaskSchema,
   UpdateTaskParams,
   UpdateTaskSchema,
+  DeleteTaskSchema,
+  CompleteTaskSchema,
+  UncompleteTaskSchema,
+  ArchiveTaskSchema,
+  UnarchiveTaskSchema,
+  RestoreDeletedTaskSchema,
 } from "../schema/task";
 import {
   createServiceErrorResponse,
   validateInput,
 } from "../services/serviceUtil";
-import { createTask, deleteTask, updateTask } from "../services/task.service";
+import {
+  createTask,
+  deleteTask,
+  updateTask,
+  completeTask,
+  uncompleteTask,
+  archiveTask,
+  unarchiveTask,
+  restoreDeletedTask,
+} from "../services/task.service";
 import { revalidatePath } from "next/cache";
-import { z } from "zod";
 
 export async function createTaskAction({
   createTaskParams,
@@ -74,13 +88,116 @@ export async function deleteTaskAction({ taskId }: { taskId: string }) {
     );
   }
 
-  const validated = z.string().cuid().safeParse(taskId);
-  if (!validated.success) {
-    return createServiceErrorResponse("VALIDATION_ERROR", "Invalid task ID");
-  }
+  const validated = validateInput(DeleteTaskSchema, { taskId });
+  if (!validated.success) return validated;
 
   const result = await deleteTask({
-    taskId: validated.data,
+    taskId: validated.data.taskId,
+    userId: session.user.id,
+  });
+
+  if (result.success) revalidatePath("/s/project", "layout");
+  return result;
+}
+
+export async function completeTaskAction({ taskId }: { taskId: string }) {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return createServiceErrorResponse(
+      "AUTHORIZATION_ERROR",
+      "Unauthorized user",
+    );
+  }
+
+  const validated = validateInput(CompleteTaskSchema, { taskId });
+  if (!validated.success) return validated;
+
+  const result = await completeTask({
+    taskId: validated.data.taskId,
+    userId: session.user.id,
+  });
+
+  if (result.success) revalidatePath("/s/project", "layout");
+  return result;
+}
+
+export async function uncompleteTaskAction({ taskId }: { taskId: string }) {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return createServiceErrorResponse(
+      "AUTHORIZATION_ERROR",
+      "Unauthorized user",
+    );
+  }
+
+  const validated = validateInput(UncompleteTaskSchema, { taskId });
+  if (!validated.success) return validated;
+
+  const result = await uncompleteTask({
+    taskId: validated.data.taskId,
+    userId: session.user.id,
+  });
+
+  if (result.success) revalidatePath("/s/project", "layout");
+  return result;
+}
+
+export async function archiveTaskAction({ taskId }: { taskId: string }) {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return createServiceErrorResponse(
+      "AUTHORIZATION_ERROR",
+      "Unauthorized user",
+    );
+  }
+
+  const validated = validateInput(ArchiveTaskSchema, { taskId });
+  if (!validated.success) return validated;
+
+  const result = await archiveTask({
+    taskId: validated.data.taskId,
+    userId: session.user.id,
+  });
+
+  if (result.success) revalidatePath("/s/project", "layout");
+  return result;
+}
+
+export async function unarchiveTaskAction({ taskId }: { taskId: string }) {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return createServiceErrorResponse(
+      "AUTHORIZATION_ERROR",
+      "Unauthorized user",
+    );
+  }
+
+  const validated = validateInput(UnarchiveTaskSchema, { taskId });
+  if (!validated.success) return validated;
+
+  const result = await unarchiveTask({
+    taskId: validated.data.taskId,
+    userId: session.user.id,
+  });
+
+  if (result.success) revalidatePath("/s/project", "layout");
+  return result;
+}
+
+export async function restoreDeletedTaskAction({ taskId }: { taskId: string }) {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return createServiceErrorResponse(
+      "AUTHORIZATION_ERROR",
+      "Unauthorized user",
+    );
+  }
+
+  const validated = validateInput(RestoreDeletedTaskSchema, { taskId });
+  if (!validated.success) return validated;
+
+  const result = await restoreDeletedTask({
+    taskId: validated.data.taskId,
     userId: session.user.id,
   });
 

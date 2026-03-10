@@ -5,9 +5,10 @@ import {
   logServiceError,
   serviceAction,
   serviceQuery,
+  ServiceErrorResponse,
   ServiceResponseWithData,
 } from "./serviceUtil";
-import { Project } from "@prisma/client";
+import { Prisma, Project } from "@prisma/client";
 import {
   CreateProjectParams,
   ProjectWithTaskTree,
@@ -209,7 +210,7 @@ export function getUserProjectWithTasks({
       where: { id: projectId, deletedAt: null },
       include: {
         tasks: {
-          where: { deletedAt: null },
+          where: { deletedAt: null, archivedAt: null },
           include: {
             todoItems: true,
             taskTags: { include: { tag: true } },
@@ -286,6 +287,8 @@ export function getProjectTaskTree({
         totalTimeSpent,
         activeTimerStartedAt:
           task.id === activeTaskId ? activeTimerStartedAt : null,
+        sumOfChildrenEstimates: 0,
+        hasEstimateOverflow: false,
       });
     }
 
@@ -315,6 +318,12 @@ export function getProjectTaskTree({
         (sum, c) => sum + c.totalTimeSpent,
         node.totalTimeSpent,
       );
+      node.sumOfChildrenEstimates = node.children.reduce(
+        (sum, c) => sum + (c.estimate ?? 0),
+        0,
+      );
+      node.hasEstimateOverflow =
+        node.estimate !== null && node.sumOfChildrenEstimates > node.estimate;
     }
 
     for (const root of roots) {
@@ -324,4 +333,251 @@ export function getProjectTaskTree({
     const { tasks: _flatTasks, ...projectData } = project;
     return createSuccessResponseWithData({ ...projectData, tasks: roots });
   }, "Failed to build task tree");
+}
+
+// ─── Archive / Deleted Queries ─────────────────────────────────────────────────
+
+const archivedTaskIncludes = {
+  todoItems: true,
+  taskTags: { include: { tag: true } },
+  timeEntries: { select: { duration: true } },
+} satisfies Prisma.TaskInclude;
+
+type TaskWithIncludes = Prisma.TaskGetPayload<{
+  include: typeof archivedTaskIncludes;
+}>;
+
+function buildTaskNodeTree(flatTasks: TaskWithIncludes[]): TaskNode[] {
+  const taskIds = new Set(flatTasks.map((t) => t.id));
+  const taskMap = new Map<string, TaskNode>();
+
+  for (const task of flatTasks) {
+    const totalTimeSpent = task.timeEntries.reduce(
+      (sum, te) => sum + te.duration,
+      0,
+    );
+    const { timeEntries: _timeEntries, ...taskData } = task;
+    taskMap.set(task.id, {
+      ...taskData,
+      children: [],
+      status: task.completedAt ? "DONE" : "OPEN",
+      hasActiveDescendant: false,
+      totalTimeSpent,
+      activeTimerStartedAt: null,
+      sumOfChildrenEstimates: 0,
+      hasEstimateOverflow: false,
+    });
+  }
+
+  const roots: TaskNode[] = [];
+  for (const node of taskMap.values()) {
+    if (node.parentId && taskIds.has(node.parentId)) {
+      taskMap.get(node.parentId)!.children.push(node);
+    } else {
+      roots.push(node);
+    }
+  }
+
+  function accumulate(node: TaskNode): void {
+    for (const child of node.children) accumulate(child);
+    node.totalTimeSpent = node.children.reduce(
+      (sum, c) => sum + c.totalTimeSpent,
+      node.totalTimeSpent,
+    );
+    node.sumOfChildrenEstimates = node.children.reduce(
+      (sum, c) => sum + (c.estimate ?? 0),
+      0,
+    );
+    node.hasEstimateOverflow =
+      node.estimate !== null && node.sumOfChildrenEstimates > node.estimate;
+  }
+  for (const root of roots) accumulate(root);
+
+  return roots;
+}
+
+async function verifyProjectOwnership(
+  userId: string,
+  projectId: string,
+): Promise<ServiceErrorResponse | null> {
+  const project = await client.project.findUnique({
+    where: { id: projectId, deletedAt: null },
+    select: { userId: true },
+  });
+  if (!project) {
+    return createServiceErrorResponse("NOT_FOUND", "Project not found");
+  }
+  if (project.userId !== userId) {
+    logServiceError(
+      "Unauthorized project access",
+      `User ${userId} attempted to access project ${projectId} owned by ${project.userId}`,
+    );
+    return createServiceErrorResponse("NOT_FOUND", "Project not found");
+  }
+  return null;
+}
+
+export function getArchivedTasksForProject({
+  userId,
+  projectId,
+}: {
+  userId: string;
+  projectId: string;
+}) {
+  return serviceAction(async () => {
+    const ownershipError = await verifyProjectOwnership(userId, projectId);
+    if (ownershipError) return ownershipError;
+
+    const tasks = await client.task.findMany({
+      where: { projectId, archivedAt: { not: null }, deletedAt: null },
+      include: archivedTaskIncludes,
+    });
+
+    return createSuccessResponseWithData(buildTaskNodeTree(tasks));
+  }, "Failed to fetch archived tasks");
+}
+
+export function getDeletedTasksForProject({
+  userId,
+  projectId,
+}: {
+  userId: string;
+  projectId: string;
+}) {
+  return serviceAction(async () => {
+    const ownershipError = await verifyProjectOwnership(userId, projectId);
+    if (ownershipError) return ownershipError;
+
+    const tasks = await client.task.findMany({
+      where: { projectId, deletedAt: { not: null } },
+      include: archivedTaskIncludes,
+    });
+
+    return createSuccessResponseWithData(buildTaskNodeTree(tasks));
+  }, "Failed to fetch deleted tasks");
+}
+
+// ─── Task Parent Map (for restore dialogs) ─────────────────────────────────────
+
+export type TaskParentInfo = {
+  id: string;
+  title: string;
+  state: "active" | "active_completed" | "archived" | "deleted";
+};
+
+export function getProjectTaskParentMap({
+  userId,
+  projectId,
+}: {
+  userId: string;
+  projectId: string;
+}) {
+  return serviceAction(async () => {
+    const ownershipError = await verifyProjectOwnership(userId, projectId);
+    if (ownershipError) return ownershipError;
+
+    const tasks = await client.task.findMany({
+      where: { projectId },
+      select: {
+        id: true,
+        title: true,
+        completedAt: true,
+        archivedAt: true,
+        deletedAt: true,
+      },
+    });
+
+    const map: Record<string, TaskParentInfo> = {};
+    for (const t of tasks) {
+      let state: TaskParentInfo["state"];
+      if (t.deletedAt) {
+        state = "deleted";
+      } else if (t.archivedAt) {
+        state = "archived";
+      } else if (t.completedAt) {
+        state = "active_completed";
+      } else {
+        state = "active";
+      }
+      map[t.id] = { id: t.id, title: t.title, state };
+    }
+
+    return createSuccessResponseWithData(map);
+  }, "Failed to fetch task parent map");
+}
+
+// ─── Archive Page (consolidated) ──────────────────────────────────────────────
+
+export type ArchivePageData = {
+  project: Project;
+  archivedTasks: TaskNode[];
+  deletedTasks: TaskNode[];
+  parentMap: Record<string, TaskParentInfo>;
+};
+
+export function getArchivePageData({
+  userId,
+  projectId,
+}: {
+  userId: string;
+  projectId: string;
+}): Promise<ServiceResponseWithData<ArchivePageData>> {
+  return serviceAction(async () => {
+    const project = await client.project.findUnique({
+      where: { id: projectId, deletedAt: null },
+    });
+    if (!project) {
+      return createServiceErrorResponse("NOT_FOUND", "Project not found");
+    }
+    if (project.userId !== userId) {
+      logServiceError(
+        "Unauthorized project access",
+        `User ${userId} attempted to access project ${projectId} owned by ${project.userId}`,
+      );
+      return createServiceErrorResponse("NOT_FOUND", "Project not found");
+    }
+
+    const [archivedRaw, deletedRaw, allTasks] = await Promise.all([
+      client.task.findMany({
+        where: { projectId, archivedAt: { not: null }, deletedAt: null },
+        include: archivedTaskIncludes,
+      }),
+      client.task.findMany({
+        where: { projectId, deletedAt: { not: null } },
+        include: archivedTaskIncludes,
+      }),
+      client.task.findMany({
+        where: { projectId },
+        select: {
+          id: true,
+          title: true,
+          completedAt: true,
+          archivedAt: true,
+          deletedAt: true,
+        },
+      }),
+    ]);
+
+    const parentMap: Record<string, TaskParentInfo> = {};
+    for (const t of allTasks) {
+      let state: TaskParentInfo["state"];
+      if (t.deletedAt) {
+        state = "deleted";
+      } else if (t.archivedAt) {
+        state = "archived";
+      } else if (t.completedAt) {
+        state = "active_completed";
+      } else {
+        state = "active";
+      }
+      parentMap[t.id] = { id: t.id, title: t.title, state };
+    }
+
+    return createSuccessResponseWithData({
+      project,
+      archivedTasks: buildTaskNodeTree(archivedRaw),
+      deletedTasks: buildTaskNodeTree(deletedRaw),
+      parentMap,
+    });
+  }, "Failed to fetch archive page data");
 }

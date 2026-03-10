@@ -20,6 +20,8 @@ import {
   CreateProjectParams,
   CreateProjectSchema,
   ProjectWithTaskTree,
+  SerializableProjectWithTaskTree,
+  serializeProjectWithTaskTree,
   UpdateProjectParams,
   UpdateProjectSchema,
 } from "../schema/project";
@@ -143,7 +145,7 @@ export async function getUserProjectWithTasksAndChildrenAction({
   projectId,
 }: {
   projectId: string;
-}): Promise<ServiceResponseWithData<ProjectWithTaskTree>> {
+}): Promise<ServiceResponseWithData<SerializableProjectWithTaskTree>> {
   const session = await auth();
   if (!session?.user?.id) {
     return createServiceErrorResponse(
@@ -157,8 +159,17 @@ export async function getUserProjectWithTasksAndChildrenAction({
     return createServiceErrorResponse("VALIDATION_ERROR", "Invalid project ID");
   }
 
-  return getProjectTaskTree({
+  const result = await getProjectTaskTree({
     userId: session.user.id,
     projectId: validated.data,
   });
+
+  if (!result.success) {
+    return result;
+  }
+
+  return {
+    success: true,
+    data: serializeProjectWithTaskTree(result.data),
+  };
 }
