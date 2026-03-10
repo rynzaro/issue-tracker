@@ -465,6 +465,32 @@ export type TaskParentInfo = {
   state: "active" | "active_completed" | "archived" | "deleted";
 };
 
+type TaskParentRaw = {
+  id: string;
+  title: string;
+  completedAt: Date | null;
+  archivedAt: Date | null;
+  deletedAt: Date | null;
+};
+
+function buildParentMap(tasks: TaskParentRaw[]): Record<string, TaskParentInfo> {
+  const map: Record<string, TaskParentInfo> = {};
+  for (const t of tasks) {
+    let state: TaskParentInfo["state"];
+    if (t.deletedAt) {
+      state = "deleted";
+    } else if (t.archivedAt) {
+      state = "archived";
+    } else if (t.completedAt) {
+      state = "active_completed";
+    } else {
+      state = "active";
+    }
+    map[t.id] = { id: t.id, title: t.title, state };
+  }
+  return map;
+}
+
 export function getProjectTaskParentMap({
   userId,
   projectId,
@@ -487,22 +513,7 @@ export function getProjectTaskParentMap({
       },
     });
 
-    const map: Record<string, TaskParentInfo> = {};
-    for (const t of tasks) {
-      let state: TaskParentInfo["state"];
-      if (t.deletedAt) {
-        state = "deleted";
-      } else if (t.archivedAt) {
-        state = "archived";
-      } else if (t.completedAt) {
-        state = "active_completed";
-      } else {
-        state = "active";
-      }
-      map[t.id] = { id: t.id, title: t.title, state };
-    }
-
-    return createSuccessResponseWithData(map);
+    return createSuccessResponseWithData(buildParentMap(tasks));
   }, "Failed to fetch task parent map");
 }
 
@@ -558,26 +569,11 @@ export function getArchivePageData({
       }),
     ]);
 
-    const parentMap: Record<string, TaskParentInfo> = {};
-    for (const t of allTasks) {
-      let state: TaskParentInfo["state"];
-      if (t.deletedAt) {
-        state = "deleted";
-      } else if (t.archivedAt) {
-        state = "archived";
-      } else if (t.completedAt) {
-        state = "active_completed";
-      } else {
-        state = "active";
-      }
-      parentMap[t.id] = { id: t.id, title: t.title, state };
-    }
-
     return createSuccessResponseWithData({
       project,
       archivedTasks: buildTaskNodeTree(archivedRaw),
       deletedTasks: buildTaskNodeTree(deletedRaw),
-      parentMap,
+      parentMap: buildParentMap(allTasks),
     });
   }, "Failed to fetch archive page data");
 }
