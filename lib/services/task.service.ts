@@ -5,6 +5,11 @@ import {
   createSuccessResponseWithData,
   serviceAction,
 } from "./serviceUtil";
+import {
+  validateTransition,
+  buildTransitionPlan,
+  type TransitionPlan,
+} from "./taskHierarchyPolicy";
 
 // ─── Shared Helpers ────────────────────────────────────────────────────────────
 
@@ -56,6 +61,53 @@ async function collectDescendantIds(
     queue.push(...children);
   }
   return allIds;
+}
+
+async function executePlan(plan: TransitionPlan, tx: DbClient): Promise<void> {
+  if (plan.setCompletedAt.ids.length > 0) {
+    await tx.task.updateMany({
+      where: { id: { in: plan.setCompletedAt.ids } },
+      data: { completedAt: plan.setCompletedAt.value },
+    });
+  }
+  if (plan.setArchivedAt.ids.length > 0) {
+    await tx.task.updateMany({
+      where: { id: { in: plan.setArchivedAt.ids } },
+      data: { archivedAt: plan.setArchivedAt.value },
+    });
+  }
+  if (plan.setDeletedAt.ids.length > 0) {
+    await tx.task.updateMany({
+      where: { id: { in: plan.setDeletedAt.ids } },
+      data: { deletedAt: plan.setDeletedAt.value },
+    });
+  }
+}
+
+async function getAllAncestors(
+  startingParentId: string | null,
+  db: DbClient,
+): Promise<AncestorRow[]> {
+  let currentParentId: string | null = startingParentId;
+  const ancestorRows: AncestorRow[] = [];
+
+  while (currentParentId) {
+    const parent: AncestorRow | null = await db.task.findUnique({
+      where: { id: currentParentId },
+      select: {
+        id: true,
+        parentId: true,
+        completedAt: true,
+        deletedAt: true,
+        archivedAt: true,
+      },
+    });
+
+    if (!parent) break;
+    ancestorRows.push(parent);
+    currentParentId = parent.parentId;
+  }
+  return ancestorRows;
 }
 
 export function createTask({
@@ -190,7 +242,11 @@ export function deleteTask({
       where: { id: taskId, deletedAt: null },
       select: {
         id: true,
+        parentId: true,
         projectId: true,
+        completedAt: true,
+        archivedAt: true,
+        deletedAt: true,
         project: { select: { userId: true } },
       },
     });
@@ -206,12 +262,25 @@ export function deleteTask({
       );
     }
 
-    // Interactive transaction: collect descendants + check active timers + soft-delete atomically.
     return await client.$transaction(async (tx) => {
-      const allIds = await collectDescendantIds(taskId, task.projectId, tx);
+      const ancestors = await getAllAncestors(task.parentId, tx);
+      const validation = validateTransition("DELETE", task, ancestors);
+      if (!validation.valid) {
+        return createServiceErrorResponse(
+          validation.error.code,
+          validation.error.message,
+        );
+      }
+
+      const descendantIds = await collectDescendantIds(
+        taskId,
+        task.projectId,
+        tx,
+        true,
+      );
 
       const activeTimer = await tx.activeTimer.findFirst({
-        where: { taskId: { in: allIds } },
+        where: { taskId: { in: descendantIds } },
       });
 
       if (activeTimer) {
@@ -221,14 +290,17 @@ export function deleteTask({
         );
       }
 
-      await tx.task.updateMany({
-        where: { id: { in: allIds } },
-        data: { deletedAt: new Date() },
-      });
+      const plan = buildTransitionPlan(
+        "DELETE",
+        task,
+        ancestors,
+        descendantIds,
+      );
+      await executePlan(plan, tx);
 
       return createSuccessResponseWithData({
         id: taskId,
-        deletedCount: allIds.length,
+        deletedCount: descendantIds.length,
       });
     });
   }, "Failed to delete task");
@@ -263,8 +335,11 @@ export function completeTask({
       where: { id: taskId, deletedAt: null },
       select: {
         id: true,
+        parentId: true,
         projectId: true,
         completedAt: true,
+        archivedAt: true,
+        deletedAt: true,
         project: { select: { userId: true } },
       },
     });
@@ -280,10 +355,23 @@ export function completeTask({
     }
 
     return await client.$transaction(async (tx) => {
-      const allIds = await collectDescendantIds(taskId, task.projectId, tx);
+      const ancestors = await getAllAncestors(task.parentId, tx);
+      const validation = validateTransition("COMPLETE", task, ancestors);
+      if (!validation.valid) {
+        return createServiceErrorResponse(
+          validation.error.code,
+          validation.error.message,
+        );
+      }
+
+      const descendantIds = await collectDescendantIds(
+        taskId,
+        task.projectId,
+        tx,
+      );
 
       const activeTimer = await tx.activeTimer.findFirst({
-        where: { taskId: { in: allIds } },
+        where: { taskId: { in: descendantIds } },
       });
       if (activeTimer) {
         return createServiceErrorResponse(
@@ -292,15 +380,17 @@ export function completeTask({
         );
       }
 
-      const now = new Date();
-      await tx.task.updateMany({
-        where: { id: { in: allIds }, completedAt: null },
-        data: { completedAt: now },
-      });
+      const plan = buildTransitionPlan(
+        "COMPLETE",
+        task,
+        ancestors,
+        descendantIds,
+      );
+      await executePlan(plan, tx);
 
       return createSuccessResponseWithData({
         id: taskId,
-        completedCount: allIds.length,
+        completedCount: descendantIds.length,
       });
     });
   }, "Failed to complete task");
@@ -318,36 +408,19 @@ export function uncompleteTask({
       where: {
         id: taskId,
         deletedAt: null,
-        parent: { completedAt: null },
       },
       select: {
         id: true,
         parentId: true,
         completedAt: true,
+        archivedAt: true,
+        deletedAt: true,
         project: { select: { userId: true } },
-        parent: {
-          select: {
-            deletedAt: true,
-            archivedAt: true,
-          },
-        },
       },
     });
 
     if (!task) {
       return createServiceErrorResponse("NOT_FOUND", "Task not found");
-    }
-    if (task.parent?.deletedAt) {
-      return createServiceErrorResponse(
-        "UNEXPECTED_ERROR",
-        "Parent task is deleted",
-      );
-    }
-    if (task.parent?.archivedAt) {
-      return createServiceErrorResponse(
-        "UNEXPECTED_ERROR",
-        "Parent task is archived",
-      );
     }
     if (task.project.userId !== userId) {
       return createServiceErrorResponse(
@@ -356,12 +429,24 @@ export function uncompleteTask({
       );
     }
 
-    await client.task.update({
-      where: { id: taskId },
-      data: { completedAt: null },
-    });
+    return await client.$transaction(async (tx) => {
+      const ancestors = await getAllAncestors(task.parentId, tx);
+      const validation = validateTransition("UNCOMPLETE", task, ancestors);
+      if (!validation.valid) {
+        return createServiceErrorResponse(
+          validation.error.code,
+          validation.error.message,
+        );
+      }
 
-    return createSuccessResponseWithData({ id: taskId });
+      const plan = buildTransitionPlan("UNCOMPLETE", task, ancestors);
+      await executePlan(plan, tx);
+
+      return createSuccessResponseWithData({
+        id: taskId,
+        uncompletedCount: plan.setCompletedAt.ids.length,
+      });
+    });
   }, "Failed to uncomplete task");
 }
 
@@ -379,7 +464,11 @@ export function archiveTask({
       where: { id: taskId, deletedAt: null, archivedAt: null },
       select: {
         id: true,
+        parentId: true,
         projectId: true,
+        completedAt: true,
+        archivedAt: true,
+        deletedAt: true,
         project: { select: { userId: true } },
       },
     });
@@ -395,10 +484,23 @@ export function archiveTask({
     }
 
     return await client.$transaction(async (tx) => {
-      const allIds = await collectDescendantIds(taskId, task.projectId, tx);
+      const ancestors = await getAllAncestors(task.parentId, tx);
+      const validation = validateTransition("ARCHIVE", task, ancestors);
+      if (!validation.valid) {
+        return createServiceErrorResponse(
+          validation.error.code,
+          validation.error.message,
+        );
+      }
+
+      const descendantIds = await collectDescendantIds(
+        taskId,
+        task.projectId,
+        tx,
+      );
 
       const activeTimer = await tx.activeTimer.findFirst({
-        where: { taskId: { in: allIds } },
+        where: { taskId: { in: descendantIds } },
       });
       if (activeTimer) {
         return createServiceErrorResponse(
@@ -407,15 +509,17 @@ export function archiveTask({
         );
       }
 
-      const now = new Date();
-      await tx.task.updateMany({
-        where: { id: { in: allIds } },
-        data: { archivedAt: now },
-      });
+      const plan = buildTransitionPlan(
+        "ARCHIVE",
+        task,
+        ancestors,
+        descendantIds,
+      );
+      await executePlan(plan, tx);
 
       return createSuccessResponseWithData({
         id: taskId,
-        archivedCount: allIds.length,
+        archivedCount: descendantIds.length,
       });
     });
   }, "Failed to archive task");
@@ -433,6 +537,10 @@ export function unarchiveTask({
       where: { id: taskId, archivedAt: { not: null }, deletedAt: null },
       select: {
         id: true,
+        parentId: true,
+        completedAt: true,
+        archivedAt: true,
+        deletedAt: true,
         project: { select: { userId: true } },
       },
     });
@@ -447,12 +555,21 @@ export function unarchiveTask({
       );
     }
 
-    await client.task.update({
-      where: { id: taskId },
-      data: { archivedAt: null },
-    });
+    return await client.$transaction(async (tx) => {
+      const ancestors = await getAllAncestors(task.parentId, tx);
+      const validation = validateTransition("UNARCHIVE", task, ancestors);
+      if (!validation.valid) {
+        return createServiceErrorResponse(
+          validation.error.code,
+          validation.error.message,
+        );
+      }
 
-    return createSuccessResponseWithData({ id: taskId });
+      const plan = buildTransitionPlan("UNARCHIVE", task, ancestors);
+      await executePlan(plan, tx);
+
+      return createSuccessResponseWithData({ id: taskId });
+    });
   }, "Failed to unarchive task");
 }
 
@@ -468,6 +585,10 @@ export function restoreDeletedTask({
       where: { id: taskId, deletedAt: { not: null } },
       select: {
         id: true,
+        parentId: true,
+        completedAt: true,
+        archivedAt: true,
+        deletedAt: true,
         project: { select: { userId: true } },
       },
     });
@@ -482,11 +603,23 @@ export function restoreDeletedTask({
       );
     }
 
-    await client.task.update({
-      where: { id: taskId },
-      data: { deletedAt: null },
-    });
+    return await client.$transaction(async (tx) => {
+      const ancestors = await getAllAncestors(task.parentId, tx);
+      const validation = validateTransition("UNDELETE", task, ancestors);
+      if (!validation.valid) {
+        return createServiceErrorResponse(
+          validation.error.code,
+          validation.error.message,
+        );
+      }
 
-    return createSuccessResponseWithData({ id: taskId });
+      const plan = buildTransitionPlan("UNDELETE", task, ancestors);
+      await executePlan(plan, tx);
+
+      return createSuccessResponseWithData({
+        id: taskId,
+        restoredCount: plan.setDeletedAt.ids.length,
+      });
+    });
   }, "Failed to restore task");
 }

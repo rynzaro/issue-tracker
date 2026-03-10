@@ -38,6 +38,7 @@ import {
   DropdownMenu,
 } from "@/components/dropdown";
 import { ArchiveBoxIcon } from "@heroicons/react/16/solid";
+import { Tooltip } from "@/components/tooltip";
 
 function formatElapsed(elapsed: number, taskStatus: string): string | null {
   if (elapsed <= 0 && taskStatus !== "IN_PROGRESS") return null;
@@ -123,8 +124,12 @@ export default function Tasks({
               <ChevronDownIcon className="w-6 h-6" />
             ) : null}
             {task.hasEstimateOverflow && (
-              // TODO add hover tooltip what this means
-              <ExclamationTriangleIcon className="text-red-500 dark:text-red-400 h-8 w-8 ml-4" />
+              <Tooltip
+                maxWidth="md"
+                content="Die geschätzte Zeit für diese Aufgabe ist geringer als die bereits aufgewendete Zeit."
+              >
+                <ExclamationTriangleIcon className="text-red-500 dark:text-red-400 h-6 w-6 ml-4" />
+              </Tooltip>
             )}
           </Subheading>
           <SecondaryText>

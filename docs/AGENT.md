@@ -200,6 +200,29 @@ All Toggl Track API code lives in `lib/toggl/`. The main app must work without T
 
 **No Toggl env vars**: Each user stores their own Toggl API token and workspace ID in their user settings (User model fields). The `lib/toggl/api.ts` reads from the database, never from `process.env`.
 
+### 8. Hierarchy Transitions Use the Policy Module (AD-19)
+
+All task hierarchy state changes (complete, uncomplete, archive, unarchive, delete, restore) flow through `lib/services/taskHierarchyPolicy.ts`. Service functions in `task.service.ts` follow a uniform pattern:
+
+```
+load task → load ancestors → validateTransition() → collect descendants (if needed) → buildTransitionPlan() → executePlan()
+```
+
+**Policy rules per operation:**
+
+| Operation  | Downward cascade                 | Ancestor forbidden states         | Ancestor propagation                      |
+| ---------- | -------------------------------- | --------------------------------- | ----------------------------------------- |
+| COMPLETE   | All descendants                  | deleted, archived, completion gap | None                                      |
+| UNCOMPLETE | None                             | deleted, archived, completion gap | Uncomplete contiguous completed ancestors |
+| ARCHIVE    | All descendants                  | deleted, archived                 | None                                      |
+| UNARCHIVE  | None                             | deleted, archive gap              | Unarchive contiguous archived ancestors   |
+| DELETE     | All descendants (incl. archived) | deleted                           | None                                      |
+| UNDELETE   | None                             | deletion gap                      | Undelete contiguous deleted ancestors     |
+
+**Key files:** `lib/services/taskHierarchyPolicy.ts` (validation + plan logic), `tests/unit/services/taskHierarchyPolicy.test.ts` (unit tests).
+
+**Never** put hierarchy validation logic inline in service functions — always use `validateTransition()` and `buildTransitionPlan()`.
+
 ## Schema Reference
 
 ### Models (compact)
@@ -370,15 +393,16 @@ User ──1:N──> Project ──1:N──> Task ──1:N──> TimeEntry
 
 ## Service Responsibilities
 
-| Service              | Owns                                                                           | Calls                                 |
-| -------------------- | ------------------------------------------------------------------------------ | ------------------------------------- |
-| `project.service`    | Project CRUD                                                                   | —                                     |
-| `task.service`       | Task CRUD, hierarchy                                                           | `event.service`, `checkpoint.service` |
-| `timeEntry.service`  | Start/stop timers (AD-16/17: ActiveTimer + mandatory stoppedAt), duration calc | `event.service`, `checkpoint.service` |
-| `event.service`      | TaskEvent creation, queries                                                    | —                                     |
-| `checkpoint.service` | Checkpoint CRUD, debouncing, snapshots, comparisons                            | —                                     |
-| `todo.service`       | TodoItem CRUD (including estimate), conversion to sub-task                     | `task.service`, `event.service`       |
-| `analysis.service`   | Error decomposition, accuracy metrics, trends                                  | `checkpoint.service`                  |
+| Service               | Owns                                                                           | Calls                                 |
+| --------------------- | ------------------------------------------------------------------------------ | ------------------------------------- |
+| `project.service`     | Project CRUD                                                                   | —                                     |
+| `task.service`        | Task CRUD, hierarchy transitions (via `taskHierarchyPolicy`)                   | `event.service`, `checkpoint.service` |
+| `taskHierarchyPolicy` | Validation + plan-building for hierarchy transitions (AD-19)                   | — (pure logic, no DB)                 |
+| `timeEntry.service`   | Start/stop timers (AD-16/17: ActiveTimer + mandatory stoppedAt), duration calc | `event.service`, `checkpoint.service` |
+| `event.service`       | TaskEvent creation, queries                                                    | —                                     |
+| `checkpoint.service`  | Checkpoint CRUD, debouncing, snapshots, comparisons                            | —                                     |
+| `todo.service`        | TodoItem CRUD (including estimate), conversion to sub-task                     | `task.service`, `event.service`       |
+| `analysis.service`    | Error decomposition, accuracy metrics, trends                                  | `checkpoint.service`                  |
 
 ## File Change Guide
 
@@ -401,6 +425,13 @@ User ──1:N──> Project ──1:N──> Task ──1:N──> TimeEntry
 
 1. `lib/services/checkpoint.service.ts` — modify `createCheckpoint()` or `debounceOrCreate()`
 2. `lib/services/task.service.ts` or `timeEntry.service.ts` — modify the trigger call site
+
+### "I need to add or change a hierarchy transition rule"
+
+1. `lib/services/taskHierarchyPolicy.ts` — modify the `validate*()` or `build*Plan()` function for the operation
+2. `tests/unit/services/taskHierarchyPolicy.test.ts` — add/update tests
+3. `docs/AGENT.md` — update the policy rules table in section 8
+4. `docs/ARCHITECTURE_DECISIONS.md` — update AD-19 if the change affects the rules table
 
 ### "I need to add a new page"
 
@@ -445,3 +476,6 @@ These must ALWAYS hold true. Verify after any change:
 7. **CheckpointTask pairs are unique** — `[checkpointId, taskId]` is enforced as unique
 8. **Toggl is optional** — the app must function fully without any Toggl configuration
 9. **No Toggl env vars** — Toggl API tokens are per-user (stored in User model), never in `.env` or `process.env`
+10. **Hierarchy transitions go through the policy module** — never inline validation or plan-building for complete/uncomplete/archive/unarchive/delete/restore in service functions. Always use `validateTransition()` + `buildTransitionPlan()` + `executePlan()` from `taskHierarchyPolicy.ts`.
+11. **No completion gaps in ancestors** — a completed ancestor above an uncompleted one is a data integrity error (`UNEXPECTED_ERROR`)
+12. **Ancestor state must be valid for the operation** — e.g., cannot complete a task under a deleted/archived parent, cannot archive under a deleted parent

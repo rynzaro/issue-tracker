@@ -7,14 +7,14 @@ Active regardless of skill mode (FAST or LEARN).
 
 ## Spec Summary TOC
 
-| Doc                              | Answers the question               | Key contents                                                                                                               |
-| -------------------------------- | ---------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
-| `docs/AGENT.md`                  | "What are the architecture rules?" | Service layer flow, server action pattern, event/checkpoint rules, schema reference, iteration status, critical invariants |
-| `docs/ARCHITECTURE_DECISIONS.md` | "Why was X decided this way?"      | Chronological AD log (AD-2 – AD-17), rejected alternatives, open future questions                                          |
-| `docs/ROADMAP.md`                | "What's done and what's next?"     | Iteration checklists (0–6), completion status per item                                                                     |
-| `docs/DEVELOPER.md`              | "How do I run this?"               | Dev setup, commands, environment variables                                                                                 |
-| `docs/USER.md`                   | "What does the product do?"        | User-facing feature descriptions                                                                                           |
-| `TODO.md`                        | "What's broken or pending?"        | Open issues from code reviews, categorized by severity                                                                     |
+| Doc                              | Answers the question               | Key contents                                                                                                                                         |
+| -------------------------------- | ---------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `docs/AGENT.md`                  | "What are the architecture rules?" | Service layer flow, server action pattern, event/checkpoint rules, hierarchy policy (AD-19), schema reference, iteration status, critical invariants |
+| `docs/ARCHITECTURE_DECISIONS.md` | "Why was X decided this way?"      | Chronological AD log (AD-2 – AD-19), rejected alternatives, open future questions                                                                    |
+| `docs/ROADMAP.md`                | "What's done and what's next?"     | Iteration checklists (0–6), completion status per item                                                                                               |
+| `docs/DEVELOPER.md`              | "How do I run this?"               | Dev setup, commands, environment variables                                                                                                           |
+| `docs/USER.md`                   | "What does the product do?"        | User-facing feature descriptions                                                                                                                     |
+| `TODO.md`                        | "What's broken or pending?"        | Open issues from code reviews, categorized by severity                                                                                               |
 
 **Rule:** Read `docs/AGENT.md` before making any code change. Check the Iteration Status table to know which rules are active.
 
@@ -136,6 +136,7 @@ While working, watch for patterns that should become reusable skills. Something 
 **Threshold:** Suggest only when (a) the pattern has appeared at least twice AND (b) no existing skill already covers it. Do not suggest on every vague pattern.
 
 **When you spot one, suggest briefly:**
+
 > "This looks like reusable expertise — [one-line description]. Want to package it as a skill? You can invoke `@skill-creator`."
 
 Then continue with the current task. Do not derail the workflow.
