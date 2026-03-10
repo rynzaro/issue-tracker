@@ -1,6 +1,6 @@
 "use client";
 
-import { SerializableTaskNode } from "@/lib/schema/task";
+import { TaskNode } from "@/lib/schema/task";
 import Tasks, { CompletedSection } from "./tasks";
 import TimeEntryDialog from "@/components/time-entry-dialog";
 import { useState } from "react";
@@ -39,21 +39,15 @@ export default function TasksWrapper({
   tasks,
 }: {
   projectId: string;
-  tasks: SerializableTaskNode[];
+  tasks: TaskNode[];
 }) {
-  const [newTaskParent, setNewTaskParent] =
-    useState<SerializableTaskNode | null>(null);
+  const [newTaskParent, setNewTaskParent] = useState<TaskNode | null>(null);
   const displayNewTaskParent = usePersistentValue(newTaskParent);
-  const [taskToEdit, setTaskToEdit] = useState<SerializableTaskNode | null>(
-    null,
-  );
+  const [taskToEdit, setTaskToEdit] = useState<TaskNode | null>(null);
   const displayTaskToEdit = usePersistentValue(taskToEdit);
-  const [taskToDelete, setTaskToDelete] = useState<SerializableTaskNode | null>(
-    null,
-  );
+  const [taskToDelete, setTaskToDelete] = useState<TaskNode | null>(null);
   const displayTaskToDelete = usePersistentValue(taskToDelete);
-  const [taskToArchive, setTaskToArchive] =
-    useState<SerializableTaskNode | null>(null);
+  const [taskToArchive, setTaskToArchive] = useState<TaskNode | null>(null);
   const displayTaskToArchive = usePersistentValue(taskToArchive);
   const [taskForTimeEntries, setTaskForTimeEntries] = useState<{
     id: string;
@@ -71,7 +65,7 @@ export default function TasksWrapper({
     submitUpdate,
   } = useTaskForm(projectId);
 
-  function handleEditClick(task: SerializableTaskNode) {
+  function handleEditClick(task: TaskNode) {
     setTaskToEdit(task);
     prefillForm(task);
   }

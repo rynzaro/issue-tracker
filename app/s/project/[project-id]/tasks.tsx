@@ -1,6 +1,6 @@
 "use client";
 
-import { SerializableTaskNode } from "@/lib/schema/task";
+import { TaskNode } from "@/lib/schema/task";
 import { InformationCircleIcon } from "@heroicons/react/24/outline";
 import {
   CheckIcon,
@@ -57,12 +57,12 @@ export default function Tasks({
   setTaskForTimeEntries,
 }: {
   projectId: string;
-  task: SerializableTaskNode;
+  task: TaskNode;
   isRoot: boolean;
-  setNewTaskParent: Dispatch<SetStateAction<SerializableTaskNode | null>>;
-  setTaskToEdit: (task: SerializableTaskNode) => void;
-  setTaskToDelete: Dispatch<SetStateAction<SerializableTaskNode | null>>;
-  setTaskToArchive: Dispatch<SetStateAction<SerializableTaskNode | null>>;
+  setNewTaskParent: Dispatch<SetStateAction<TaskNode | null>>;
+  setTaskToEdit: (task: TaskNode) => void;
+  setTaskToDelete: Dispatch<SetStateAction<TaskNode | null>>;
+  setTaskToArchive: Dispatch<SetStateAction<TaskNode | null>>;
   setTaskForTimeEntries: Dispatch<
     SetStateAction<{ id: string; title: string } | null>
   >;
@@ -314,12 +314,12 @@ function ExpandedChildren({
   setTaskToArchive,
   setTaskForTimeEntries,
 }: {
-  task: SerializableTaskNode;
+  task: TaskNode;
   projectId: string;
-  setNewTaskParent: Dispatch<SetStateAction<SerializableTaskNode | null>>;
-  setTaskToEdit: (task: SerializableTaskNode) => void;
-  setTaskToDelete: Dispatch<SetStateAction<SerializableTaskNode | null>>;
-  setTaskToArchive: Dispatch<SetStateAction<SerializableTaskNode | null>>;
+  setNewTaskParent: Dispatch<SetStateAction<TaskNode | null>>;
+  setTaskToEdit: (task: TaskNode) => void;
+  setTaskToDelete: Dispatch<SetStateAction<TaskNode | null>>;
+  setTaskToArchive: Dispatch<SetStateAction<TaskNode | null>>;
   setTaskForTimeEntries: Dispatch<
     SetStateAction<{ id: string; title: string } | null>
   >;
@@ -400,7 +400,7 @@ export function CompletedSection({
         ) : (
           <ChevronDownIcon className="w-4 h-4" />
         )}
-        Erledigte ({count})
+        Abgeschlossen ({count})
       </button>
       {open && children}
     </div>

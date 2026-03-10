@@ -7,7 +7,6 @@ import { Link } from "@/components/link";
 import { redirect } from "next/navigation";
 import ArchiveTaskList from "./archiveTaskList";
 import { ArrowLeftIcon } from "@heroicons/react/16/solid";
-import { serializeTaskNode } from "@/lib/schema/task";
 
 export default async function ArchivePage({
   params,

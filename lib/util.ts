@@ -1,4 +1,4 @@
-import { SerializableTaskNode, TaskNode } from "./schema/task";
+import { TaskNode } from "./schema/task";
 
 export type ApiErrorCode =
   | "ZOD_VALIDATION_ERROR"
@@ -103,9 +103,7 @@ export function formatTime(
   }
 }
 
-export function getActiveDescendantElapsed(
-  task: TaskNode | SerializableTaskNode,
-): number {
+export function getActiveDescendantElapsed(task: TaskNode): number {
   if (task.activeTimerStartedAt) {
     const start = new Date(task.activeTimerStartedAt).getTime();
     return Math.floor((Date.now() - start) / 1000);
@@ -119,9 +117,7 @@ export function getActiveDescendantElapsed(
   return 0;
 }
 
-export function getActiveDescendantStartedAt(
-  task: TaskNode | SerializableTaskNode,
-): Date | string | null {
+export function getActiveDescendantStartedAt(task: TaskNode): Date | null {
   if (task.activeTimerStartedAt) {
     return task.activeTimerStartedAt;
   }

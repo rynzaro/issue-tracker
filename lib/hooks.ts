@@ -1,11 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { FormState, handleInput as _handleInput } from "./formUtils";
-import {
-  CreateTaskParams,
-  TaskNode,
-  SerializableTaskNode,
-  UpdateTaskParams,
-} from "./schema/task";
+import { CreateTaskParams, TaskNode, UpdateTaskParams } from "./schema/task";
 import { createTaskAction, updateTaskAction } from "./actions/task.actions";
 import { useRouter } from "next/navigation";
 
@@ -72,7 +67,7 @@ export function useTaskForm(projectId: string) {
     setValues(initialFormState);
   }
 
-  function prefillForm(task: TaskNode | SerializableTaskNode) {
+  function prefillForm(task: TaskNode) {
     setValues((prev) => ({
       ...prev,
       title: { ...prev.title, value: task.title ?? "" },

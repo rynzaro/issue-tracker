@@ -9,7 +9,6 @@ import { Link } from "@/components/link";
 import { ArchiveBoxIcon, Cog8ToothIcon } from "@heroicons/react/24/outline";
 import { redirect } from "next/navigation";
 import SetDefaultButton from "./setDefaultButton";
-import { serializeProjectWithTaskTree } from "@/lib/schema/project";
 
 export default async function Page({
   params,
@@ -37,20 +36,19 @@ export default async function Page({
     );
   }
 
-  const serializedProject = serializeProjectWithTaskTree(project.data);
-  const tasks = serializedProject.tasks;
+  const tasks = project.data.tasks;
 
   return (
     <div className="flex flex-col gap-4">
       <div className="flex justify-between">
         <div className="flex items-baseline gap-4">
-          <Heading>{serializedProject.name}</Heading>
+          <Heading>{project.data.name}</Heading>
         </div>
         <div className="flex items-center gap-2">
-          {!serializedProject.isDefault && (
+          {!project.data.isDefault && (
             <SetDefaultButton
               projectId={projectId}
-              projectName={serializedProject.name}
+              projectName={project.data.name}
             />
           )}
           <Link

@@ -10,6 +10,13 @@ import {
 
 /** Subset of PrismaClient used by collectDescendantIds — satisfied by both client and tx */
 type DbClient = Pick<typeof client, "task">;
+type AncestorRow = {
+  id: string;
+  parentId: string | null;
+  completedAt: Date | null;
+  deletedAt: Date | null;
+  archivedAt: Date | null;
+};
 
 /**
  * BFS to collect a task and all its descendants within a project.
@@ -20,9 +27,15 @@ async function collectDescendantIds(
   taskId: string,
   projectId: string,
   db: DbClient = client,
+  includeArchived = false,
+  includeDeleted = false,
 ): Promise<string[]> {
   const projectTasks = await db.task.findMany({
-    where: { projectId, deletedAt: null, archivedAt: null },
+    where: {
+      projectId,
+      deletedAt: includeDeleted ? undefined : null,
+      archivedAt: includeArchived ? undefined : null,
+    },
     select: { id: true, parentId: true },
   });
 
@@ -44,8 +57,6 @@ async function collectDescendantIds(
   }
   return allIds;
 }
-
-// ─── Task CRUD ─────────────────────────────────────────────────────────────────
 
 export function createTask({
   userId,
@@ -113,6 +124,9 @@ export function createTask({
   }, "Failed to create task");
 }
 
+/**
+ * Update tasks if they are not archived or deleted, and user has access via project.
+ * */
 export function updateTask({
   userId,
   updateTaskParams,
@@ -122,7 +136,7 @@ export function updateTask({
 }) {
   return serviceAction(async () => {
     const task = await client.task.findUnique({
-      where: { id: updateTaskParams.id, deletedAt: null },
+      where: { id: updateTaskParams.id, deletedAt: null, archivedAt: null },
       select: { project: { select: { userId: true } } },
     });
     if (!task) {
@@ -193,7 +207,6 @@ export function deleteTask({
     }
 
     // Interactive transaction: collect descendants + check active timers + soft-delete atomically.
-    // Prevents race where a timer starts or a child is added between checks and delete.
     return await client.$transaction(async (tx) => {
       const allIds = await collectDescendantIds(taskId, task.projectId, tx);
 
@@ -237,8 +250,6 @@ export function hasActiveDescendants({ taskId }: { taskId: string }) {
     return createSuccessResponseWithData(!!activeTimer);
   }, "Failed to check active timers for task");
 }
-
-// ─── Complete / Uncomplete ─────────────────────────────────────────────────────
 
 export function completeTask({
   taskId,
@@ -304,17 +315,39 @@ export function uncompleteTask({
 }) {
   return serviceAction(async () => {
     const task = await client.task.findUnique({
-      where: { id: taskId, deletedAt: null },
+      where: {
+        id: taskId,
+        deletedAt: null,
+        parent: { completedAt: null },
+      },
       select: {
         id: true,
         parentId: true,
         completedAt: true,
         project: { select: { userId: true } },
+        parent: {
+          select: {
+            deletedAt: true,
+            archivedAt: true,
+          },
+        },
       },
     });
 
     if (!task) {
       return createServiceErrorResponse("NOT_FOUND", "Task not found");
+    }
+    if (task.parent?.deletedAt) {
+      return createServiceErrorResponse(
+        "UNEXPECTED_ERROR",
+        "Parent task is deleted",
+      );
+    }
+    if (task.parent?.archivedAt) {
+      return createServiceErrorResponse(
+        "UNEXPECTED_ERROR",
+        "Parent task is archived",
+      );
     }
     if (task.project.userId !== userId) {
       return createServiceErrorResponse(
@@ -323,23 +356,12 @@ export function uncompleteTask({
       );
     }
 
-    // Transaction: clear completedAt on task + parent atomically
-    return await client.$transaction(async (tx) => {
-      await tx.task.update({
-        where: { id: taskId },
-        data: { completedAt: null },
-      });
-
-      // Also clear direct parent's completedAt if set
-      if (task.parentId) {
-        await tx.task.updateMany({
-          where: { id: task.parentId, completedAt: { not: null } },
-          data: { completedAt: null },
-        });
-      }
-
-      return createSuccessResponseWithData({ id: taskId });
+    await client.task.update({
+      where: { id: taskId },
+      data: { completedAt: null },
     });
+
+    return createSuccessResponseWithData({ id: taskId });
   }, "Failed to uncomplete task");
 }
 

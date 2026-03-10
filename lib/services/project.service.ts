@@ -473,7 +473,9 @@ type TaskParentRaw = {
   deletedAt: Date | null;
 };
 
-function buildParentMap(tasks: TaskParentRaw[]): Record<string, TaskParentInfo> {
+function buildParentMap(
+  tasks: TaskParentRaw[],
+): Record<string, TaskParentInfo> {
   const map: Record<string, TaskParentInfo> = {};
   for (const t of tasks) {
     let state: TaskParentInfo["state"];

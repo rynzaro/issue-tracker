@@ -1,6 +1,6 @@
 "use client";
 
-import { SerializableTaskNode, TaskNode } from "@/lib/schema/task";
+import { TaskNode } from "@/lib/schema/task";
 import { TaskParentInfo } from "@/lib/services/project.service";
 import { formatTime } from "@/lib/util";
 import {
