@@ -108,6 +108,9 @@ export default function NewRootTask({ projectId }: { projectId: string }) {
                 )}
               </Field>
               <Field>
+                <div>
+                  <Label>To-Do Liste</Label>
+                </div>
                 <TodoList />
               </Field>
             </FieldGroup>
