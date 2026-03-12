@@ -107,6 +107,7 @@ export default function NewRootTask({ projectId }: { projectId: string }) {
                   <ErrorMessage>{values.description.error}</ErrorMessage>
                 )}
               </Field>
+              <TodoList />
             </FieldGroup>
             <DialogActions>
               <Button
