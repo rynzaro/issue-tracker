@@ -1,6 +1,6 @@
 "use client";
 
-import { TaskNode } from "@/lib/schema/task";
+import { TaskNode, UpdateTaskParams } from "@/lib/schema/task";
 import Tasks, { CompletedSection } from "./tasks";
 import TimeEntryDialog from "@/components/time-entry-dialog";
 import { useState } from "react";
@@ -25,11 +25,12 @@ import { Textarea } from "@/components/textarea";
 import { handleInput } from "@/lib/formUtils";
 import {
   archiveTaskAction,
+  completeTaskAction,
   deleteTaskAction,
+  updateTaskAction,
 } from "@/lib/actions/task.actions";
 import {
   ErrorToast,
-  InfoToast,
   SuccessToast,
   useToast,
 } from "@/lib/notification/toastProvider";
@@ -91,12 +92,8 @@ export default function TasksWrapper({
     } else {
       showToast(
         <ErrorToast
-          title="Fehler"
-          description={
-            typeof result.error === "string"
-              ? result.error
-              : result.error.message
-          }
+          title="Die Aufgabe konnte nicht erstellt werden"
+          description="Bitte probiere es noch einmal"
         />,
       );
     }
@@ -120,12 +117,8 @@ export default function TasksWrapper({
     } else {
       showToast(
         <ErrorToast
-          title="Fehler"
-          description={
-            result.error instanceof Error
-              ? result.error.message
-              : "Die Aufgabe konnte nicht aktualisiert werden."
-          }
+          title="Die Aufgabe konnte nicht aktualisiert werden"
+          description="Bitte probiere es noch einmal."
         />,
       );
     }
@@ -149,8 +142,8 @@ export default function TasksWrapper({
     } else {
       showToast(
         <ErrorToast
-          title="Fehler"
-          description="Die Aufgabe konnte nicht gelöscht werden."
+          title="Die Aufgabe konnte nicht gelöscht werden"
+          description="Bitte probiere es noch einmal."
         />,
       );
     }
@@ -180,28 +173,6 @@ export default function TasksWrapper({
       );
     }
     setArchiveLoading(false);
-  }
-
-  function triggerNotification() {
-    showToast(
-      <SuccessToast
-        title="Neue Aufgabe erstellt"
-        description="Die Aufgabe wurde erfolgreich erstellt."
-      />,
-      2000,
-    );
-    showToast(
-      <ErrorToast
-        title="Fehler"
-        description="Die Aufgabe konnte nicht erstellt werden."
-      />,
-    );
-    showToast(
-      <InfoToast
-        title="Info"
-        description="Dies ist eine informative Nachricht."
-      />,
-    );
   }
 
   const activeTasks = tasks.filter((t) => t.status !== "DONE");
@@ -303,9 +274,6 @@ export default function TasksWrapper({
               </FieldGroup>
 
               <DialogActions>
-                <Button onClick={() => triggerNotification()}>
-                  Benachrichtigung
-                </Button>
                 <Button
                   plain
                   onClick={() => {

@@ -48,60 +48,81 @@ type RestoreCheck = {
   canRestore: boolean;
   description: string;
   warning?: string;
+  affectedAncestors: TaskParentInfo[];
 };
+
+function getAffectedSummary(affectedAncestors: TaskParentInfo[]): string {
+  if (affectedAncestors.length === 0) {
+    return "";
+  }
+
+  return `Diese Aktion stellt diese Aufgabe und ${affectedAncestors.length} weitere Aufgabe${affectedAncestors.length > 1 ? "n" : ""} wieder her.`;
+}
+
+function collectAncestors(
+  task: TaskNode,
+  parentMap: Record<string, TaskParentInfo>,
+): TaskParentInfo[] {
+  const ancestors: TaskParentInfo[] = [];
+  const visited = new Set<string>();
+  let currentParentId = task.parentId;
+
+  while (currentParentId && !visited.has(currentParentId)) {
+    visited.add(currentParentId);
+    const parent = parentMap[currentParentId];
+    if (!parent) break;
+    ancestors.push(parent);
+    currentParentId = parent.parentId;
+  }
+
+  return ancestors;
+}
 
 function getRestoreCheck(
   task: TaskNode,
   mode: "archived" | "deleted",
   parentMap: Record<string, TaskParentInfo>,
 ): RestoreCheck {
-  const base = `Bist du dir sicher, dass du Aufgabe „${task.title}" wiederherstellen möchtest?`;
+  const base = `Bist du dir sicher?`;
+  const ancestors = collectAncestors(task, parentMap);
+  const affectedAncestors = ancestors.filter((ancestor) =>
+    mode === "archived"
+      ? ancestor.state === "archived"
+      : ancestor.state === "deleted",
+  );
 
-  if (!task.parentId) {
-    return { canRestore: true, description: base };
-  }
-
-  const parent = parentMap[task.parentId];
-  if (!parent) {
-    return { canRestore: true, description: base };
-  }
-
-  const parentLabel = `„${parent.title}"`;
-
-  // Parent is in the same tree (both archived or both deleted)
-  if (
-    (mode === "archived" && parent.state === "archived") ||
-    (mode === "deleted" && parent.state === "deleted")
-  ) {
-    const stateLabel = mode === "archived" ? "archiviert" : "gelöscht";
+  const blockingAncestor = ancestors.find((ancestor) => {
+    if (mode === "archived") return ancestor.state === "deleted";
+    return ancestor.state === "archived";
+  });
+  if (blockingAncestor) {
+    const stateLabel =
+      blockingAncestor.state === "archived" ? "archiviert" : "gelöscht";
     return {
       canRestore: false,
-      description: `Die Elternaufgabe ${parentLabel} ist ebenfalls ${stateLabel}. Stelle zuerst die Elternaufgabe wieder her.`,
+      description: `Wiederherstellung nicht möglich — die Überaufgabe „${blockingAncestor.title}" ist ${stateLabel}.`,
+      affectedAncestors,
     };
   }
 
-  // Parent is in the OTHER tree
-  if (parent.state === "archived" || parent.state === "deleted") {
-    const stateLabel = parent.state === "archived" ? "archiviert" : "gelöscht";
-    return {
-      canRestore: false,
-      description: `Wiederherstellung nicht möglich — die Elternaufgabe ${parentLabel} ist ${stateLabel}.`,
-    };
-  }
-
-  // Parent is active and completed, but child is NOT completed
-  if (parent.state === "active_completed" && !task.completedAt) {
+  // If any active completed ancestor exists and this task is not completed,
+  // restoring can force completion rollback up the chain.
+  const completedAncestor = ancestors.find(
+    (ancestor) => ancestor.state === "active_completed",
+  );
+  if (completedAncestor && !task.completedAt) {
     return {
       canRestore: true,
-      description: `${base} Dies ist eine Unteraufgabe von ${parentLabel}.`,
-      warning: `Die Elternaufgabe ${parentLabel} ist als erledigt markiert — die Erledigung der Elternaufgabe wird dadurch aufgehoben.`,
+      description: base,
+      warning: `Die Überaufgabe „${completedAncestor.title}" ist als erledigt markiert.`,
+      affectedAncestors,
     };
   }
 
-  // Parent is active (possibly completed, but child also completed — no issue)
   return {
     canRestore: true,
-    description: `${base} Dies ist eine Unteraufgabe von ${parentLabel}.`,
+    description: base,
+    affectedAncestors,
   };
 }
 
@@ -247,11 +268,18 @@ export default function ArchiveTaskList({
       <Alert open={!!taskToRestore} onClose={() => setTaskToRestore(null)}>
         <AlertTitle>
           {check?.canRestore
-            ? `Aufgabe „${taskToRestore?.title}" wiederherstellen?`
+            ? check.affectedAncestors.length > 0
+              ? `„${taskToRestore?.title}" inkl. Überaufgaben wiederherstellen?`
+              : `„${taskToRestore?.title}" wiederherstellen?`
             : "Wiederherstellung nicht möglich"}
         </AlertTitle>
         <AlertDescription>
           {check?.description}
+          {check?.canRestore && check && (
+            <span className="mt-2 block">
+              {getAffectedSummary(check.affectedAncestors)}
+            </span>
+          )}
           {check?.warning && (
             <span className="block mt-2 text-amber-600 dark:text-amber-400">
               {check.warning}

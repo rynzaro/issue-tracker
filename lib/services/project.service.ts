@@ -461,12 +461,14 @@ export function getDeletedTasksForProject({
 
 export type TaskParentInfo = {
   id: string;
+  parentId: string | null;
   title: string;
   state: "active" | "active_completed" | "archived" | "deleted";
 };
 
 type TaskParentRaw = {
   id: string;
+  parentId: string | null;
   title: string;
   completedAt: Date | null;
   archivedAt: Date | null;
@@ -488,7 +490,7 @@ function buildParentMap(
     } else {
       state = "active";
     }
-    map[t.id] = { id: t.id, title: t.title, state };
+    map[t.id] = { id: t.id, parentId: t.parentId, title: t.title, state };
   }
   return map;
 }
@@ -508,6 +510,7 @@ export function getProjectTaskParentMap({
       where: { projectId },
       select: {
         id: true,
+        parentId: true,
         title: true,
         completedAt: true,
         archivedAt: true,
@@ -563,6 +566,7 @@ export function getArchivePageData({
         where: { projectId },
         select: {
           id: true,
+          parentId: true,
           title: true,
           completedAt: true,
           archivedAt: true,

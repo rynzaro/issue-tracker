@@ -39,6 +39,11 @@ import {
 } from "@/components/dropdown";
 import { ArchiveBoxIcon } from "@heroicons/react/16/solid";
 import { Tooltip } from "@/components/tooltip";
+import {
+  ErrorToast,
+  SuccessToast,
+  useToast,
+} from "@/lib/notification/toastProvider";
 
 function formatElapsed(elapsed: number, taskStatus: string): string | null {
   if (elapsed <= 0 && taskStatus !== "IN_PROGRESS") return null;
@@ -72,6 +77,8 @@ export default function Tasks({
   const isTimerActive =
     task.hasActiveDescendant || task.status === "IN_PROGRESS";
   const [isExpanded, setIsExpanded] = useState(task.hasActiveDescendant);
+  const [loading, setLoading] = useState(false);
+  const { showToast } = useToast();
 
   const timerStartedAt =
     task.status === "IN_PROGRESS"
@@ -82,6 +89,50 @@ export default function Tasks({
 
   const elapsed = useElapsedTimer(timerStartedAt);
   const displayTotal = task.totalTimeSpent + elapsed;
+
+  async function handleCompleteTask(completeTaskParams: { taskId: string }) {
+    setLoading(true);
+    const result = await completeTaskAction(completeTaskParams);
+    if (result.success) {
+      showToast(
+        <SuccessToast
+          title="Aufgabe als erledigt markiert"
+          description="Die Aufgabe wurde erfolgreich als erledigt markiert."
+        />,
+      );
+    } else {
+      showToast(
+        <ErrorToast
+          title="Fehler beim bearbeiten der Aufgabe"
+          description="Bitte versuche es erneut."
+        />,
+      );
+    }
+    setLoading(false);
+  }
+
+  async function handleUncompleteTask(uncompleteTaskParams: {
+    taskId: string;
+  }) {
+    setLoading(true);
+    const result = await uncompleteTaskAction(uncompleteTaskParams);
+    if (result.success) {
+      showToast(
+        <SuccessToast
+          title="Aufgabe als nicht erledigt markiert"
+          description="Die Aufgabe wurde erfolgreich als nicht erledigt markiert."
+        />,
+      );
+    } else {
+      showToast(
+        <ErrorToast
+          title="Fehler beim bearbeiten der Aufgabe"
+          description="Bitte versuche es erneut."
+        />,
+      );
+    }
+    setLoading(false);
+  }
 
   return (
     <div
@@ -126,7 +177,7 @@ export default function Tasks({
             {task.hasEstimateOverflow && (
               <Tooltip
                 maxWidth="md"
-                content="Die geschätzte Zeit für diese Aufgabe ist geringer als die bereits aufgewendete Zeit."
+                content="Die geschätzte Zeit für diese Aufgabe ist geringer als die Summe aller Schätzungen der Unteraufgaben."
               >
                 <ExclamationTriangleIcon className="text-red-500 dark:text-red-400 h-6 w-6 ml-4" />
               </Tooltip>
@@ -202,8 +253,8 @@ export default function Tasks({
                   disabled={isTimerActive}
                   onClick={() =>
                     isCompleted
-                      ? uncompleteTaskAction({ taskId: task.id })
-                      : completeTaskAction({ taskId: task.id })
+                      ? handleUncompleteTask({ taskId: task.id })
+                      : handleCompleteTask({ taskId: task.id })
                   }
                 >
                   {isCompleted ? (
@@ -295,7 +346,7 @@ export default function Tasks({
         </div>
       </div>
 
-      {isExpanded && task.children && task.children.length > 0 && (
+      {isExpanded && task.children.length > 0 && task.children && (
         <ExpandedChildren
           task={task}
           projectId={projectId}

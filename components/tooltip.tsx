@@ -132,22 +132,18 @@ export function Tooltip({
     switch (pos) {
       case "top":
         top = triggerRect.top - tooltipRect.height - gap;
-        left =
-          triggerRect.left + triggerRect.width / 2 - tooltipRect.width / 2;
+        left = triggerRect.left + triggerRect.width / 2 - tooltipRect.width / 2;
         break;
       case "bottom":
         top = triggerRect.bottom + gap;
-        left =
-          triggerRect.left + triggerRect.width / 2 - tooltipRect.width / 2;
+        left = triggerRect.left + triggerRect.width / 2 - tooltipRect.width / 2;
         break;
       case "left":
-        top =
-          triggerRect.top + triggerRect.height / 2 - tooltipRect.height / 2;
+        top = triggerRect.top + triggerRect.height / 2 - tooltipRect.height / 2;
         left = triggerRect.left - tooltipRect.width - gap;
         break;
       case "right":
-        top =
-          triggerRect.top + triggerRect.height / 2 - tooltipRect.height / 2;
+        top = triggerRect.top + triggerRect.height / 2 - tooltipRect.height / 2;
         left = triggerRect.right + gap;
         break;
     }

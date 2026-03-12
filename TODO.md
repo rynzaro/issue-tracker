@@ -428,6 +428,7 @@ Review pass after Time Entry CRUD implementation. Mandatory 5 checks all pass.
 
 Captured from earlier brainstorming. Prioritize when relevant.
 
+- [ ] account creation / forgot password etc the whole flow
 - [ ] stack projects in sidenavbar
 - [ ] fix mobile version text sizes and buttons (thinking of a popup menu instead of buttons and just having start and stop visible, so the task + times can be large)
 - [ ] Deletion / Archiving architecture + impact of tasks -- do we need deletion AND archiving?
