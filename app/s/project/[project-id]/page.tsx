@@ -9,6 +9,7 @@ import { Link } from "@/components/link";
 import { ArchiveBoxIcon, Cog8ToothIcon } from "@heroicons/react/24/outline";
 import { redirect } from "next/navigation";
 import SetDefaultButton from "./setDefaultButton";
+import PrimaryHeader from "@/components/primaryHeader";
 
 export default async function Page({
   params,
@@ -37,9 +38,10 @@ export default async function Page({
   }
 
   const tasks = project.data.tasks;
+  const completedTasks = tasks.filter((t) => t.status === "DONE");
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col">
       <div className="flex justify-between">
         <div className="flex items-baseline gap-4">
           <Heading>{project.data.name}</Heading>
@@ -60,7 +62,7 @@ export default async function Page({
           </Link>
           <Link
             href={`/s/project/${projectId}/settings`}
-            className="inline-flex items-center justify-center w-10 h-10 rounded hover:bg-gray-100 dark:hover:bg-zinc-800 transition-colors"
+            className="inline-flex items-center justify-center w-10 h-10 rounded hover:bg-gray-100 dark:hover:bg-zinc-800 mr-3 transition-colors"
             aria-label="Projekteinstellungen"
           >
             <Cog8ToothIcon className="w-5 h-5 text-zinc-500 dark:text-zinc-400" />
@@ -68,8 +70,25 @@ export default async function Page({
           <NewRootTask projectId={projectId} />
         </div>
       </div>
-      <Divider className="my-0" />
-      <TasksWrapper projectId={projectId} tasks={tasks} />
+      <Divider className="my-2" />
+      <TasksWrapper
+        key={"active-" + projectId}
+        projectId={projectId}
+        tasks={tasks.filter((t) => t.status !== "DONE")}
+        inCompletedSection={false}
+      />
+      <div className="h-16" />
+      {completedTasks.length > 0 && (
+        <>
+          <PrimaryHeader noMargin title="Abgeschlossene Aufgaben" />
+          <TasksWrapper
+            key={"completed-" + projectId}
+            projectId={projectId}
+            tasks={tasks.filter((t) => t.status === "DONE")}
+            inCompletedSection={true}
+          />
+        </>
+      )}
     </div>
   );
 }

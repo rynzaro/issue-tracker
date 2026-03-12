@@ -1,7 +1,7 @@
 "use client";
 
-import { TaskNode, UpdateTaskParams } from "@/lib/schema/task";
-import Tasks, { CompletedSection } from "./tasks";
+import { TaskNode } from "@/lib/schema/task";
+import Tasks from "./tasks";
 import TimeEntryDialog from "@/components/time-entry-dialog";
 import { useState } from "react";
 import { usePersistentValue, useTaskForm } from "@/lib/hooks";
@@ -32,14 +32,15 @@ import {
   SuccessToast,
   useToast,
 } from "@/lib/notification/toastProvider";
-import TodoList from "./todoList";
 
 export default function TasksWrapper({
   projectId,
   tasks,
+  inCompletedSection,
 }: {
   projectId: string;
   tasks: TaskNode[];
+  inCompletedSection: boolean;
 }) {
   const [newTaskParent, setNewTaskParent] = useState<TaskNode | null>(null);
   const displayNewTaskParent = usePersistentValue(newTaskParent);
@@ -54,8 +55,6 @@ export default function TasksWrapper({
     title: string;
   } | null>(null);
   const [loading, setLoading] = useState(false);
-  const [deleteLoading, setDeleteLoading] = useState(false);
-  const [archiveLoading, setArchiveLoading] = useState(false);
   const {
     values,
     setValues,
@@ -126,7 +125,7 @@ export default function TasksWrapper({
 
   async function handleDeleteTask() {
     if (!taskToDelete) return;
-    setDeleteLoading(true);
+    setLoading(true);
 
     const result = await deleteTaskAction({ taskId: taskToDelete.id });
 
@@ -146,12 +145,12 @@ export default function TasksWrapper({
         />,
       );
     }
-    setDeleteLoading(false);
+    setLoading(false);
   }
 
   async function handleArchiveTask() {
     if (!taskToArchive) return;
-    setArchiveLoading(true);
+    setLoading(true);
 
     const result = await archiveTaskAction({ taskId: taskToArchive.id });
 
@@ -171,16 +170,12 @@ export default function TasksWrapper({
         />,
       );
     }
-    setArchiveLoading(false);
+    setLoading(false);
   }
-
-  const activeTasks = tasks.filter((t) => t.status !== "DONE");
-  const completedTasks = tasks.filter((t) => t.status === "DONE");
-  const [showCompleted, setShowCompleted] = useState(false);
 
   return (
     <>
-      {activeTasks.map((task) => (
+      {tasks.map((task) => (
         <Tasks
           key={task.id}
           projectId={projectId}
@@ -191,31 +186,9 @@ export default function TasksWrapper({
           setTaskToDelete={setTaskToDelete}
           setTaskToArchive={setTaskToArchive}
           setTaskForTimeEntries={setTaskForTimeEntries}
-          inCompletedSection={false}
+          inCompletedSection={inCompletedSection}
         />
       ))}
-      {completedTasks.length > 0 && (
-        <CompletedSection
-          count={completedTasks.length}
-          open={showCompleted}
-          onToggle={() => setShowCompleted((p) => !p)}
-        >
-          {completedTasks.map((task) => (
-            <Tasks
-              key={task.id}
-              projectId={projectId}
-              task={task}
-              isRoot={true}
-              setNewTaskParent={setNewTaskParent}
-              setTaskToEdit={handleEditClick}
-              setTaskToDelete={setTaskToDelete}
-              setTaskToArchive={setTaskToArchive}
-              setTaskForTimeEntries={setTaskForTimeEntries}
-              inCompletedSection={true}
-            />
-          ))}
-        </CompletedSection>
-      )}
       <>
         <Dialog
           open={!!newTaskParent}
@@ -380,16 +353,12 @@ export default function TasksWrapper({
               onClick={() => {
                 setTaskToDelete(null);
               }}
-              disabled={deleteLoading}
+              disabled={loading}
             >
               Abbrechen
             </Button>
-            <Button
-              color="red"
-              onClick={handleDeleteTask}
-              disabled={deleteLoading}
-            >
-              {deleteLoading ? "Löschen…" : "Löschen"}
+            <Button color="red" onClick={handleDeleteTask} disabled={loading}>
+              Löschen
             </Button>
           </AlertActions>
         </Alert>
@@ -414,12 +383,12 @@ export default function TasksWrapper({
               onClick={() => {
                 setTaskToArchive(null);
               }}
-              disabled={archiveLoading}
+              disabled={loading}
             >
               Abbrechen
             </Button>
-            <Button onClick={handleArchiveTask} disabled={archiveLoading}>
-              {archiveLoading ? "Archivieren…" : "Archivieren"}
+            <Button onClick={handleArchiveTask} disabled={loading}>
+              Archivieren
             </Button>
           </AlertActions>
         </Alert>

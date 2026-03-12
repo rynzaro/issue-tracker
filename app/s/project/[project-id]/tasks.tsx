@@ -76,6 +76,7 @@ export default function Tasks({
   inCompletedSection: boolean;
 }) {
   const isCompleted = task.status === "DONE";
+
   const isTimerActive =
     task.hasActiveDescendant || task.status === "IN_PROGRESS";
   const [isExpanded, setIsExpanded] = useState(task.hasActiveDescendant);
@@ -140,10 +141,9 @@ export default function Tasks({
     <div
       className={clsx(
         "flex flex-col gap-4 dark:text-white",
-        !isRoot ? "ml-4  " : "mt-4  font-semibold",
+        !isRoot ? "ml-4  " : "mb-8 font-semibold",
       )}
     >
-      <div className="flex sm:flex-col"></div>
       <div
         role="button"
         className={clsx(
@@ -210,7 +210,7 @@ export default function Tasks({
         >
           {isCompleted ? (
             <IconButton
-              onClick={() => uncompleteTaskAction({ taskId: task.id })}
+              onClick={() => handleUncompleteTask({ taskId: task.id })}
             >
               <ArrowUturnLeftIcon className="w-6 h-6" />
             </IconButton>
@@ -392,7 +392,7 @@ function ExpandedChildren({
       <>
         {task.children.map((child) => (
           <Tasks
-            key={task.id}
+            key={child.id}
             projectId={projectId}
             task={child}
             isRoot={false}
@@ -475,11 +475,11 @@ export function CompletedSection({
   children: React.ReactNode;
 }) {
   return (
-    <div className="mt-4">
+    <div className="ml-4">
       <button
         type="button"
         onClick={onToggle}
-        className="flex items-center gap-1 text-sm text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 select-none"
+        className="flex items-center gap-1 text-sm text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 select-none mb-2"
       >
         {open ? (
           <ChevronUpIcon className="w-4 h-4" />
