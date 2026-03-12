@@ -272,6 +272,7 @@ export default function TasksWrapper({
                     <ErrorMessage>{values.description.error}</ErrorMessage>
                   )}
                 </Field>
+                <TodoList />
               </FieldGroup>
 
               <DialogActions>
@@ -343,6 +344,7 @@ export default function TasksWrapper({
                     <ErrorMessage>{values.description.error}</ErrorMessage>
                   )}
                 </Field>
+                <TodoList />
               </FieldGroup>
               <DialogActions>
                 <Button
