@@ -191,6 +191,7 @@ export default function TasksWrapper({
           setTaskToDelete={setTaskToDelete}
           setTaskToArchive={setTaskToArchive}
           setTaskForTimeEntries={setTaskForTimeEntries}
+          inCompletedSection={false}
         />
       ))}
       {completedTasks.length > 0 && (
@@ -210,6 +211,7 @@ export default function TasksWrapper({
               setTaskToDelete={setTaskToDelete}
               setTaskToArchive={setTaskToArchive}
               setTaskForTimeEntries={setTaskForTimeEntries}
+              inCompletedSection={true}
             />
           ))}
         </CompletedSection>

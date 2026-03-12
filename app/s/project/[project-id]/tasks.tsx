@@ -61,6 +61,7 @@ export default function Tasks({
   setTaskToDelete,
   setTaskToArchive,
   setTaskForTimeEntries,
+  inCompletedSection,
 }: {
   projectId: string;
   task: TaskNode;
@@ -72,6 +73,7 @@ export default function Tasks({
   setTaskForTimeEntries: Dispatch<
     SetStateAction<{ id: string; title: string } | null>
   >;
+  inCompletedSection: boolean;
 }) {
   const isCompleted = task.status === "DONE";
   const isTimerActive =
@@ -355,6 +357,7 @@ export default function Tasks({
           setTaskToDelete={setTaskToDelete}
           setTaskToArchive={setTaskToArchive}
           setTaskForTimeEntries={setTaskForTimeEntries}
+          inCompletedSection={inCompletedSection}
         />
       )}
     </div>
@@ -369,6 +372,7 @@ function ExpandedChildren({
   setTaskToDelete,
   setTaskToArchive,
   setTaskForTimeEntries,
+  inCompletedSection,
 }: {
   task: TaskNode;
   projectId: string;
@@ -379,45 +383,71 @@ function ExpandedChildren({
   setTaskForTimeEntries: Dispatch<
     SetStateAction<{ id: string; title: string } | null>
   >;
+  inCompletedSection: boolean;
 }) {
-  const activeChildren = task.children.filter((c) => c.status !== "DONE");
-  const completedChildren = task.children.filter((c) => c.status === "DONE");
   const [showCompleted, setShowCompleted] = useState(false);
+
+  if (inCompletedSection) {
+    return (
+      <>
+        {task.children.map((child) => (
+          <Tasks
+            key={task.id}
+            projectId={projectId}
+            task={child}
+            isRoot={false}
+            setNewTaskParent={setNewTaskParent}
+            setTaskToEdit={setTaskToEdit}
+            setTaskToDelete={setTaskToDelete}
+            setTaskToArchive={setTaskToArchive}
+            setTaskForTimeEntries={setTaskForTimeEntries}
+            inCompletedSection={true}
+          />
+        ))}
+      </>
+    );
+  }
 
   return (
     <>
-      {activeChildren.map((child) => (
-        <Tasks
-          key={child.id}
-          projectId={projectId}
-          task={child}
-          isRoot={false}
-          setNewTaskParent={setNewTaskParent}
-          setTaskToEdit={setTaskToEdit}
-          setTaskToDelete={setTaskToDelete}
-          setTaskToArchive={setTaskToArchive}
-          setTaskForTimeEntries={setTaskForTimeEntries}
-        />
-      ))}
-      {completedChildren.length > 0 && (
+      {task.children
+        .filter((c) => c.status !== "DONE")
+        .map((child) => (
+          <Tasks
+            key={child.id}
+            projectId={projectId}
+            task={child}
+            isRoot={false}
+            setNewTaskParent={setNewTaskParent}
+            setTaskToEdit={setTaskToEdit}
+            setTaskToDelete={setTaskToDelete}
+            setTaskToArchive={setTaskToArchive}
+            setTaskForTimeEntries={setTaskForTimeEntries}
+            inCompletedSection={false}
+          />
+        ))}
+      {task.children.filter((c) => c.status === "DONE").length > 0 && (
         <CompletedSection
-          count={completedChildren.length}
+          count={task.children.filter((c) => c.status === "DONE").length}
           open={showCompleted}
           onToggle={() => setShowCompleted((p) => !p)}
         >
-          {completedChildren.map((child) => (
-            <Tasks
-              key={child.id}
-              projectId={projectId}
-              task={child}
-              isRoot={false}
-              setNewTaskParent={setNewTaskParent}
-              setTaskToEdit={setTaskToEdit}
-              setTaskToDelete={setTaskToDelete}
-              setTaskToArchive={setTaskToArchive}
-              setTaskForTimeEntries={setTaskForTimeEntries}
-            />
-          ))}
+          {task.children
+            .filter((c) => c.status === "DONE")
+            .map((child) => (
+              <Tasks
+                key={child.id}
+                projectId={projectId}
+                task={child}
+                isRoot={false}
+                setNewTaskParent={setNewTaskParent}
+                setTaskToEdit={setTaskToEdit}
+                setTaskToDelete={setTaskToDelete}
+                setTaskToArchive={setTaskToArchive}
+                setTaskForTimeEntries={setTaskForTimeEntries}
+                inCompletedSection={true}
+              />
+            ))}
         </CompletedSection>
       )}
     </>
