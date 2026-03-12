@@ -25,15 +25,14 @@ import { Textarea } from "@/components/textarea";
 import { handleInput } from "@/lib/formUtils";
 import {
   archiveTaskAction,
-  completeTaskAction,
   deleteTaskAction,
-  updateTaskAction,
 } from "@/lib/actions/task.actions";
 import {
   ErrorToast,
   SuccessToast,
   useToast,
 } from "@/lib/notification/toastProvider";
+import TodoList from "./todoList";
 
 export default function TasksWrapper({
   projectId,

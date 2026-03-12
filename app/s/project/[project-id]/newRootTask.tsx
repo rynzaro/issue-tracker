@@ -16,10 +16,10 @@ import { Textarea } from "@/components/textarea";
 import { handleInput } from "@/lib/formUtils";
 import {
   ErrorToast,
-  InfoToast,
   SuccessToast,
   useToast,
 } from "@/lib/notification/toastProvider";
+import TodoList from "./todoList";
 
 export default function NewRootTask({ projectId }: { projectId: string }) {
   const { showToast } = useToast();
@@ -106,6 +106,9 @@ export default function NewRootTask({ projectId }: { projectId: string }) {
                 {values.description.error && (
                   <ErrorMessage>{values.description.error}</ErrorMessage>
                 )}
+              </Field>
+              <Field>
+                <TodoList />
               </Field>
             </FieldGroup>
             <DialogActions>
