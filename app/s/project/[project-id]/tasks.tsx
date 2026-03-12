@@ -55,7 +55,7 @@ function formatElapsed(elapsed: number, taskStatus: string): string | null {
 export default function Tasks({
   projectId,
   task,
-  isRoot,
+  isRoot = false,
   setNewTaskParent,
   setTaskToEdit,
   setTaskToDelete,
@@ -65,7 +65,7 @@ export default function Tasks({
 }: {
   projectId: string;
   task: TaskNode;
-  isRoot: boolean;
+  isRoot?: boolean;
   setNewTaskParent: Dispatch<SetStateAction<TaskNode | null>>;
   setTaskToEdit: (task: TaskNode) => void;
   setTaskToDelete: Dispatch<SetStateAction<TaskNode | null>>;
