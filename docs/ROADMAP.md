@@ -78,19 +78,19 @@ Core task management with time tracking. The first usable version of the app.
   - [x] Edit existing time entries (start/stop times, duration)
   - [x] Edit running entry's start time (navbar + mobile pill)
   - [x] Time input selector component (date + time native inputs — `<DateTimeInput>`)
-- [ ] **Task Status Transitions** (complete, uncomplete, archive, unarchive)
-  - [ ] Set/clear `completedAt` (complete/uncomplete)
+- [x] **Task Status Transitions** (complete, uncomplete, archive, unarchive)
+  - [x] Set/clear `completedAt` (complete/uncomplete)
   - [x] Add `archivedAt DateTime?` to Task schema (already in schema from Iteration 0)
-  - [ ] Set/clear `archivedAt` (archive/unarchive)
-  - [ ] Archived tasks section (filterable view)
-  - [ ] Deleted tasks section (soft-deleted, read-only view)
+  - [x] Set/clear `archivedAt` (archive/unarchive)
+  - [x] Archived tasks section (filterable view)
+  - [x] Deleted tasks section (soft-deleted, read-only view)
 - [ ] **Timer Behavior**
   - [ ] Only one active task per PROJECT per user (currently global per-user)
   - [ ] Keyboard shortcut to stop active task
 - [ ] **Estimates**
   - [x] Accumulative and/or own estimate field on Task (add database field(s))
     - [ ] change display / sum calculation
-  - [ ] Indicator when sum of sub-task estimates exceeds parent's estimate
+  - [x] Indicator when sum of sub-task estimates exceeds parent's estimate
 - [ ] **Task Tags** (M:N, optional via `Tag`/`TaskTag` models)
 - [ ] **Task Search** (filter/search tasks within a project)
 - [ ] **Mobile Layout**

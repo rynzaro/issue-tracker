@@ -32,6 +32,7 @@ import {
   SuccessToast,
   useToast,
 } from "@/lib/notification/toastProvider";
+import TaskDialog from "./taskDialog";
 
 export default function TasksWrapper({
   projectId,
@@ -190,148 +191,33 @@ export default function TasksWrapper({
         />
       ))}
       <>
-        <Dialog
+        <TaskDialog
           open={!!newTaskParent}
           onClose={() => {
             setNewTaskParent(null);
             resetForm();
           }}
-        >
-          <DialogTitle>Neue Aufgabe erstellen</DialogTitle>
-          <DialogDescription>
-            Erstelle eine neue Aufgabe unter "{displayNewTaskParent?.title}"
-          </DialogDescription>
-          <form
-            onSubmit={(e) => handleCreateTask(e, newTaskParent?.id ?? null)}
-          >
-            <DialogBody>
-              <FieldGroup>
-                <Field>
-                  <Label>Titel</Label>
-                  <Input
-                    name="title"
-                    value={values.title.value}
-                    invalid={!!values.title.error}
-                    onChange={(e) => handleInput(e, setValues)}
-                  />
-                  {values.title.error && (
-                    <ErrorMessage>{values.title.error}</ErrorMessage>
-                  )}
-                </Field>
-                <Field>
-                  <Label>Geschätzte Dauer</Label>
-                  <Input
-                    inputMode="numeric"
-                    name="estimatedDuration"
-                    pattern="[0-9]*"
-                    value={values.estimatedDuration.value}
-                    onChange={(e) => {
-                      if (/^\d*$/.test(e.target.value)) {
-                        handleInput(e, setValues);
-                      }
-                    }}
-                  />
-                </Field>
-                <Field>
-                  <Label>Beschreibung</Label>
-                  <Textarea
-                    name="description"
-                    rows={4}
-                    value={values.description.value}
-                    invalid={!!values.description.error}
-                    onChange={(e) => handleInput(e, setValues)}
-                  />
-                  {values.description.error && (
-                    <ErrorMessage>{values.description.error}</ErrorMessage>
-                  )}
-                </Field>
-              </FieldGroup>
+          title="Neue Aufgabe erstellen"
+          description={`Erstelle eine neue Aufgabe unter "${displayNewTaskParent?.title}"`}
+          submitButtonText="Aufgabe erstellen"
+          onSubmit={(e) =>
+            handleCreateTask(e, displayNewTaskParent?.id ?? null)
+          }
+          projectId={projectId}
+        />
 
-              <DialogActions>
-                <Button
-                  plain
-                  onClick={() => {
-                    setNewTaskParent(null);
-                    resetForm();
-                  }}
-                >
-                  Zurück
-                </Button>
-                <Button type="submit"> Aufgabe erstellen</Button>
-              </DialogActions>
-            </DialogBody>
-          </form>
-        </Dialog>
-
-        <Dialog
+        <TaskDialog
           open={!!taskToEdit}
           onClose={() => {
             setTaskToEdit(null);
             resetForm();
           }}
-        >
-          <DialogTitle>Aufgabe bearbeiten</DialogTitle>
-          <DialogDescription>
-            Bearbeite die Aufgabe "{displayTaskToEdit?.title}"
-          </DialogDescription>
-          <form onSubmit={handleUpdateTask}>
-            <DialogBody>
-              <FieldGroup>
-                <Field>
-                  <Label>Titel</Label>
-                  <Input
-                    name="title"
-                    value={values.title.value}
-                    invalid={!!values.title.error}
-                    onChange={(e) => handleInput(e, setValues)}
-                  />
-                  {values.title.error && (
-                    <ErrorMessage>{values.title.error}</ErrorMessage>
-                  )}
-                </Field>
-                <Field>
-                  <Label>Geschätzte Dauer</Label>
-                  <Input
-                    inputMode="numeric"
-                    name="estimatedDuration"
-                    pattern="[0-9]*"
-                    value={values.estimatedDuration.value}
-                    onChange={(e) => {
-                      if (/^\d*$/.test(e.target.value)) {
-                        handleInput(e, setValues);
-                      }
-                    }}
-                  />
-                </Field>
-                <Field>
-                  <Label>Beschreibung</Label>
-                  <Textarea
-                    name="description"
-                    rows={4}
-                    value={values.description.value}
-                    invalid={!!values.description.error}
-                    onChange={(e) => handleInput(e, setValues)}
-                  />
-                  {values.description.error && (
-                    <ErrorMessage>{values.description.error}</ErrorMessage>
-                  )}
-                </Field>
-              </FieldGroup>
-              <DialogActions>
-                <Button
-                  plain
-                  onClick={() => {
-                    setTaskToEdit(null);
-                    resetForm();
-                  }}
-                >
-                  Zurück
-                </Button>
-                <Button type="submit"> Aufgabe bearbeiten</Button>
-              </DialogActions>
-            </DialogBody>
-          </form>
-        </Dialog>
+          title="Aufgabe bearbeiten"
+          description={`Bearbeite die Aufgabe "${displayTaskToEdit?.title}"`}
+          submitButtonText="Aufgabe bearbeiten"
+          onSubmit={handleUpdateTask}
+          projectId={projectId}
+        />
 
         <Alert
           open={!!taskToDelete}

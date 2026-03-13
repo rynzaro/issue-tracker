@@ -9,6 +9,7 @@ export const CreateTaskSchema = z.object({
   title: z.string().min(2).max(100),
   description: z.string().max(1000).optional(),
   estimate: z.number().int().min(0).optional(),
+  addSubtaskEstimates: z.boolean().optional(),
   tagIds: z.array(z.int()).optional(),
   todoItems: z
     .array(
@@ -41,7 +42,9 @@ export const RestoreDeletedTaskSchema = z.object({ taskId: z.cuid() });
 
 /** Server-side task node with Date objects */
 export type TaskNode = Prisma.TaskGetPayload<{
-  include: { todoItems: true; taskTags: { include: { tag: true } } };
+  include: {
+    taskTags: { include: { tag: true } };
+  };
 }> & {
   children: TaskNode[];
   status: TaskStatus;
@@ -50,4 +53,5 @@ export type TaskNode = Prisma.TaskGetPayload<{
   activeTimerStartedAt: Date | null;
   sumOfChildrenEstimates: number; // minutes
   hasEstimateOverflow: boolean; // true if sumOfChildrenEstimates > estimate
+  addSubtaskEstimates: boolean;
 };

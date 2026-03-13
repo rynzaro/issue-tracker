@@ -176,7 +176,7 @@ export default function Tasks({
             ) : task.children.length > 0 ? (
               <ChevronDownIcon className="w-6 h-6" />
             ) : null}
-            {task.hasEstimateOverflow && (
+            {task.hasEstimateOverflow && !task.completedAt && (
               <Tooltip
                 maxWidth="md"
                 content="Die geschätzte Zeit für diese Aufgabe ist geringer als die Summe aller Schätzungen der Unteraufgaben."

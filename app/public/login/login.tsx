@@ -8,6 +8,7 @@ import { Heading } from "@/components/heading";
 import { Input } from "@/components/input";
 import { Strong, SecondaryText, TextLink } from "@/components/text";
 import { authenticate } from "@/lib/actions/auth.actions";
+import { completeTask } from "@/lib/services/task.service";
 import { ExclamationCircleIcon } from "@heroicons/react/16/solid";
 import { useSearchParams } from "next/navigation";
 import { useActionState } from "react";

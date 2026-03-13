@@ -270,14 +270,12 @@ export function getProjectTaskTree({
     const activeTaskId = activeTimerResult.data?.taskId ?? null;
     const activeTimerStartedAt = activeTimerResult.data?.startedAt ?? null;
 
-    // Build task tree from flat list
     const taskMap = new Map<string, TaskNode>();
     for (const task of project.tasks) {
       const totalTimeSpent = task.timeEntries.reduce(
         (sum, te) => sum + te.duration,
         0,
       );
-      // Destructure to avoid serializing raw timeEntries to the client
       const { timeEntries: _timeEntries, ...taskData } = task;
       taskMap.set(task.id, {
         ...taskData,

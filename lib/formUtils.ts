@@ -11,6 +11,23 @@ export type FormState<T> = {
   [key in keyof T]: FieldState<T[key]>;
 };
 
+export function setFormErrors<T>(
+  values: FormState<T>,
+  errors: Partial<Record<keyof T, string>>,
+): FormState<T> {
+  const nextValues = { ...values };
+
+  for (const key in values) {
+    const typedKey = key as keyof T;
+    nextValues[typedKey] = {
+      ...values[typedKey],
+      error: errors[typedKey] ?? null,
+    };
+  }
+
+  return nextValues;
+}
+
 export function handleInput<T extends Record<string, unknown>>(
   event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
   setValues: Dispatch<SetStateAction<FormState<T>>>,
@@ -19,6 +36,21 @@ export function handleInput<T extends Record<string, unknown>>(
   setValues((prevFormData) => ({
     ...prevFormData,
     [name]: { ...prevFormData[name], value, error: null },
+  }));
+}
+
+export function handleCheckbox<T extends Record<string, unknown>, K extends keyof T>(
+  checked: boolean,
+  setValues: Dispatch<SetStateAction<FormState<T>>>,
+  name: K,
+) {
+  setValues((prevFormData) => ({
+    ...prevFormData,
+    [name]: {
+      ...prevFormData[name],
+      value: checked as T[K],
+      error: null,
+    },
   }));
 }
 
@@ -35,16 +67,5 @@ export function extractFormStateValues<T>(values: FormState<T>) {
 export function clearErrors<T>(
   setValues: Dispatch<SetStateAction<FormState<T>>>,
 ) {
-  setValues((prev) => {
-    const updatedValues = { ...prev };
-
-    for (const key in updatedValues) {
-      updatedValues[key] = {
-        ...updatedValues[key],
-        error: null,
-      };
-    }
-
-    return updatedValues;
-  });
+  setValues((prev) => setFormErrors(prev, {}));
 }
