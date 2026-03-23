@@ -89,7 +89,8 @@ Core task management with time tracking. The first usable version of the app.
   - [ ] Keyboard shortcut to stop active task
 - [ ] **Estimates**
   - [x] Accumulative and/or own estimate field on Task (add database field(s))
-    - [ ] change display / sum calculation
+    - [x] change display / sum calculation
+    - [ ] contain children estimate adding boolean in action and service
   - [x] Indicator when sum of sub-task estimates exceeds parent's estimate
 - [ ] **Task Tags** (M:N, optional via `Tag`/`TaskTag` models)
 - [ ] **Task Search** (filter/search tasks within a project)
