@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { FormState, handleInput as _handleInput } from "./formUtils";
+import { FormState, setFormErrors } from "./formUtils";
 import { CreateTaskParams, TaskNode, UpdateTaskParams } from "./schema/task";
 import { createTaskAction, updateTaskAction } from "./actions/task.actions";
 import { useRouter } from "next/navigation";
@@ -46,12 +46,14 @@ export type TaskFormValues = {
   title: string;
   estimatedDuration: string;
   description: string;
+  addSubtaskEstimates: boolean;
 };
 
 const initialFormState: FormState<TaskFormValues> = {
   title: { value: "", required: true, touched: false },
   estimatedDuration: { value: "", required: false, touched: false },
   description: { value: "", required: false, touched: false },
+  addSubtaskEstimates: { value: false, required: false, touched: false },
 };
 
 /**
@@ -76,6 +78,10 @@ export function useTaskForm(projectId: string) {
         value: task.estimate ? String(task.estimate) : "",
       },
       description: { ...prev.description, value: task.description ?? "" },
+      addSubtaskEstimates: {
+        ...prev.addSubtaskEstimates,
+        value: task.addSubtaskEstimates ?? false,
+      },
     }));
   }
 
@@ -91,14 +97,7 @@ export function useTaskForm(projectId: string) {
 
     const hasErrors = Object.keys(errors).length > 0;
     if (hasErrors) {
-      setValues((prev) => {
-        const next = { ...prev };
-        for (const key in next) {
-          const k = key as keyof TaskFormValues;
-          next[k] = { ...next[k], error: errors[k] ?? null };
-        }
-        return next;
-      });
+      setValues((prev) => setFormErrors(prev, errors));
     }
     return !hasErrors;
   }
@@ -119,6 +118,7 @@ export function useTaskForm(projectId: string) {
         ? parseInt(values.estimatedDuration.value) || undefined
         : undefined,
       parentId,
+      addSubtaskEstimates: values.addSubtaskEstimates.value,
     };
     const result = await createTaskAction({ createTaskParams: body });
     if (result.success) {

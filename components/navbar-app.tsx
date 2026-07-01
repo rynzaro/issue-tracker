@@ -4,15 +4,12 @@ import { Avatar } from "@/components/avatar";
 import {
   Dropdown,
   DropdownButton,
-  DropdownDivider,
   DropdownItem,
   DropdownLabel,
   DropdownMenu,
 } from "@/components/dropdown";
 import {
   Navbar,
-  NavbarDivider,
-  NavbarItem,
   NavbarLabel,
   NavbarSection,
   NavbarSpacer,
@@ -20,55 +17,23 @@ import {
 import {
   Sidebar,
   SidebarBody,
+  SidebarFooter,
   SidebarHeader,
   SidebarItem,
   SidebarLabel,
   SidebarSection,
 } from "@/components/sidebar";
-import { StackedLayout } from "@/components/stacked-layout";
+import { SidebarLayout } from "@/components/sidebar-layout";
 import {
   ArrowRightStartOnRectangleIcon,
   ChevronDownIcon,
   Cog8ToothIcon,
   PlusIcon,
 } from "@heroicons/react/16/solid";
+import { usePathname } from "next/navigation";
 import { ReactNode } from "react";
 import ActiveTimerNavbar from "@/components/active-timer-navbar";
 import ActiveTimerPill from "@/components/active-timer-pill";
-import clsx from "clsx";
-
-const navItems = [{ label: "Home", url: "/" }];
-
-function ProjectDropdownMenu({
-  projects,
-}: {
-  projects: { id: string; name: string }[];
-}) {
-  return (
-    <DropdownMenu className="min-w-80 lg:min-w-64" anchor="bottom start">
-      {/*     // TODO proper header       */}
-      {projects.map((project, id) => (
-        <DropdownItem key={project.id} href={`/s/project/${project.id}`}>
-          <Avatar
-            initials={project.name.substring(0, 2).toUpperCase()}
-            className={clsx(
-              id % 2 === 0
-                ? "bg-amber-400 text-amber-800"
-                : "bg-green-300 text-green-700",
-            )}
-            square
-          />
-          <DropdownLabel> {project.name}</DropdownLabel>
-        </DropdownItem>
-      ))}
-      {projects.length > 0 && <DropdownDivider />}
-      <DropdownItem href="/s/project/create">
-        <PlusIcon />
-        <DropdownLabel>Neues Projekt erstellen</DropdownLabel>
-      </DropdownItem>
-    </DropdownMenu>
-  );
-}
 
 export type ActiveTimerData = {
   taskId: string;
@@ -87,34 +52,22 @@ export function NavbarApp({
   projects: { id: string; name: string }[];
   activeTimer: ActiveTimerData | null;
 }) {
+  const pathname = usePathname();
+
   return (
     <>
-      <StackedLayout
+      <SidebarLayout
         mobileBottomPadding={!!activeTimer}
         navbar={
           <Navbar>
-            <Dropdown>
-              <DropdownButton as={NavbarItem} className="max-lg:hidden">
-                <NavbarLabel>OnTrack</NavbarLabel>
-                <ChevronDownIcon />
-              </DropdownButton>
-              <ProjectDropdownMenu projects={projects} />
-            </Dropdown>
-            <NavbarDivider className="max-lg:hidden" />
-            <NavbarSection className="max-lg:hidden">
-              {navItems.map(({ label, url }) => (
-                <NavbarItem key={label} href={url}>
-                  {label}
-                </NavbarItem>
-              ))}
-            </NavbarSection>
+            <NavbarLabel className="font-semibold">OnTrack</NavbarLabel>
             <NavbarSpacer />
             {activeTimer && <ActiveTimerNavbar timer={activeTimer} />}
             <NavbarSection>
               <Dropdown>
-                <DropdownButton as={NavbarItem}>
+                <DropdownButton as="button" className="flex items-center gap-1 text-sm font-medium text-zinc-700 dark:text-zinc-300">
                   {emailAddress}
-                  <ChevronDownIcon />
+                  <ChevronDownIcon className="size-4" />
                 </DropdownButton>
                 <DropdownMenu className="min-w-64" anchor="bottom end">
                   <DropdownItem href="/settings">
@@ -133,29 +86,68 @@ export function NavbarApp({
         sidebar={
           <Sidebar>
             <SidebarHeader>
-              <Dropdown>
-                <DropdownButton as={SidebarItem} className="lg:mb-2.5">
-                  <Avatar initials="EF" />
-                  <SidebarLabel>OnTrack</SidebarLabel>
-                  <ChevronDownIcon />
-                </DropdownButton>
-                <ProjectDropdownMenu projects={projects} />
-              </Dropdown>
+              <SidebarItem href="/s/main" className="font-semibold">
+                <SidebarLabel>OnTrack</SidebarLabel>
+              </SidebarItem>
             </SidebarHeader>
             <SidebarBody>
               <SidebarSection>
-                {navItems.map(({ label, url }) => (
-                  <SidebarItem key={label} href={url}>
-                    {label}
+                {projects.map((project, idx) => (
+                  <SidebarItem
+                    key={project.id}
+                    href={`/s/project/${project.id}`}
+                    current={pathname.startsWith(`/s/project/${project.id}`)}
+                  >
+                    <Avatar
+                      initials={project.name.substring(0, 2).toUpperCase()}
+                      className={
+                        idx % 2 === 0
+                          ? "bg-amber-400 text-amber-800"
+                          : "bg-green-300 text-green-700"
+                      }
+                      square
+                    />
+                    <SidebarLabel>{project.name}</SidebarLabel>
                   </SidebarItem>
                 ))}
               </SidebarSection>
             </SidebarBody>
+            <SidebarFooter>
+              <SidebarSection>
+                {activeTimer && (
+                  <div className="max-lg:hidden">
+                    <ActiveTimerNavbar timer={activeTimer} />
+                  </div>
+                )}
+                <SidebarItem href="/s/project/create">
+                  <PlusIcon data-slot="icon" />
+                  <SidebarLabel>Neues Projekt</SidebarLabel>
+                </SidebarItem>
+                <Dropdown>
+                  <DropdownButton as={SidebarItem}>
+                    <SidebarLabel className="truncate text-xs text-zinc-500 dark:text-zinc-400">
+                      {emailAddress}
+                    </SidebarLabel>
+                    <ChevronDownIcon />
+                  </DropdownButton>
+                  <DropdownMenu className="min-w-64" anchor="top start">
+                    <DropdownItem href="/settings">
+                      <Cog8ToothIcon />
+                      <DropdownLabel>Settings</DropdownLabel>
+                    </DropdownItem>
+                    <DropdownItem href="/s/logout">
+                      <ArrowRightStartOnRectangleIcon />
+                      <DropdownLabel>Sign out</DropdownLabel>
+                    </DropdownItem>
+                  </DropdownMenu>
+                </Dropdown>
+              </SidebarSection>
+            </SidebarFooter>
           </Sidebar>
         }
       >
         {children}
-      </StackedLayout>
+      </SidebarLayout>
       {activeTimer && <ActiveTimerPill timer={activeTimer} />}
     </>
   );

@@ -132,7 +132,11 @@ export function createTask({
       );
     }
 
-    // Verify parent task exists, belongs to the same project, and is not soft-deleted or archived
+    // Verify parent task exists, belongs to the same project, and is not
+    // soft-deleted, archived, or completed. Blocking completed parents keeps
+    // completedAt cascade invariants intact (see AD-19) — reopening a
+    // completed task to add subtasks is a deliberate future feature, not
+    // this guard's job.
     if (createTaskParams.parentId) {
       const parentTask = await client.task.findUnique({
         where: {
@@ -140,6 +144,7 @@ export function createTask({
           projectId: createTaskParams.projectId,
           deletedAt: null,
           archivedAt: null,
+          completedAt: null,
         },
         select: { id: true },
       });

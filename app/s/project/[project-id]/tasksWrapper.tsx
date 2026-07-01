@@ -1,28 +1,17 @@
 "use client";
 
-import { TaskNode, UpdateTaskParams } from "@/lib/schema/task";
-import Tasks, { CompletedSection } from "./tasks";
+import { TaskNode } from "@/lib/schema/task";
+import Tasks from "./tasks";
 import TimeEntryDialog from "@/components/time-entry-dialog";
 import { useState } from "react";
 import { usePersistentValue, useTaskForm } from "@/lib/hooks";
 import { Button } from "@/components/button";
-import {
-  Dialog,
-  DialogActions,
-  DialogBody,
-  DialogDescription,
-  DialogTitle,
-} from "@/components/dialog";
 import {
   Alert,
   AlertActions,
   AlertDescription,
   AlertTitle,
 } from "@/components/alert";
-import { ErrorMessage, Field, FieldGroup, Label } from "@/components/fieldset";
-import { Input } from "@/components/input";
-import { Textarea } from "@/components/textarea";
-import { handleInput } from "@/lib/formUtils";
 import {
   archiveTaskAction,
   deleteTaskAction,
@@ -32,14 +21,16 @@ import {
   SuccessToast,
   useToast,
 } from "@/lib/notification/toastProvider";
-import TodoList from "./todoList";
+import TaskDialog from "./taskDialog";
 
 export default function TasksWrapper({
   projectId,
   tasks,
+  inCompletedSection,
 }: {
   projectId: string;
   tasks: TaskNode[];
+  inCompletedSection: boolean;
 }) {
   const [newTaskParent, setNewTaskParent] = useState<TaskNode | null>(null);
   const displayNewTaskParent = usePersistentValue(newTaskParent);
@@ -54,8 +45,6 @@ export default function TasksWrapper({
     title: string;
   } | null>(null);
   const [loading, setLoading] = useState(false);
-  const [deleteLoading, setDeleteLoading] = useState(false);
-  const [archiveLoading, setArchiveLoading] = useState(false);
   const {
     values,
     setValues,
@@ -126,7 +115,7 @@ export default function TasksWrapper({
 
   async function handleDeleteTask() {
     if (!taskToDelete) return;
-    setDeleteLoading(true);
+    setLoading(true);
 
     const result = await deleteTaskAction({ taskId: taskToDelete.id });
 
@@ -146,12 +135,12 @@ export default function TasksWrapper({
         />,
       );
     }
-    setDeleteLoading(false);
+    setLoading(false);
   }
 
   async function handleArchiveTask() {
     if (!taskToArchive) return;
-    setArchiveLoading(true);
+    setLoading(true);
 
     const result = await archiveTaskAction({ taskId: taskToArchive.id });
 
@@ -171,16 +160,12 @@ export default function TasksWrapper({
         />,
       );
     }
-    setArchiveLoading(false);
+    setLoading(false);
   }
-
-  const activeTasks = tasks.filter((t) => t.status !== "DONE");
-  const completedTasks = tasks.filter((t) => t.status === "DONE");
-  const [showCompleted, setShowCompleted] = useState(false);
 
   return (
     <>
-      {activeTasks.map((task) => (
+      {tasks.map((task) => (
         <Tasks
           key={task.id}
           projectId={projectId}
@@ -191,176 +176,39 @@ export default function TasksWrapper({
           setTaskToDelete={setTaskToDelete}
           setTaskToArchive={setTaskToArchive}
           setTaskForTimeEntries={setTaskForTimeEntries}
-          inCompletedSection={false}
+          inCompletedSection={inCompletedSection}
         />
       ))}
-      {completedTasks.length > 0 && (
-        <CompletedSection
-          count={completedTasks.length}
-          open={showCompleted}
-          onToggle={() => setShowCompleted((p) => !p)}
-        >
-          {completedTasks.map((task) => (
-            <Tasks
-              key={task.id}
-              projectId={projectId}
-              task={task}
-              isRoot={true}
-              setNewTaskParent={setNewTaskParent}
-              setTaskToEdit={handleEditClick}
-              setTaskToDelete={setTaskToDelete}
-              setTaskToArchive={setTaskToArchive}
-              setTaskForTimeEntries={setTaskForTimeEntries}
-              inCompletedSection={true}
-            />
-          ))}
-        </CompletedSection>
-      )}
       <>
-        <Dialog
+        <TaskDialog
           open={!!newTaskParent}
           onClose={() => {
             setNewTaskParent(null);
             resetForm();
           }}
-        >
-          <DialogTitle>Neue Aufgabe erstellen</DialogTitle>
-          <DialogDescription>
-            Erstelle eine neue Aufgabe unter "{displayNewTaskParent?.title}"
-          </DialogDescription>
-          <form
-            onSubmit={(e) => handleCreateTask(e, newTaskParent?.id ?? null)}
-          >
-            <DialogBody>
-              <FieldGroup>
-                <Field>
-                  <Label>Titel</Label>
-                  <Input
-                    name="title"
-                    value={values.title.value}
-                    invalid={!!values.title.error}
-                    onChange={(e) => handleInput(e, setValues)}
-                  />
-                  {values.title.error && (
-                    <ErrorMessage>{values.title.error}</ErrorMessage>
-                  )}
-                </Field>
-                <Field>
-                  <Label>Geschätzte Dauer</Label>
-                  <Input
-                    inputMode="numeric"
-                    name="estimatedDuration"
-                    pattern="[0-9]*"
-                    value={values.estimatedDuration.value}
-                    onChange={(e) => {
-                      if (/^\d*$/.test(e.target.value)) {
-                        handleInput(e, setValues);
-                      }
-                    }}
-                  />
-                </Field>
-                <Field>
-                  <Label>Beschreibung</Label>
-                  <Textarea
-                    name="description"
-                    rows={4}
-                    value={values.description.value}
-                    invalid={!!values.description.error}
-                    onChange={(e) => handleInput(e, setValues)}
-                  />
-                  {values.description.error && (
-                    <ErrorMessage>{values.description.error}</ErrorMessage>
-                  )}
-                </Field>
-                <TodoList />
-              </FieldGroup>
+          title="Neue Aufgabe erstellen"
+          description={`Erstelle eine neue Aufgabe unter "${displayNewTaskParent?.title}"`}
+          submitButtonText="Aufgabe erstellen"
+          onSubmit={(e) =>
+            handleCreateTask(e, displayNewTaskParent?.id ?? null)
+          }
+          values={values}
+          setValues={setValues}
+        />
 
-              <DialogActions>
-                <Button
-                  plain
-                  onClick={() => {
-                    setNewTaskParent(null);
-                    resetForm();
-                  }}
-                >
-                  Zurück
-                </Button>
-                <Button type="submit"> Aufgabe erstellen</Button>
-              </DialogActions>
-            </DialogBody>
-          </form>
-        </Dialog>
-
-        <Dialog
+        <TaskDialog
           open={!!taskToEdit}
           onClose={() => {
             setTaskToEdit(null);
             resetForm();
           }}
-        >
-          <DialogTitle>Aufgabe bearbeiten</DialogTitle>
-          <DialogDescription>
-            Bearbeite die Aufgabe "{displayTaskToEdit?.title}"
-          </DialogDescription>
-          <form onSubmit={handleUpdateTask}>
-            <DialogBody>
-              <FieldGroup>
-                <Field>
-                  <Label>Titel</Label>
-                  <Input
-                    name="title"
-                    value={values.title.value}
-                    invalid={!!values.title.error}
-                    onChange={(e) => handleInput(e, setValues)}
-                  />
-                  {values.title.error && (
-                    <ErrorMessage>{values.title.error}</ErrorMessage>
-                  )}
-                </Field>
-                <Field>
-                  <Label>Geschätzte Dauer</Label>
-                  <Input
-                    inputMode="numeric"
-                    name="estimatedDuration"
-                    pattern="[0-9]*"
-                    value={values.estimatedDuration.value}
-                    onChange={(e) => {
-                      if (/^\d*$/.test(e.target.value)) {
-                        handleInput(e, setValues);
-                      }
-                    }}
-                  />
-                </Field>
-                <Field>
-                  <Label>Beschreibung</Label>
-                  <Textarea
-                    name="description"
-                    rows={4}
-                    value={values.description.value}
-                    invalid={!!values.description.error}
-                    onChange={(e) => handleInput(e, setValues)}
-                  />
-                  {values.description.error && (
-                    <ErrorMessage>{values.description.error}</ErrorMessage>
-                  )}
-                </Field>
-                <TodoList />
-              </FieldGroup>
-              <DialogActions>
-                <Button
-                  plain
-                  onClick={() => {
-                    setTaskToEdit(null);
-                    resetForm();
-                  }}
-                >
-                  Zurück
-                </Button>
-                <Button type="submit"> Aufgabe bearbeiten</Button>
-              </DialogActions>
-            </DialogBody>
-          </form>
-        </Dialog>
+          title="Aufgabe bearbeiten"
+          description={`Bearbeite die Aufgabe "${displayTaskToEdit?.title}"`}
+          submitButtonText="Aufgabe bearbeiten"
+          onSubmit={handleUpdateTask}
+          values={values}
+          setValues={setValues}
+        />
 
         <Alert
           open={!!taskToDelete}
@@ -382,16 +230,12 @@ export default function TasksWrapper({
               onClick={() => {
                 setTaskToDelete(null);
               }}
-              disabled={deleteLoading}
+              disabled={loading}
             >
               Abbrechen
             </Button>
-            <Button
-              color="red"
-              onClick={handleDeleteTask}
-              disabled={deleteLoading}
-            >
-              {deleteLoading ? "Löschen…" : "Löschen"}
+            <Button color="red" onClick={handleDeleteTask} disabled={loading}>
+              Löschen
             </Button>
           </AlertActions>
         </Alert>
@@ -416,12 +260,12 @@ export default function TasksWrapper({
               onClick={() => {
                 setTaskToArchive(null);
               }}
-              disabled={archiveLoading}
+              disabled={loading}
             >
               Abbrechen
             </Button>
-            <Button onClick={handleArchiveTask} disabled={archiveLoading}>
-              {archiveLoading ? "Archivieren…" : "Archivieren"}
+            <Button onClick={handleArchiveTask} disabled={loading}>
+              Archivieren
             </Button>
           </AlertActions>
         </Alert>
