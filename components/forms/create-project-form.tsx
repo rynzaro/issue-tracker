@@ -9,10 +9,17 @@ import { useRouter } from "next/navigation";
 import { FormState } from "@/lib/formUtils";
 import { createProjectAction } from "@/lib/actions/project.actions";
 import { CreateProjectParams } from "@/lib/schema/project";
+import { JSX } from "react/jsx-runtime";
+import {
+  ErrorToast,
+  SuccessToast,
+  useToast,
+} from "@/lib/notification/toastProvider";
 
 export default function CreateProjectForm() {
   const [loading, setLoading] = useState(false);
   const router = useRouter();
+  const { showToast } = useToast();
   const [values, setValues] = useState<
     FormState<{ name: string; description: string }>
   >({
@@ -30,7 +37,6 @@ export default function CreateProjectForm() {
 
   async function handleSubmit(e: SubmitEvent<HTMLFormElement>) {
     e.preventDefault();
-    console.log("submit", values);
     const formData = new FormData(e.currentTarget);
     const body: CreateProjectParams = {
       name: formData.get("name") as string,
@@ -41,10 +47,20 @@ export default function CreateProjectForm() {
     setLoading(false);
     if (result.success) {
       // TODO success notification
+      showToast(
+        <SuccessToast
+          title="Neues Projekt erstellt"
+          description="Das Projekt wurde erfolgreich erstellt."
+        />,
+      );
       router.push(`/s/project/${result.data.id}`);
     } else {
-      //TODO handle error with notifications
-      console.error(result.error);
+      showToast(
+        <ErrorToast
+          title="Das Projekt konnte nicht erstellt werden"
+          description="Bitte probiere es noch einmal"
+        />,
+      );
     }
   }
   return (
