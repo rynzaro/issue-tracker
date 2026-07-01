@@ -177,3 +177,7 @@ Analysis needs baseline→completion. Allow analysis on latest checkpoint if nev
 ### Iter 5: Root task per project?
 
 Deferred. No perf benefit now. Revisit if project-level aggregation painful without single root.
+
+### Gap: COMPLETE doesn't guard against an already-archived target
+
+AD-19's COMPLETE self-fetch filters `deletedAt: null` only, not `archivedAt`. `validateTransition("COMPLETE", ...)` only checks ancestors for archived/deleted state, not the target task itself. Net effect: a task can be completed directly while it is itself archived. Unclear if intentional (retroactively recording finished work on archived items) or an oversight — decide, then either add the guard or document it as allowed behavior.

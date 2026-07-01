@@ -1,4 +1,4 @@
-import { SubmitEvent } from "react";
+import { Dispatch, SetStateAction, SubmitEvent } from "react";
 import {
   Dialog,
   DialogActions,
@@ -8,7 +8,8 @@ import {
 } from "@/components/dialog";
 import { ErrorMessage, Field, FieldGroup, Label } from "@/components/fieldset";
 import { Input } from "@/components/input";
-import { useTaskForm } from "@/lib/hooks";
+import { TaskFormValues } from "@/lib/hooks";
+import { FormState } from "@/lib/formUtils";
 import { handleCheckbox, handleInput } from "@/lib/formUtils";
 import { Textarea } from "@/components/textarea";
 import { Button } from "@/components/button";
@@ -20,7 +21,8 @@ export default function TaskDialog({
   description,
   submitButtonText,
   onSubmit,
-  projectId,
+  values,
+  setValues,
 }: {
   open: boolean;
   onClose: () => void;
@@ -28,10 +30,9 @@ export default function TaskDialog({
   description?: string;
   submitButtonText?: string;
   onSubmit: (event: SubmitEvent<HTMLFormElement>) => Promise<void>;
-  projectId: string;
+  values: FormState<TaskFormValues>;
+  setValues: Dispatch<SetStateAction<FormState<TaskFormValues>>>;
 }) {
-  const { values, setValues, resetForm } = useTaskForm(projectId);
-
   return (
     <Dialog open={open} onClose={onClose}>
       <DialogTitle>{title}</DialogTitle>

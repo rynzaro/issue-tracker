@@ -203,7 +203,8 @@ export default function TasksWrapper({
           onSubmit={(e) =>
             handleCreateTask(e, displayNewTaskParent?.id ?? null)
           }
-          projectId={projectId}
+          values={values}
+          setValues={setValues}
         />
 
         <TaskDialog
@@ -216,7 +217,8 @@ export default function TasksWrapper({
           description={`Bearbeite die Aufgabe "${displayTaskToEdit?.title}"`}
           submitButtonText="Aufgabe bearbeiten"
           onSubmit={handleUpdateTask}
-          projectId={projectId}
+          values={values}
+          setValues={setValues}
         />
 
         <Alert
