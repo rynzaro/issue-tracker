@@ -1,6 +1,7 @@
 ## Today
 
 - [ ] brevo integration
+- [ ] AD-20: centralized authorization policy (`lib/authz/policy.ts`) — decided, hand-implement; design in `docs/ARCHITECTURE_DECISIONS.md` (AD-20), checklist in `docs/REFACTOR_TODO.md`
 
 ## UX Ideas
 

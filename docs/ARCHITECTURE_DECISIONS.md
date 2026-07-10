@@ -152,6 +152,51 @@ export async function getProjectAction(projectId: string) {
 
 ---
 
+## Decided, not yet implemented
+
+### AD-20: Centralized authorization policy at service boundaries
+
+**Status:** Decided 2026-07-02. Awaiting hand implementation — checklist in `docs/REFACTOR_TODO.md`. Extends (and partially retires) AD-18.
+
+**Context:** AD-18 made authorization the action layer's job and let services assume a pre-authorized caller ("services compose freely without re-checking auth"). A review of that property found it holds today only because the permission model is flat — one principal, binary ownership, no roles. Its known limitations:
+
+- **Security by convention.** Nothing enforces that every action calls `auth()` or that services receive the session's `userId` rather than one derived from request input.
+- **Confused-deputy exposure.** Unscoped internal helpers (e.g. `getProjectById(projectId)` — exported, currently uncalled, no ownership check) sit one name away from scoped ones; only the `getUser*` naming convention distinguishes them.
+- **Inconsistent ownership definitions.** 19 scattered checks define ownership two ways: `project.userId` (task/project services) vs `task.createdById` (timeEntry/activeTask services). These coincide in solo mode, but AD-13 redefines `createdById` as "planner" in team mode — one of the two is a latent bug.
+- **Breaks under team mode.** The moment permissions stop being flat (AD-13 planner/assignee, AD-15 dual-perspective tagging), a raw `userId: string` cannot express authority, and free composition allows a service authorized for the caller's role to reach an operation the caller shouldn't perform.
+
+**Decision:** Hand-rolled centralized policy module — `lib/authz/policy.ts`. No external engine (CASL/Oso/OpenFGA are overkill for this matrix; the seam is the function signature, so an engine can be swapped in later without touching callers).
+
+```typescript
+type Principal = { userId: string };          // later: + role, projectGrants
+type Act = "project:read" | "project:update" | "project:delete"
+         | "task:complete" | "timeEntry:create" | /* ... */;
+
+can(principal: Principal, act: Act, resource): boolean   // pure, sync, no I/O
+assertCan(principal, act, resource): ServiceErrorResponse | null
+```
+
+Layering after AD-20:
+
+- **Action layer** — authentication only: `auth()` → `Principal`, zod validation, `revalidatePath`. Unchanged shape, thinner content (ad-hoc ownership logic leaves).
+- **Service layer** — loads the resource, then `assertCan(principal, act, resource)` before acting. Authorization moves to the point of use so *every* path (action, server component, service→service composition) passes the check.
+- **Policy module** — all "may" rules in one auditable file. Pure and synchronous: it judges already-loaded data, never queries — services load, policy decides.
+
+Rules of placement: resource-free checks (session exists; future global role gates) stay at the entry point; resource-dependent checks live in services via the policy module.
+
+**Error semantics:** `assertCan` masks unauthorized as `NOT_FOUND`, preserving the current non-leaking behavior — no service can accidentally return a `FORBIDDEN` that leaks resource existence.
+
+**Rationale:**
+
+- One auditable place where policy lives, replacing 19 scattered `!==` checks with two definitions of ownership.
+- Fixes the confused-deputy blind spot structurally: checks sit where the work happens, so composition cannot skip them.
+- Forward-compatible: team mode extends `Principal` and the rule table; callers don't change.
+- Pure `can()` is unit-testable in milliseconds with no DB.
+
+**Consequences:** AD-18's "services assume a pre-authorized caller" is retired; services re-check at their boundary (defense in depth). The "compose freely without re-checking auth" property is deliberately given up — that property was a benefit purchased by the flat permission model, and this decision knowingly pays it back. AD-18's consequence note for reviewers inverts: absence of an `assertCan` call in a service that touches an owned resource becomes a review finding, not a design feature.
+
+---
+
 ## Future (decide when relevant)
 
 ### Iter 1: Persistent ordering?

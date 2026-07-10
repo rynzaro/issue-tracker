@@ -15,7 +15,7 @@ export default function NewRootTask({ projectId }: { projectId: string }) {
   const [open, setOpen] = useState(false);
   const { values, setValues, resetForm, submitCreate } = useTaskForm(projectId);
 
-  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: React.SubmitEvent<HTMLFormElement>) {
     event.preventDefault();
     event.stopPropagation();
     const result = await submitCreate(null);

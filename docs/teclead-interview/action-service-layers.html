@@ -1,0 +1,377 @@
+<title>Action- & Service-Layer — issue-tracker</title>
+<style>
+  :root {
+    --paper: #f4f7f8;
+    --card: #ffffff;
+    --ink: #1d2730;
+    --muted: #5b6b78;
+    --line: #d4dde2;
+    --accent: #0e6b72;        /* petrol — the action layer / security boundary owner */
+    --accent-soft: #e3eff0;
+    --service: #35506b;       /* slate blue — service layer */
+    --service-soft: #e9eef4;
+    --danger: #b3402f;
+    --danger-soft: #fbeeec;
+    --good: #2c6e49;
+    --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: Charter, Georgia, "Iowan Old Style", serif;
+    line-height: 1.55;
+    margin: 0;
+    padding: 3rem 1.25rem 4rem;
+  }
+  .wrap { max-width: 60rem; margin: 0 auto; }
+  h1, h2, h3, .label, .node, .step, .chip, .col-head {
+    font-family: "Avenir Next", Avenir, Seravek, "Segoe UI", system-ui, sans-serif;
+  }
+  header { margin-bottom: 2.5rem; max-width: 42rem; }
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin: 0 0 0.6rem;
+  }
+  h1 {
+    font-size: clamp(1.6rem, 4vw, 2.2rem);
+    font-weight: 600;
+    letter-spacing: -0.015em;
+    margin: 0 0 0.75rem;
+    text-wrap: balance;
+  }
+  .lede { color: var(--muted); font-size: 1.02rem; margin: 0; }
+  .lede code, p code, li code, td code, dd code {
+    font-family: var(--mono);
+    font-size: 0.85em;
+    background: #e8edf0;
+    padding: 0.1em 0.35em;
+    border-radius: 3px;
+  }
+
+  /* ---------- flowchart ---------- */
+  .chart {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 2rem clamp(1rem, 4vw, 2.5rem);
+    margin-bottom: 3rem;
+  }
+  .flow {
+    display: grid;
+    grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr);
+    column-gap: 2rem;
+  }
+  .node {
+    border: 1.5px solid var(--ink);
+    border-radius: 5px;
+    background: var(--card);
+    padding: 0.7rem 1rem;
+    text-align: center;
+    font-weight: 600;
+    font-size: 0.95rem;
+  }
+  .node small {
+    display: block;
+    font-weight: 400;
+    color: var(--muted);
+    font-size: 0.78rem;
+    margin-top: 0.15rem;
+  }
+  .node .file { font-family: var(--mono); font-size: 0.72rem; color: var(--muted); font-weight: 400; }
+
+  .arrow {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 0.15rem 0;
+  }
+  .arrow .stem { width: 1.5px; flex: 1; min-height: 1.4rem; background: var(--ink); }
+  .arrow .head {
+    width: 0; height: 0;
+    border-left: 5px solid transparent;
+    border-right: 5px solid transparent;
+    border-top: 7px solid var(--ink);
+  }
+  .arrow .note {
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    color: var(--muted);
+    padding: 0.2rem 0;
+    text-align: center;
+  }
+  .arrow.bypass .stem { background: var(--muted); }
+  .arrow.bypass .head { border-top-color: var(--muted); }
+
+  /* grid placement (desktop) */
+  .n-client  { grid-column: 1; grid-row: 1; }
+  .n-server  { grid-column: 2; grid-row: 1; }
+  .a-client  { grid-column: 1; grid-row: 2; }
+  .a-bypass  { grid-column: 2; grid-row: 2 / 5; }
+  .n-action  { grid-column: 1; grid-row: 3; }
+  .a-action  { grid-column: 1; grid-row: 4; }
+  .boundary  { grid-column: 1 / -1; grid-row: 5; }
+  .n-service { grid-column: 1 / -1; grid-row: 6; }
+  .a-service { grid-column: 1 / -1; grid-row: 7; }
+  .n-data    { grid-column: 1 / -1; grid-row: 8; }
+
+  .layer {
+    border-radius: 6px;
+    padding: 1rem 1.15rem 1.15rem;
+    text-align: left;
+  }
+  .layer .label {
+    font-size: 0.72rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    font-weight: 700;
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    flex-wrap: wrap;
+    margin-bottom: 0.6rem;
+  }
+  .layer .label .file { font-family: var(--mono); text-transform: none; letter-spacing: 0; font-weight: 400; }
+
+  .layer.action { background: var(--accent-soft); border: 1.5px solid var(--accent); }
+  .layer.action .label { color: var(--accent); }
+  .steps { display: flex; flex-wrap: wrap; gap: 0.45rem; align-items: center; }
+  .step {
+    background: var(--card);
+    border: 1px solid var(--accent);
+    color: var(--ink);
+    border-radius: 4px;
+    padding: 0.3rem 0.6rem;
+    font-size: 0.78rem;
+    font-weight: 500;
+    white-space: nowrap;
+  }
+  .step b { color: var(--accent); font-family: var(--mono); font-weight: 700; margin-right: 0.3em; }
+  .step code { font-family: var(--mono); font-size: 0.9em; background: none; padding: 0; }
+  .steps .sep { color: var(--accent); font-size: 0.8rem; }
+
+  .layer.service { background: var(--service-soft); border: 1.5px solid var(--service); }
+  .layer.service .label { color: var(--service); }
+  .duties { display: grid; grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr)); gap: 0.4rem 1.25rem; margin: 0; padding: 0; list-style: none; }
+  .duties li { font-size: 0.85rem; padding-left: 1rem; position: relative; }
+  .duties li::before { content: "▪"; position: absolute; left: 0; color: var(--service); }
+  .duties .ref { font-family: var(--mono); font-size: 0.72rem; color: var(--muted); }
+
+  .boundary {
+    display: flex;
+    align-items: center;
+    gap: 0.9rem;
+    margin: 1.1rem 0;
+  }
+  .boundary::before, .boundary::after {
+    content: "";
+    flex: 1;
+    border-top: 2px dashed var(--danger);
+  }
+  .boundary .tag {
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: var(--danger);
+    background: var(--danger-soft);
+    border: 1px solid var(--danger);
+    border-radius: 999px;
+    padding: 0.25rem 0.8rem;
+    text-align: center;
+  }
+
+  .n-data { display: flex; justify-content: center; gap: 0.75rem; align-items: center; flex-wrap: wrap; }
+  .n-data .node { min-width: 10rem; }
+  .n-data .link { font-family: var(--mono); font-size: 0.75rem; color: var(--muted); }
+
+  .caption {
+    font-size: 0.85rem;
+    color: var(--muted);
+    margin: 1.4rem 0 0;
+    padding-top: 1rem;
+    border-top: 1px solid var(--line);
+  }
+
+  /* ---------- trade-offs ---------- */
+  h2 { font-size: 1.25rem; font-weight: 600; margin: 0 0 1rem; letter-spacing: -0.01em; }
+  .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; margin-bottom: 3rem; }
+  .tcol {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-top: 3px solid var(--good);
+    border-radius: 6px;
+    padding: 1.25rem 1.4rem;
+  }
+  .tcol.cons { border-top-color: var(--danger); }
+  .col-head {
+    font-size: 0.72rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    font-weight: 700;
+    color: var(--good);
+    margin: 0 0 0.9rem;
+  }
+  .tcol.cons .col-head { color: var(--danger); }
+  .tcol dl { margin: 0; }
+  .tcol dt { font-family: "Avenir Next", Avenir, Seravek, "Segoe UI", system-ui, sans-serif; font-weight: 600; font-size: 0.92rem; margin-top: 0.85rem; }
+  .tcol dt:first-child { margin-top: 0; }
+  .tcol dd { margin: 0.15rem 0 0; font-size: 0.88rem; color: var(--muted); }
+
+  /* ---------- evolution note ---------- */
+  .evolution {
+    background: var(--card);
+    border: 1px dashed var(--accent);
+    border-radius: 6px;
+    padding: 1.25rem 1.4rem;
+    margin-bottom: 3rem;
+  }
+  .evolution .col-head { color: var(--accent); }
+  .evolution p { margin: 0; font-size: 0.9rem; color: var(--muted); max-width: 65ch; }
+
+  /* ---------- sources ---------- */
+  .sources {
+    font-size: 0.85rem;
+    color: var(--muted);
+    border-top: 1px solid var(--line);
+    padding-top: 1.25rem;
+  }
+  .sources h2 { font-size: 0.72rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); font-family: "Avenir Next", Avenir, Seravek, "Segoe UI", system-ui, sans-serif; }
+  .sources ul { margin: 0; padding-left: 1.1rem; }
+  .sources li { margin-bottom: 0.3rem; }
+
+  @media (max-width: 660px) {
+    .flow { display: flex; flex-direction: column; }
+    .n-server { order: 5; margin-top: 1.25rem; border-style: dashed; border-color: var(--muted); }
+    .a-bypass { order: 6; }
+    .a-bypass .stem { min-height: 1rem; }
+    .n-client { order: 0; } .a-client { order: 1; } .n-action { order: 2; }
+    .a-action { order: 3; } .boundary { order: 7; } .n-service { order: 8; }
+    .a-service { order: 9; } .n-data { order: 10; }
+    .cols { grid-template-columns: 1fr; }
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .step { transition: transform 120ms ease; }
+    .step:hover { transform: translateY(-1px); }
+  }
+</style>
+
+<div class="wrap">
+  <header>
+    <p class="eyebrow">issue-tracker · Architektur</p>
+    <h1>Warum ein Action-Layer <em>und</em> ein Service-Layer?</h1>
+    <p class="lede">In einem Satz: <strong>Actions sind die Sicherheitsgrenze, Services sind die Geschäftslogik.</strong> Actions kümmern sich um alles, was nur das Web-Framework wissen kann (wer eingeloggt ist, wie der rohe Input aussah, welche Seiten revalidiert werden müssen); Services stellen sicher, was fachlich gelten muss (Ownership, Kaskaden, Transaktionen, Invarianten) — und bleiben genau deshalb testbar und wiederverwendbar. Festgehalten in <code>AD-18</code> und <code>AF-3</code>.</p>
+  </header>
+
+  <section class="chart" aria-label="Request-Fluss-Diagramm">
+    <div class="flow">
+      <div class="node n-client">Client Component<small>"use client" — forms, buttons, optimistic UI</small></div>
+
+      <div class="node n-server">Server Component<small>pages &amp; layouts — reads only</small></div>
+
+      <div class="arrow a-client">
+        <div class="stem"></div>
+        <div class="note">invokes server action (mutation or read)</div>
+        <div class="stem"></div>
+        <div class="head"></div>
+      </div>
+
+      <div class="arrow bypass a-bypass">
+        <div class="stem"></div>
+        <div class="note">reads call services directly —<br>the component does its own<br>session check (AF-3)</div>
+        <div class="stem"></div>
+        <div class="head"></div>
+      </div>
+
+      <div class="layer action n-action">
+        <div class="label"><span>Action layer — thin wrapper, no business logic</span><span class="file">lib/actions/*.actions.ts</span></div>
+        <div class="steps">
+          <span class="step"><b>1</b><code>auth()</code> session check</span><span class="sep">→</span>
+          <span class="step"><b>2</b>validate input <code>(zod)</code></span><span class="sep">→</span>
+          <span class="step"><b>3</b>call service with <code>userId</code></span><span class="sep">→</span>
+          <span class="step"><b>4</b><code>revalidatePath()</code></span><span class="sep">→</span>
+          <span class="step"><b>5</b>return <code>ServiceResponse</code></span>
+        </div>
+      </div>
+
+      <div class="arrow a-action">
+        <div class="stem"></div>
+        <div class="head"></div>
+      </div>
+
+      <div class="boundary"><span class="tag">SECURITY BOUNDARY · AD-18 — below this line, the caller is assumed authenticated</span></div>
+
+      <div class="layer service n-service">
+        <div class="label"><span>Service layer — all business logic, no session access</span><span class="file">lib/services/*.service.ts</span></div>
+        <ul class="duties">
+          <li>Ownership-scoped queries via the <code>userId</code> parameter passed down from the action</li>
+          <li>Transactions &amp; app-level cascades <span class="ref">AD-10 / AD-11</span></li>
+          <li>Hierarchy transition policy (complete, archive, delete…) <span class="ref">AD-19</span></li>
+          <li>Event emission — append-only audit trail <span class="ref">AF-8</span></li>
+          <li>Services compose freely: a service can call another service without re-checking auth</li>
+          <li>Uniform result contract via <code>serviceUtil</code> — no thrown errors cross the boundary</li>
+        </ul>
+      </div>
+
+      <div class="arrow a-service">
+        <div class="stem"></div>
+        <div class="head"></div>
+      </div>
+
+      <div class="n-data">
+        <div class="node">Prisma Client<small>typed queries</small></div>
+        <span class="link">──</span>
+        <div class="node">MariaDB</div>
+      </div>
+    </div>
+    <p class="caption">Fluss nach AF-3: <code>Component → Server Action → Service → Prisma</code>. Es gibt keine REST-API-Routen für die App selbst — Server Actions ersetzen sie für Mutationen, und Server Components lesen direkt über Services. API-Routen existieren nur für externe Integrationen.</p>
+  </section>
+
+  <div class="cols">
+    <section class="tcol">
+      <h2 class="col-head">Vorteile</h2>
+      <dl>
+        <dt>Auth wird genau einmal geprüft — am Eintrittspunkt</dt>
+        <dd>Jeder Session-Check liegt in einer Action oder Server Component — eine einzige, auditierbare Stelle pro Operation statt defensiver Checks quer durch die Datenschicht.</dd>
+        <dt>Services komponieren reibungslos</dt>
+        <dd><code>deleteProject</code> kann die Task-Kaskaden-Logik aufrufen, Checkpoint-Services rufen Task-Services — ohne wiederholtes Auth-Zeremoniell, ohne zirkuläres Session-Plumbing.</dd>
+        <dt>Geschäftslogik ist unit-testbar</dt>
+        <dd>Services sind einfache async-Funktionen. <code>tests/unit/services/</code> testet Kaskaden und Hierarchie-Policy gegen eine DB, ohne <code>auth()</code> oder die Next.js-Runtime zu mocken.</dd>
+        <dt>Framework-Belange bleiben isoliert</dt>
+        <dd><code>"use server"</code>, <code>auth()</code> und <code>revalidatePath()</code> existieren nur in Actions. Die Services würden einen Umzug zu API-Routen, einer CLI oder einem Cron-Job unverändert überstehen.</dd>
+        <dt>Ein Fehler-Contract von Ende zu Ende</dt>
+        <dd>Alles gibt eine <code>ServiceResponse</code> zurück — das UI rendert Erfolgs- und Fehler-Toasts einheitlich, und keine rohe Exception erreicht den Client.</dd>
+      </dl>
+    </section>
+    <section class="tcol cons">
+      <h2 class="col-head">Nachteile</h2>
+      <dl>
+        <dt>Boilerplate pro Operation</dt>
+        <dd>Jede Action wiederholt dieselben ~20 Zeilen: Session-Check, zod-Parse, Delegation, Revalidierung. <code>project.actions.ts</code> besteht aus fünf fast identischen Wrappern.</dd>
+        <dt>Sicherheit per Konvention, nicht per Compiler</dt>
+        <dd>Nichts hindert eine neue Action daran, <code>auth()</code> zu vergessen, und nichts hindert Code daran, einen Service mit der falschen <code>userId</code> aufzurufen. AD-18 warnt Reviewer explizit: fehlende Checks in Services sind Absicht — dieses Wissen muss jedes Review mittragen.</dd>
+        <dt>Indirektionskosten bei trivialem CRUD</dt>
+        <dd>Ein einzeiliges Prisma-Update berührt trotzdem drei Dateien (Schema, Action, Service). Bei simplen Reads bringt der Wrapper kaum mehr als den Auth-Check.</dd>
+        <dt>Die Grenze ist unschärfer als der Slogan</dt>
+        <dd>Services machen keine <em>Authentifizierung</em>, aber sie erzwingen <em>Ownership</em> — <code>updateProject</code> vergleicht <code>project.userId</code> mit der übergebenen <code>userId</code>. Die ehrliche Regel lautet „kein Session-Zugriff unterhalb der Linie“, nicht „keine Sicherheit unterhalb der Linie“.</dd>
+      </dl>
+    </section>
+  </div>
+
+  <section class="evolution">
+    <h2 class="col-head">Bewusste Grenze → geplante Erweiterung (AD-20)</h2>
+    <p>Die Nachteile links sind bekannt und dokumentiert — die Weiterentwicklung ist bereits entschieden: Ein zentrales, handgeschriebenes Policy-Modul (<code>lib/authz/policy.ts</code>) mit <code>can(principal, action, resource)</code>, das Autorisierung an die Service-Grenze verlagert. Actions bleiben die Authentifizierungsgrenze; Services laden die Ressource und prüfen dann selbst. Damit wird „Services komponieren frei ohne Auth-Recheck“ bewusst aufgegeben — diese Eigenschaft funktioniert nur, solange das Berechtigungsmodell flach ist (ein Principal, binäres Ownership). Sobald Team-Modus (AD-13/AD-15) Rollen einführt, kann ein roher <code>userId</code>-String Autorität nicht mehr ausdrücken. Status: entschieden, noch nicht implementiert — <code>ARCHITECTURE_DECISIONS.md → AD-20</code>.</p>
+  </section>
+
+  <section class="sources">
+    <h2>Wo das festgehalten ist</h2>
+    <ul>
+      <li><code>docs/ARCHITECTURE_DECISIONS.md</code> — <strong>AD-18</strong> „Authorization is the action layer's responsibility“ (Begründung &amp; das ❌/✅-Muster)</li>
+      <li><code>docs/ARCHITECTURE_FOUNDATION.md</code> — <strong>AF-3</strong> „Three-Layer Code Flow“ (Services = Geschäftslogik, Actions = dünne Wrapper, Server Components lesen direkt)</li>
+      <li>Code: <code>lib/actions/</code> · <code>lib/services/</code> · gemeinsamer Contract in <code>lib/services/serviceUtil.ts</code></li>
+    </ul>
+  </section>
+</div>

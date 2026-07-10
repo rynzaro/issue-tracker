@@ -46,7 +46,6 @@ export default function CreateProjectForm() {
     const result = await createProjectAction(body);
     setLoading(false);
     if (result.success) {
-      // TODO success notification
       showToast(
         <SuccessToast
           title="Neues Projekt erstellt"
