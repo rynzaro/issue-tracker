@@ -74,7 +74,7 @@ Derived from datetime flags, no enum (ADR-0007): `completedAt`, `archivedAt`, `d
 ## Architecture rules
 
 - **Three layers**: Component → Server Action (`lib/actions/`) → Service (`lib/services/`) → Prisma. Business logic in services only. Reads: server components call services directly. API routes only for external integrations.
-- **Security boundary (ADR-0017 → ADR-0019)**: actions + server components authenticate via `auth()`. Ownership checks today: 19 scattered sites inside services. Decided target: central `lib/authz/policy.ts`, pure `can()`/`assertCan()`, `NOT_FOUND`-masked errors — **not yet implemented**, Felix hand-implements (see ticket).
+- **Security boundary (ADR-0017 → ADR-0019)**: actions + server components authenticate via `auth()`. Ownership checks today: 19 scattered sites inside services. Decided target: central `lib/authz/policy.ts`, pure `can()`/`assertCan()`, `NOT_FOUND`-masked errors — **deliberately deferred until multiplayer** (#22; plan: `docs/AUTHORIZATION_PLAN.md`).
 - **Hierarchy transitions (ADR-0018)**: complete/uncomplete/archive/unarchive/delete/restore all flow through `lib/services/taskHierarchyPolicy.ts` — `validateTransition()` → `buildTransitionPlan()` → execute. Never inline hierarchy validation in service functions. Per-operation rules table: the ADR.
 - **Toggl isolation**: all Toggl code in `lib/toggl/`; per-user tokens in User model, never env vars; app fully functional without Toggl.
 

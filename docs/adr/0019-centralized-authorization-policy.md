@@ -1,5 +1,5 @@
 ---
-status: accepted 2026-07-02 — implementation pending (checklist in docs/REFACTOR_TODO.md); extends and partially retires ADR-0017
+status: accepted 2026-07-02 — implementation deliberately deferred 2026-07-11 until multiplayer (premature while single-player; plan: docs/AUTHORIZATION_PLAN.md, tickets #22/#38); extends and partially retires ADR-0017
 ---
 
 # Centralized authorization policy at service boundaries
@@ -40,3 +40,7 @@ Rules of placement: resource-free checks (session exists; future global role gat
 - Pure `can()` is unit-testable in milliseconds with no DB.
 
 **Consequences:** ADR-0017's "services assume a pre-authorized caller" is retired; services re-check at their boundary (defense in depth). The "compose freely without re-checking auth" property is deliberately given up — that property was a benefit purchased by the flat permission model, and this decision knowingly pays it back. ADR-0017's consequence note for reviewers inverts: absence of an `assertCan` call in a service that touches an owned resource becomes a review finding, not a design feature.
+
+---
+
+**Addendum (2026-07-11 grilling session):** The open ownership question is decided — three roots: structural (`project.userId`), execution (`task.createdById`, exclusive even against the project owner), entry author (`entry.userId`). Rationale: time entries are personal estimation evidence. One correction to the text above: the claim that `NOT_FOUND` masking "preserv[es] the current non-leaking behavior" is wrong — current services return `AUTHORIZATION_ERROR` after loading, which leaks existence; masking is a deliberate behavior change. Implementation is deferred until multiplayer; full plan, gate verification, and team-mode hazards: `docs/AUTHORIZATION_PLAN.md`.
