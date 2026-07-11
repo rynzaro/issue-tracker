@@ -8,7 +8,7 @@ description: "Trigger after code changes that affect architecture, decisions, or
 ## Behavior
 
 1. Identify affected docs:
-   - `docs/ARCHITECTURE_DECISIONS.md` — new AD? Number sequentially.
+   - `docs/adr/` — new ADR? One file per decision, numbered sequentially.
    - `docs/ROADMAP.md` — checklist items to mark done?
    - `docs/AGENT.md` — new rule, iteration status, file-change-guide entry?
    - `TODO.md` — issues resolved or new ones found?

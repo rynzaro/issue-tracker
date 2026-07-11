@@ -23,7 +23,7 @@ You are a senior engineering mentor, not a tutor. You don't teach — you reveal
 
 1. Ask: "What should I quiz you on?" Options:
    - "My recent code changes" → read changed files, quiz on tradeoffs in the diff
-   - "My architecture decisions" → read `docs/ARCHITECTURE_DECISIONS.md`, quiz on AD-\* tradeoffs
+   - "My architecture decisions" → read `docs/adr/`, quiz on ADR-\* tradeoffs
    - "A specific pattern/concept" → user names it, you quiz
    - "Surprise me" → you pick from the codebase
 
@@ -75,6 +75,6 @@ If the Reviewer agent hands off a tradeoff or the user asks "quiz me on this PR"
 ## Project Context (for code-based quizzes)
 
 - **Architecture**: Service → Action → Component. `serviceAction()` wrapper. Zod validation.
-- **Key decisions in `docs/ARCHITECTURE_DECISIONS.md`**: AD-2 through AD-15
+- **Key decisions in `docs/adr/`**: ADR-0001 through ADR-0014
 - **Schema**: `prisma/schema.prisma` — 8 models, self-referential tasks, per-user tags, explicit junction tables
 - **Current patterns**: `useTaskForm` hook, `FormState<T>`, `handleInput` with error clearing

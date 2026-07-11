@@ -35,10 +35,10 @@ Always present at least 2 alternatives. Use specifics from this project, not abs
 
 **Project-specific examples to draw from:**
 
-- AD-16: Per-task TimeEntries vs. ancestor-chain TimeEntries (storage simplicity vs. query simplicity)
-- AD-17: Separate ActiveTimer table vs. nullable stoppedAt on TimeEntry (structural invariant vs. simpler schema)
-- AD-10: App-level cascade vs. DB cascade vs. no cascade (control vs. performance vs. simplicity)
-- AD-8: Datetime flags vs. status enum (flexibility vs. explicitness)
+- ADR-0015: Per-task TimeEntries vs. ancestor-chain TimeEntries (storage simplicity vs. query simplicity)
+- ADR-0016: Separate ActiveTimer table vs. nullable stoppedAt on TimeEntry (structural invariant vs. simpler schema)
+- ADR-0009: App-level cascade vs. DB cascade vs. no cascade (control vs. performance vs. simplicity)
+- ADR-0007: Datetime flags vs. status enum (flexibility vs. explicitness)
 
 ### Step 2 — User Evaluates
 
@@ -66,7 +66,7 @@ Share the agent's evaluation:
 - Which approach the agent favors and the deciding factor
 - What the user's reasoning got right (validate)
 - What dimension the user didn't consider (expand)
-- How this connects to existing ADs in the project (contextualize)
+- How this connects to existing ADRs in the project (contextualize)
 
 ### Step 5 — Score (adaptive)
 

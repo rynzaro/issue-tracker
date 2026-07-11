@@ -43,7 +43,7 @@ When the context window is getting large, the user invokes this agent to produce
 
 ### Decisions Made This Session
 
-[Numbered list. Each: what was decided and why. Reference AD-* if new architecture decisions.]
+[Numbered list. Each: what was decided and why. Reference ADR-* if new architecture decisions.]
 
 ### Changes Applied
 

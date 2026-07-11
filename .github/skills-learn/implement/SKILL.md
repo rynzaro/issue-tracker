@@ -61,7 +61,7 @@ Always allow the user to override:
 ### Path B: Agent Implements
 
 1. **Deliberate**: Use Sequential Thinking to evaluate 2–3 approaches. Present them with concrete tradeoffs (not abstractions).
-2. **Decide**: State which approach and why. Reference relevant ADs.
+2. **Decide**: State which approach and why. Reference relevant ADRs.
 3. **Implement**: Write the code following existing patterns.
 4. **Explain**: After implementation, call out the non-obvious decisions. Why this error handling shape? Why this validation order? Why this particular query filter?
 5. **Quiz**: Ask 1–2 questions tied to the SPECIFIC tradeoffs encountered during deliberation. E.g., "I used a `$transaction` here instead of two separate calls. What would break without the transaction? When would separate calls actually be preferable?"

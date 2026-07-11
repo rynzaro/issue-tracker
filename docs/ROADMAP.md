@@ -48,9 +48,9 @@ Core task management with time tracking. The first usable version of the app.
 - [x] Task tree UI (`app/s/project/[project-id]/page.tsx`)
 - [x] Inline estimate editing (minutes)
 - [x] Task description / notes field
-- [x] Time tracking: start/stop timer (AD-16 + AD-17: ActiveTimer table, single active task)
+- [x] Time tracking: start/stop timer (ADR-0015 + ADR-0016: ActiveTimer table, single active task)
 - [x] `timeEntry.service.ts` + `timeEntry.actions.ts`
-- [x] ActiveTimer model + migration (AD-17: `@@unique([userId])`, mandatory `stoppedAt`/`duration` on TimeEntry)
+- [x] ActiveTimer model + migration (ADR-0016: `@@unique([userId])`, mandatory `stoppedAt`/`duration` on TimeEntry)
 - [x] Auto-stop previous timer when starting a new one (handled by ActiveTimer swap in transaction)
 - [x] Time rollup: parent shows sum of children's tracked time (on-the-fly `SUM()` query, acceptable for <10k tasks)
 - [x] Replace legacy `app/s/[workspaceId]/` with `app/s/project/[project-id]/`
@@ -66,7 +66,7 @@ Core task management with time tracking. The first usable version of the app.
   - [x] Delete project confirmation dialog
 - [x] **Task CRUD** (create, edit, delete)
   - [x] Add soft-delete filtering (`deletedAt: null`) to tasks in `getUserProjectWithTasks` (Phase 0)
-  - [x] Update AD-10: cascade soft-delete to descendants (app-level, not DB cascade)
+  - [x] Update ADR-0009: cascade soft-delete to descendants (app-level, not DB cascade)
   - [x] `deleteTask()` service with cascade logic + active timer check
   - [x] `deleteTaskAction()`
   - [x] Wire delete dialog state in `tasksWrapper.tsx`
@@ -105,17 +105,13 @@ Core task management with time tracking. The first usable version of the app.
   - [ ] Project action tests: auth, validation, revalidation
   - [ ] Task action tests: auth, validation, revalidation
   - [ ] Integration tests: CRUD flows, multi-user isolation, soft-delete filtering
-
-## Iteration 1.5 - Integrations
-
-- [ ] Toggl
-- [ ] Github
-  - [ ] show and edit issues in OnTrack
+- [ ] **Decision**: Persistent ordering? Position removed (ADR-0003) — ephemeral or persisted drag-and-drop order? If persisted, re-add `position`.
 
 ## Iteration 2 — Event Log
 
 Passive audit trail on all task mutations.
 
+- [ ] Run `/grill-with-docs` session (opening act of this iteration) — resolves: event taxonomy, payload shapes, what emits where. Its vocabulary feeds the Iter 3 checkpoint grill (checkpoint triggers are defined in terms of event types). Also decide whether events record their source/actor (interactive user vs. bulk import) — retrofitting that field after the optional Toggl integration lands means a migration plus backfill.
 - [ ] `event.service.ts` — generic `emitEvent(taskId, type, payload)` function
 - [ ] Add `emitEvent()` calls in `task.service.ts` for: ESTIMATE_SET, ESTIMATE_CHANGED, SUBTASK_CREATED, SUBTASK_REMOVED, TASK_STARTED, TASK_COMPLETED, TASK_STATUS_CHANGED, TAGS_CHANGED (payload: `{ added: string[], removed: string[] }`)
 - [ ] Add `emitEvent()` calls in `timeEntry.service.ts` for: TASK_STARTED
@@ -125,6 +121,7 @@ Passive audit trail on all task mutations.
 
 Auto + manual checkpoints with user settings.
 
+- [ ] Run `/grill-with-docs` session (opening act of this iteration) — resolves the two Decision bullets below (debounce = destructive replace?, leaf-task CheckpointTask rows?). Keep Iter 5 analysis requirements on the table as inputs: the snapshot design must serve scope/effort decomposition, even though analysis gets its own grill. Also note: bulk-import paths (optional Toggl integration) must bypass or flag auto-checkpoint triggers, or historical time entries would spuriously mint baselines.
 - [ ] `checkpoint.service.ts` — createCheckpoint, debounceOrCreate, updateSnapshot, getCheckpointHistory
 - [ ] Checkpoint creation: snapshot task + direct children (estimate, tracked time, status per child)
 - [ ] Baseline concept: first WORK_STARTED checkpoint on **this task** gets `isBaseline = true` (scoped per-task, not per-hierarchy)
@@ -140,6 +137,7 @@ Auto + manual checkpoints with user settings.
   - [ ] Auto-checkpoints on/off (per-project toggle)
   - [ ] Per-trigger toggles (scope change, estimate change)
   - [ ] Debounce window (minutes)
+- [ ] **Decision**: Debounce = destructive replace? Debounced checkpoint replaces snapshot → intermediate state lost. Acceptable?
 - [ ] **Decision**: Create CheckpointTask rows for leaf tasks (no children) or skip? (affects data size)
 - [ ] Checkpoint history view per task
 
@@ -160,6 +158,7 @@ Lightweight checklists that can become full sub-tasks.
 
 Scope vs effort error decomposition and accuracy metrics.
 
+- [ ] Run `/grill-with-docs` session (opening act of this iteration) — resolves the two Decision bullets below (analysis on incomplete tasks?, root task per project?) plus accuracy-metric definitions.
 - [ ] `analysis.service.ts`
 - [ ] Compare baseline checkpoint to completion checkpoint (or latest checkpoint if task never completed)
 - [ ] **Decision**: Allow analysis on incomplete tasks using latest checkpoint?
@@ -169,8 +168,13 @@ Scope vs effort error decomposition and accuracy metrics.
 - [ ] Percentage split (e.g., "62% scope error, 38% effort error")
 - [ ] Analysis dashboard UI (`app/s/[projectId]/analysis/`)
 - [ ] Trend visualization (accuracy over time across projects)
+- [ ] **Decision**: Root task per project? Deferred — no perf benefit now. Revisit if project-level aggregation is painful without a single root.
 
-## Iteration 6 — Toggl Integration
+## Optional — Integrations (postponed, no fixed slot)
+
+Deliberately outside the iteration sequence: nothing in Iterations 2–5 depends on these. Pick up anytime after Iteration 1. Design footnotes already live in the Iter 2/3 grill bullets (event source/actor field; imports must not fire auto-checkpoint triggers).
+
+### Toggl
 
 Optional tag sync and time entry import/export using per-user tokens.
 
@@ -181,6 +185,10 @@ Optional tag sync and time entry import/export using per-user tokens.
 - [ ] Push tasks as Toggl tags
 - [ ] Import time entries from Toggl
 - [ ] Toggl API proxy routes in `app/api/toggl/`
+
+### GitHub
+
+- [ ] Show and edit GitHub issues in OnTrack
 
 ---
 
@@ -289,7 +297,7 @@ ProjectSettings {
 Task {
   id: String @id @default(cuid())
   projectId: String → Project
-  createdById: String → User (AD-13: immutable creator)
+  createdById: String → User (ADR-0012: immutable creator)
   parentId: String? → Task (self-ref "SubTasks")
   title: String
   description: String?
@@ -307,7 +315,7 @@ Task {
 Tag {
   id: Int @id @default(autoincrement())
   name: String
-  userId: String → User (AD-14: per-user tags, cross-project)
+  userId: String → User (ADR-0013: per-user tags, cross-project)
   taskTags: TaskTag[]
   @@unique([name, userId])
 }
@@ -316,7 +324,7 @@ TaskTag {
   id: String @id @default(cuid())
   taskId: String → Task
   tagId: Int → Tag
-  userId: String → User (AD-15: who applied the tag)
+  userId: String → User (ADR-0014: who applied the tag)
   createdAt: DateTime @default(now())
   @@unique([taskId, tagId])
 }
@@ -333,7 +341,7 @@ TimeEntry {
 
 ActiveTimer {
   id: String @id @default(cuid())
-  userId: String @unique → User (AD-17: one active timer per user)
+  userId: String @unique → User (ADR-0016: one active timer per user)
   taskId: String → Task
   startedAt: DateTime
   createdAt: DateTime @default(now())
@@ -448,5 +456,5 @@ Auto-checkpoints debounced (30 min default), toggleable per trigger in project s
                    │
                    └──> 4
 
-6 depends on 1 (can be done anytime after 1)
+Optional integrations (Toggl, GitHub) depend only on 1 — can be done anytime after it
 ```

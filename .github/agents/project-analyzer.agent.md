@@ -39,7 +39,7 @@ Use sequential thinking to decide which files need reading for each section of t
 | ----------------- | ------------------------------------------------------------------------ |
 | Stack & deps      | `package.json`                                                           |
 | Overview          | `README.md`                                                              |
-| Architecture      | `docs/ARCHITECTURE_DECISIONS.md`, `docs/ARCHITECTURE_FOUNDATION.md`      |
+| Architecture      | `docs/adr/`, `docs/ARCHITECTURE_FOUNDATION.md`      |
 | Agent conventions | `docs/AGENT.md`                                                          |
 | Developer setup   | `docs/DEVELOPER.md`                                                      |
 | Iteration state   | `TODO.md`, `docs/ROADMAP.md`, `docs/ROADMAP_NOTES.md`                    |
@@ -80,7 +80,7 @@ Use this exact structure:
 
 ### Conventions
 
-[Bullet list: naming patterns, language rules, architecture constraints from ARCHITECTURE_DECISIONS.md and AGENT.md]
+[Bullet list: naming patterns, language rules, architecture constraints from docs/adr/ and AGENT.md]
 
 ### Iteration State
 

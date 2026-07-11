@@ -1,6 +1,6 @@
 # Future: Collaboration & Team Features
 
-Anchor document for expanding the current single-user architecture into a collaborative platform. The schema foundations (AD-12 through AD-15) were designed to make this transition non-breaking.
+Anchor document for expanding the current single-user architecture into a collaborative platform. The schema foundations (ADR-0011 through ADR-0014) were designed to make this transition non-breaking.
 
 ---
 

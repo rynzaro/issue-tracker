@@ -126,5 +126,5 @@ Default to step-by-step if user doesn't specify.
 - **UI language**: German (all user-facing strings must be German)
 - **Architecture**: Services → Actions → Components. `serviceAction()` wrapper for auth + error handling. See `docs/AGENT.md`.
 - **Validation**: Zod schemas in `lib/schema/` (server authority)
-- **Key files**: `docs/AGENT.md` (rules), `docs/ARCHITECTURE_DECISIONS.md` (active decisions), `prisma/schema.prisma` (models)
+- **Key files**: `docs/AGENT.md` (rules), `docs/adr/` (active decisions), `prisma/schema.prisma` (models)
 - **Patterns to match**: Check existing files in the same directory before writing new code. Match naming, structure, error handling style.

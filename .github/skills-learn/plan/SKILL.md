@@ -51,7 +51,7 @@ Present the comparison:
 - **What was over-scoped** — if they included unnecessary work, explain why less is better here
 - **Dependency errors** — if their ordering would cause issues
 
-Connect each observation to specific architecture rules or ADs.
+Connect each observation to specific architecture rules or ADRs.
 
 ### Step 5 — Present Final Plan
 
@@ -59,7 +59,7 @@ Output a numbered, dependency-ordered step list. Each step:
 
 1. **What** — the concrete change
 2. **Where** — file(s) affected (reference AGENT.md "File Change Guide" patterns)
-3. **Why** — rationale connecting to architecture (cite specific ADs)
+3. **Why** — rationale connecting to architecture (cite specific ADRs)
 4. **Depends on** — which prior steps must complete first
 
 ### Step 6 — Score (non-trivial plans only)

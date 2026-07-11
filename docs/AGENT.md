@@ -38,7 +38,7 @@ Server Actions must:
 4. Call `revalidatePath()` for affected pages
 5. Return the result
 
-**Security Boundary (AD-18):** Server Actions are the authorization layer. Service functions are internal utilities that assume the caller has already verified permissions. Auth checks belong in actions and server components, NOT in services.
+**Security Boundary (ADR-0017):** Server Actions are the authorization layer. Service functions are internal utilities that assume the caller has already verified permissions. Auth checks belong in actions and server components, NOT in services.
 
 ```typescript
 "use server";
@@ -59,7 +59,7 @@ export async function someAction(params: SomeParams) {
 
 Server Components fetch data by calling service functions directly. No API routes needed for reads.
 
-**Auth Responsibility:** Server Components must verify the session (via `auth()`) before calling services, just like Server Actions. The component layer is part of the security boundary (AD-18).
+**Auth Responsibility:** Server Components must verify the session (via `auth()`) before calling services, just like Server Actions. The component layer is part of the security boundary (ADR-0017).
 
 ```typescript
 // app/s/[projectId]/page.tsx (Server Component)
@@ -98,7 +98,7 @@ Event types and when to emit:
 | `TODO_ADDED`          | A TodoItem is added to a task                                                                         |
 | `TODO_CONVERTED`      | A TodoItem is converted to a sub-task                                                                 |
 | `TODO_COMPLETED`      | A TodoItem is checked off                                                                             |
-| `TASK_STARTED`        | First TimeEntry ever created for this task (AD-16: only the explicitly-started task gets a TimeEntry) |
+| `TASK_STARTED`        | First TimeEntry ever created for this task (ADR-0015: only the explicitly-started task gets a TimeEntry) |
 | `TASK_COMPLETED`      | `completedAt` is set on a task (task marked done)                                                     |
 | `TASK_STATUS_CHANGED` | `archivedAt` is set or cleared on a task                                                              |
 | `TAGS_CHANGED`        | Tags added and removed from the Task                                                                  |
@@ -200,7 +200,7 @@ All Toggl Track API code lives in `lib/toggl/`. The main app must work without T
 
 **No Toggl env vars**: Each user stores their own Toggl API token and workspace ID in their user settings (User model fields). The `lib/toggl/api.ts` reads from the database, never from `process.env`.
 
-### 8. Hierarchy Transitions Use the Policy Module (AD-19)
+### 8. Hierarchy Transitions Use the Policy Module (ADR-0018)
 
 All task hierarchy state changes (complete, uncomplete, archive, unarchive, delete, restore) flow through `lib/services/taskHierarchyPolicy.ts`. Service functions in `task.service.ts` follow a uniform pattern:
 
@@ -397,8 +397,8 @@ User ──1:N──> Project ──1:N──> Task ──1:N──> TimeEntry
 | --------------------- | ------------------------------------------------------------------------------ | ------------------------------------- |
 | `project.service`     | Project CRUD                                                                   | —                                     |
 | `task.service`        | Task CRUD, hierarchy transitions (via `taskHierarchyPolicy`)                   | `event.service`, `checkpoint.service` |
-| `taskHierarchyPolicy` | Validation + plan-building for hierarchy transitions (AD-19)                   | — (pure logic, no DB)                 |
-| `timeEntry.service`   | Start/stop timers (AD-16/17: ActiveTimer + mandatory stoppedAt), duration calc | `event.service`, `checkpoint.service` |
+| `taskHierarchyPolicy` | Validation + plan-building for hierarchy transitions (ADR-0018)                   | — (pure logic, no DB)                 |
+| `timeEntry.service`   | Start/stop timers (ADR-0015/17: ActiveTimer + mandatory stoppedAt), duration calc | `event.service`, `checkpoint.service` |
 | `event.service`       | TaskEvent creation, queries                                                    | —                                     |
 | `checkpoint.service`  | Checkpoint CRUD, debouncing, snapshots, comparisons                            | —                                     |
 | `todo.service`        | TodoItem CRUD (including estimate), conversion to sub-task                     | `task.service`, `event.service`       |
@@ -431,7 +431,7 @@ User ──1:N──> Project ──1:N──> Task ──1:N──> TimeEntry
 1. `lib/services/taskHierarchyPolicy.ts` — modify the `validate*()` or `build*Plan()` function for the operation
 2. `tests/unit/services/taskHierarchyPolicy.test.ts` — add/update tests
 3. `docs/AGENT.md` — update the policy rules table in section 8
-4. `docs/ARCHITECTURE_DECISIONS.md` — update AD-19 if the change affects the rules table
+4. `docs/adr/0018-policy-based-hierarchy-transitions.md` — update if the change affects the rules table
 
 ### "I need to add a new page"
 
@@ -468,7 +468,7 @@ Update this table as iterations are completed.
 These must ALWAYS hold true. Verify after any change:
 
 1. **Time entries only on tasks** — every TimeEntry must reference a valid Task
-2. **One ActiveTimer per user** — enforced by `@@unique([userId])` on ActiveTimer (AD-17). ActiveTimer = running, TimeEntry = completed.
+2. **One ActiveTimer per user** — enforced by `@@unique([userId])` on ActiveTimer (ADR-0016). ActiveTimer = running, TimeEntry = completed.
 3. **Task depth is accurate** — `task.depth` must equal the number of ancestors (0 for root)
 4. **Checkpoints never cascade above parent** — auto-checkpoint triggers ONLY fire for the changed task and its direct parent
 5. **Events are append-only** — never update or delete TaskEvent rows

@@ -31,7 +31,7 @@ Designed a **dual-mode Copilot skill architecture** (FAST mode for speed, LEARN 
 | `implement/`       | Read AGENT.md → deliberate approaches → present decision + rationale → implement     |
 | `review/`          | Structured code review (correctness, architecture compliance, edge cases)            |
 | `test/`            | Write tests following vitest patterns in `tests/`, match existing factory/mock setup |
-| `document/`        | Update ROADMAP.md, ARCHITECTURE_DECISIONS.md, AGENT.md after changes                 |
+| `document/`        | Update ROADMAP.md, docs/adr/, AGENT.md after changes                 |
 | `refactor/`        | Identify smells → propose changes with tradeoffs → implement after approval          |
 | `session-handoff/` | Produce structured handoff summary for new context window                            |
 
@@ -113,5 +113,5 @@ Designed a **dual-mode Copilot skill architecture** (FAST mode for speed, LEARN 
 2. `docs/AGENT.md` — architecture rules (skills reference this, don't duplicate)
 3. `agents/README.md` — the 10-agent design being replaced (context for what was there before)
 4. `.github/skills/ask-user-questions-extended/SKILL.md` — the fixed skill file (example of format)
-5. `docs/ARCHITECTURE_DECISIONS.md` — active decisions
+5. `docs/adr/` — active decisions
 6. `docs/ROADMAP.md` — iteration status

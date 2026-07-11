@@ -23,8 +23,8 @@ These are the docs to audit. Read ALL of them at session start:
 | `docs/AGENT.md`                   | Architecture rules, schema reference, iteration status table   | Schema out of date, status table stale   |
 | `docs/DEVELOPER.md`               | Directory structure, tech stack, what works today, conventions | Directory tree wrong, stale "what works" |
 | `docs/USER.md`                    | User-facing feature descriptions                               | Features renamed or changed              |
-| `docs/ARCHITECTURE_DECISIONS.md`  | Numbered AD-\* decisions                                       | Missing new decisions                    |
-| `docs/ARCHITECTURE_FOUNDATION.md` | Root AF-\* principles                                          | Principles contradicted by later ADs     |
+| `docs/adr/`  | Numbered ADR-\* decisions                                       | Missing new decisions                    |
+| `docs/ARCHITECTURE_FOUNDATION.md` | Root AF-\* principles                                          | Principles contradicted by later ADRs     |
 | `docs/FUTURE_COLLABORATION.md`    | Multi-user expansion plan                                      | Schema foundations changed               |
 | `TODO.md`                         | Post-MVP items and UX ideas                                    | Items completed but not removed          |
 
@@ -59,7 +59,7 @@ These are the docs to audit. Read ALL of them at session start:
 - **"What Works Today"** in DEVELOPER.md matches actual implemented features
 - **Code conventions** in DEVELOPER.md match actual patterns
 - **Target schema** in ROADMAP.md matches current schema + planned additions
-- **AF-\* principles** in ARCHITECTURE_FOUNDATION.md consistent with AD-\* decisions
+- **AF-\* principles** in ARCHITECTURE_FOUNDATION.md consistent with ADR-\* decisions
 - **Future collaboration** schema references match actual schema
 
 ## Output Format

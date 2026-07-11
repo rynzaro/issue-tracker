@@ -26,7 +26,7 @@ Writing decision rationale is a reasoning exercise. The user articulates WHY; th
 
 Check which docs are affected:
 
-- `docs/ARCHITECTURE_DECISIONS.md` — new AD needed?
+- `docs/adr/` — new ADR needed?
 - `docs/ROADMAP.md` — checklist items to mark complete?
 - `docs/AGENT.md` — new rule, iteration status change, new file-change-guide entry?
 - `TODO.md` — issues resolved or new ones discovered?
@@ -59,9 +59,9 @@ Wait for the user's draft.
 Improve the user's draft:
 
 - Fill in consequences they didn't consider (especially downstream effects on other services or future iterations)
-- Add rejected alternatives they didn't mention (check if existing ADs were considered)
-- Ensure the rationale connects to existing ADs (e.g., "Complements AD-16" or "Extends AD-10")
-- Match the format and level of detail in existing entries in `ARCHITECTURE_DECISIONS.md`
+- Add rejected alternatives they didn't mention (check if existing ADRs were considered)
+- Ensure the rationale connects to existing ADRs (e.g., "Complements ADR-0015" or "Extends ADR-0009")
+- Match the format and level of detail in existing entries in `docs/adr/`
 - Number the AD sequentially (next after highest existing)
 
 ### Step 5 — Score (New Decisions Only)

@@ -34,7 +34,7 @@ Read ALL of the following in parallel:
 | File                              | What to extract                                         |
 | --------------------------------- | ------------------------------------------------------- |
 | `docs/AGENT.md`                   | Architecture rules, current iteration, schema reference |
-| `docs/ARCHITECTURE_DECISIONS.md`  | All active AD-\* decisions                              |
+| `docs/adr/`  | All active ADR-\* decisions                              |
 | `docs/ARCHITECTURE_FOUNDATION.md` | All AF-\* principles                                    |
 | `prisma/schema.prisma`            | Models, enums, relations                                |
 | `lib/services/serviceUtil.ts`     | `serviceAction()` wrapper — signature + behavior        |
@@ -62,7 +62,7 @@ Emit exactly this structure — nothing else:
 - [bullet per rule, max 1 line each]
 
 ### Active Decisions
-- AD-[N]: [one-line summary]
+- ADR-[NNNN]: [one-line summary]
 
 ### Root Principles
 - AF-[N]: [one-line summary]

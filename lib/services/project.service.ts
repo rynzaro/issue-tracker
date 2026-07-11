@@ -142,7 +142,7 @@ export function deleteProject({
         );
       }
 
-      // Cascade soft-delete: project + all its tasks (AD-10)
+      // Cascade soft-delete: project + all its tasks (ADR-0009)
       const now = new Date();
       const deleted = await tx.project.update({
         where: { id: projectId },

@@ -134,7 +134,7 @@ export function createTask({
 
     // Verify parent task exists, belongs to the same project, and is not
     // soft-deleted, archived, or completed. Blocking completed parents keeps
-    // completedAt cascade invariants intact (see AD-19) — reopening a
+    // completedAt cascade invariants intact (see ADR-0018) — reopening a
     // completed task to add subtasks is a deliberate future feature, not
     // this guard's job.
     if (createTaskParams.parentId) {

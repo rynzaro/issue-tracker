@@ -9,7 +9,7 @@ All changes are unstaged.
 
 ### Decisions Made This Session
 
-1. **AD-10 updated**: Cascade soft-delete to all descendants via BFS in service code (not DB cascades). Applied to both tasks and projects.
+1. **ADR-0009 updated**: Cascade soft-delete to all descendants via BFS in service code (not DB cascades). Applied to both tasks and projects.
 2. **isDefault is "set-only"**: Can't uncheck via UI. `updateProject` ignores `isDefault: false`.
 3. **Removed `listProjectsAction`**: Main page uses direct `getProjectsByUser` service call (Rule 3).
 4. **Removed `serviceQueryOrNotFound`**: Replaced with explicit `serviceAction` + null checks.
@@ -31,7 +31,7 @@ All changes are unstaged.
 - `app/s/project/[project-id]/settings/page.tsx` — NEW: project settings server component.
 - `app/s/project/[project-id]/settings/updateProjectForm.tsx` — NEW: client component for project update.
 - `app/s/project/[project-id]/settings/deleteProjectSection.tsx` — NEW: danger zone delete section.
-- `docs/ARCHITECTURE_DECISIONS.md` — Updated AD-10 (cascade) and AD-11 (no DB cascades).
+- `docs/adr/` — Updated ADR-0009 (cascade) and ADR-0010 (no DB cascades).
 - `docs/ROADMAP.md` — Expanded Project CRUD and Task CRUD checklist items.
 - `TODO.md` — Added comprehensive test specifications.
 
@@ -110,7 +110,7 @@ All changes are unstaged.
 - **Architecture**: Services → Actions → Components. Rule 1: business logic in services. Rule 2: mutations via actions. Rule 3: reads via direct service calls.
 - **Service wrappers**: `serviceAction()` for complex ops, `serviceQuery()` for simple reads. Both in `lib/services/serviceUtil.ts`.
 - **ActiveTimer**: `@@unique([userId])`. Must check for active timers before deleting tasks/projects.
-- **Soft-delete**: AD-10 cascade via BFS. All queries filter `deletedAt IS NULL`. No restore UI.
+- **Soft-delete**: ADR-0009 cascade via BFS. All queries filter `deletedAt IS NULL`. No restore UI.
 - **UI language**: German throughout. No toast system.
 - **Zero TypeScript errors** as of last check across all modified files.
 

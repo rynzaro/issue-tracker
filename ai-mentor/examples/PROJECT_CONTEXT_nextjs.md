@@ -74,7 +74,7 @@ export async function xService(params: ValidatedParams) {
 | Doc | Answers the question | Key contents |
 |-----|---------------------|--------------|
 | `docs/AGENT.md` | "What are the architecture rules?" | Service layer flow, server action pattern, schema reference, iteration status |
-| `docs/ARCHITECTURE_DECISIONS.md` | "Why was X decided this way?" | Chronological AD log, rejected alternatives |
+| `docs/adr/` | "Why was X decided this way?" | Numbered ADRs, rejected alternatives |
 | `docs/ROADMAP.md` | "What's done and what's next?" | Iteration checklists, completion status |
 | `docs/DEVELOPER.md` | "How do I run this?" | Dev setup, commands, environment variables |
 | `TODO.md` | "What's broken or pending?" | Open issues categorized by severity |

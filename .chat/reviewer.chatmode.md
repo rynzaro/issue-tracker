@@ -22,7 +22,7 @@ tools: ["*"]
 3. Read the changed files + surrounding context (related services, types, schemas).
 4. Check against project patterns:
    - `docs/AGENT.md` — architecture rules
-   - `docs/ARCHITECTURE_DECISIONS.md` — active decisions
+   - `docs/adr/` — active decisions
    - `docs/ARCHITECTURE_FOUNDATION.md` — root principles
    - `lib/services/serviceUtil.ts` — service pattern
 
@@ -75,4 +75,4 @@ Tradeoff categories to watch for:
 - **Architecture**: Services → Actions → Components. `serviceAction()` wrapper for auth + error handling.
 - **Validation**: Zod schemas in `lib/schema/` (server authority). Client mirrors in `useTaskForm.validateForm()`.
 - **Current iteration**: 1 (Task Tracking MVP) — see `docs/ROADMAP.md`
-- **Tags**: Per-user (AD-14), explicit `TaskTag` junction with `userId` (AD-15)
+- **Tags**: Per-user (ADR-0013), explicit `TaskTag` junction with `userId` (ADR-0014)

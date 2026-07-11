@@ -43,7 +43,7 @@ tools:
 1. Read these project files (use sequential thinking to plan what to read):
    - `docs/ROADMAP.md` — iteration status, what's done, what's next
    - `TODO.md` — current post-MVP items and UX ideas
-   - `docs/ARCHITECTURE_DECISIONS.md` — active decisions
+   - `docs/adr/` — active decisions
    - `docs/AGENT.md` — iteration status table at bottom
 2. Identify: what's the current iteration? What's done? What's remaining?
 3. Interview user: what do they want to tackle next? Any blockers? Time constraints?
@@ -73,5 +73,5 @@ tools:
 - **Tech**: Next.js 16 App Router, React 19, Prisma 7, MariaDB, NextAuth 5, Tailwind 4, Zod, pnpm
 - **UI language**: German (intentional)
 - **Architecture**: Services → Actions → Components. See `docs/AGENT.md` for rules.
-- **Key docs**: `docs/ROADMAP.md`, `docs/ARCHITECTURE_DECISIONS.md`, `docs/ARCHITECTURE_FOUNDATION.md`, `docs/DEVELOPER.md`
+- **Key docs**: `docs/ROADMAP.md`, `docs/adr/`, `docs/ARCHITECTURE_FOUNDATION.md`, `docs/DEVELOPER.md`
 - **Schema**: `prisma/schema.prisma` — 8 models, 4 enums. Task has `createdById`, Tag has `userId`, explicit `TaskTag` with `userId`.

@@ -1,7 +1,11 @@
+## Tomorrow (2026-07-11) — highest priority, do first
+
+- [ ] Grilling session (`/grill-me`) on the whole meta-interaction architecture — "a lot of stuff mixed right now." Surfaces to untangle: `.claude/skills/` (24 skills incl. grill/teach/handoff), `.github/skills/` vs `.github/skills-learn/` vs `.github/agents/` (Copilot-era), `.chat/` chatmodes + session handoffs, `ai-mentor/`, `agents/` (README only), `stuff/generic-agents`, plus the planning-doc surface (TODO.md, docs/REFACTOR_TODO.md, ROADMAP.md, IDEAS.md, docs/adr/, docs/learning/) and Claude auto-memory. Goal: which surfaces are canonical, which retire, and where each kind of decision/note lives.
+
 ## Today
 
 - [ ] brevo integration
-- [ ] AD-20: centralized authorization policy (`lib/authz/policy.ts`) — decided, hand-implement; design in `docs/ARCHITECTURE_DECISIONS.md` (AD-20), checklist in `docs/REFACTOR_TODO.md`
+- [ ] ADR-0019: centralized authorization policy (`lib/authz/policy.ts`) — decided, hand-implement; design in `docs/adr/0019-centralized-authorization-policy.md`, checklist in `docs/REFACTOR_TODO.md`
 
 ## UX Ideas
 

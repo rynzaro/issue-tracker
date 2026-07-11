@@ -41,7 +41,7 @@ Every task → one project → one user. Single-user ownership, no sharing/colla
 
 ### AF-5: Tags over Category
 
-M:N relation (Tag model + explicit TaskTag junction). Replaces `category: String?`. Task can span multiple concerns ("frontend" + "auth"). Tags scoped per-user (AD-14). Each user has their own tag vocabulary, reusable across projects. TaskTag junction includes `userId` to record who applied the tag (AD-15).
+M:N relation (Tag model + explicit TaskTag junction). Replaces `category: String?`. Task can span multiple concerns ("frontend" + "auth"). Tags scoped per-user (ADR-0013). Each user has their own tag vocabulary, reusable across projects. TaskTag junction includes `userId` to record who applied the tag (ADR-0014).
 
 Event: `TAGS_CHANGED`, payload: `{ added: string[], removed: string[] }`.
 
@@ -52,7 +52,7 @@ No `TaskStatus` enum. Status is derived from nullable datetime fields on `Task`:
 | Derived state | Condition                                                        |
 | ------------- | ---------------------------------------------------------------- |
 | Active        | `completedAt IS NULL`, `archivedAt IS NULL`, `deletedAt IS NULL` |
-| In Progress   | ActiveTimer exists for this task (AD-17)                         |
+| In Progress   | ActiveTimer exists for this task (ADR-0016)                         |
 | Completed     | `completedAt IS NOT NULL`                                        |
 | Archived      | `archivedAt IS NOT NULL`                                         |
 | Deleted       | `deletedAt IS NOT NULL` (soft delete, filtered from all queries) |
@@ -61,7 +61,7 @@ No `TaskStatus` enum. Status is derived from nullable datetime fields on `Task`:
 
 ### AF-7: Single Active Timer (ActiveTimer table)
 
-One timer per user, enforced by `ActiveTimer` table with `@@unique([userId])` (AD-17). Running work lives in ActiveTimer; completed work lives in TimeEntry with mandatory `stoppedAt` and `duration`.
+One timer per user, enforced by `ActiveTimer` table with `@@unique([userId])` (ADR-0016). Running work lives in ActiveTimer; completed work lives in TimeEntry with mandatory `stoppedAt` and `duration`.
 
 `startWork`: stop existing ActiveTimer (convert to TimeEntry) → create new ActiveTimer. `stopWork`: delete ActiveTimer → create TimeEntry. Both in a transaction.
 

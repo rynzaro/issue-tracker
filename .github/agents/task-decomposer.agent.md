@@ -102,4 +102,4 @@ Do NOT start implementing. That is the coding agent's job.
   - `app/` — components/pages (call actions or hooks, no direct service calls)
 - **Schema**: 8 models, 4 enums in `prisma/schema.prisma`. Task has `createdById`, Tag has `userId`, explicit `TaskTag` with `userId`.
 - **Snapshot file**: `.github/context-snapshot.md` — written by Codebase Explorer
-- **Active decisions**: always check `docs/ARCHITECTURE_DECISIONS.md` before proposing structural changes
+- **Active decisions**: always check `docs/adr/` before proposing structural changes

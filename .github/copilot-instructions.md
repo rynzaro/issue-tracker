@@ -9,8 +9,8 @@ Active regardless of skill mode (FAST or LEARN).
 
 | Doc                              | Answers the question               | Key contents                                                                                                                                         |
 | -------------------------------- | ---------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `docs/AGENT.md`                  | "What are the architecture rules?" | Service layer flow, server action pattern, event/checkpoint rules, hierarchy policy (AD-19), schema reference, iteration status, critical invariants |
-| `docs/ARCHITECTURE_DECISIONS.md` | "Why was X decided this way?"      | Chronological AD log (AD-2 – AD-19), rejected alternatives, open future questions                                                                    |
+| `docs/AGENT.md`                  | "What are the architecture rules?" | Service layer flow, server action pattern, event/checkpoint rules, hierarchy policy (ADR-0018), schema reference, iteration status, critical invariants |
+| `docs/adr/` | "Why was X decided this way?"      | Numbered ADRs (0001–0019, one file per decision), rejected alternatives; open questions live in `docs/ROADMAP.md`                                                                    |
 | `docs/ROADMAP.md`                | "What's done and what's next?"     | Iteration checklists (0–6), completion status per item                                                                                               |
 | `docs/DEVELOPER.md`              | "How do I run this?"               | Dev setup, commands, environment variables                                                                                                           |
 | `docs/USER.md`                   | "What does the product do?"        | User-facing feature descriptions                                                                                                                     |
@@ -62,7 +62,7 @@ Do NOT ask permission when the path is clear.
 
 - Schema changes (`prisma/schema.prisma`)
 - New dependencies (`package.json`)
-- New patterns not in `ARCHITECTURE_DECISIONS.md`
+- New patterns not in `docs/adr/`
 - Auth flow or middleware changes
 - Deleting or renaming existing files
 - Changes touching more than 3 files
@@ -71,7 +71,7 @@ Do NOT ask permission when the path is clear.
 
 - Business logic in components or API routes
 - Skip auth checks in server actions
-- DB-level cascade deletes (AD-11)
+- DB-level cascade deletes (ADR-0010)
 - Import from `lib/toggl/` outside the Toggl feature
 - Secrets or API tokens in `.env` / `process.env`
 - Remove a failing test without explicit approval
@@ -129,7 +129,7 @@ When ending a session: use the `session-handoff` skill.
 While working, watch for patterns that should become reusable skills. Something is skill-worthy when:
 
 1. **Recurring judgment** — the same non-obvious decision or reasoning process appears for the 2nd+ time across sessions
-2. **Undocumented convention** — "how we do things" that isn't captured in any existing skill, AGENT.md, or ARCHITECTURE_DECISIONS.md
+2. **Undocumented convention** — "how we do things" that isn't captured in any existing skill, AGENT.md, or docs/adr/
 3. **Repeatable workflow** — a multi-step process the user describes as "whenever I do X, I always need to Y then Z"
 4. **Fragile expertise** — knowledge that would need to be re-discovered if this session's context disappeared
 

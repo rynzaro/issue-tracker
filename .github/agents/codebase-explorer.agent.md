@@ -65,7 +65,7 @@ Key areas to check per task type:
 Always check:
 
 - `prisma/schema.prisma` — ground truth for models and enums
-- `docs/ARCHITECTURE_DECISIONS.md` — any active constraints on the area
+- `docs/adr/` — any active constraints on the area
 
 ### 4. Write the Snapshot
 
@@ -95,7 +95,7 @@ Write to `.github/context-snapshot.md`. Use this structure:
 
 ### Dependencies & Constraints
 
-[Any architecture rules, AD-* decisions, or caller/callee relationships that matter]
+[Any architecture rules, ADR-* decisions, or caller/callee relationships that matter]
 
 ### Recent Relevant Changes
 
@@ -121,4 +121,4 @@ After writing: "Snapshot written to `.github/context-snapshot.md`. Ready for Tas
   - `lib/actions/` — server actions (call services, validate with Zod)
   - `lib/hooks.ts` — client hooks
   - `app/s/project/[project-id]/` — main project pages
-- **Docs**: `docs/AGENT.md`, `docs/ARCHITECTURE_DECISIONS.md`, `docs/ARCHITECTURE_FOUNDATION.md`
+- **Docs**: `docs/AGENT.md`, `docs/adr/`, `docs/ARCHITECTURE_FOUNDATION.md`
