@@ -1,24 +1,3 @@
-## Tomorrow (2026-07-11) — highest priority, do first
+# Scratch
 
-- [ ] Grilling session (`/grill-me`) on the whole meta-interaction architecture — "a lot of stuff mixed right now." Surfaces to untangle: `.claude/skills/` (24 skills incl. grill/teach/handoff), `.github/skills/` vs `.github/skills-learn/` vs `.github/agents/` (Copilot-era), `.chat/` chatmodes + session handoffs, `ai-mentor/`, `agents/` (README only), `stuff/generic-agents`, plus the planning-doc surface (TODO.md, docs/REFACTOR_TODO.md, ROADMAP.md, IDEAS.md, docs/adr/, docs/learning/) and Claude auto-memory. Goal: which surfaces are canonical, which retire, and where each kind of decision/note lives.
-
-## Today
-
-- [ ] brevo integration
-- [ ] ADR-0019: centralized authorization policy (`lib/authz/policy.ts`) — decided, hand-implement; design in `docs/adr/0019-centralized-authorization-policy.md`, checklist in `docs/REFACTOR_TODO.md`
-
-## UX Ideas
-
-Captured from earlier brainstorming. Prioritize when relevant.
-
-- [x] account creation — signup, login, logout all implemented
-- [ ] forgot password flow — UI stub exists at `/public/forgot-password/`, needs backend (token generation, email sending via Brevo, reset completion)
-- [x] stack projects in sidenavbar — switched to SidebarLayout with persistent desktop sidebar; projects listed as SidebarItems with active highlighting
-- [x] fix mobile version text sizes and buttons (thinking of a popup menu instead of buttons and just having start and stop visible, so the task + times can be large)
-- [x] Deletion / Archiving architecture — both implemented: soft-delete (`deletedAt`) + archiving (`archivedAt`) with restore/unarchive, cascade behavior, and dedicated archive page
-- [ ] Notification system — custom toast system in place (`toastProvider.tsx`), remaining: migrate inline errors to toasts in `create-project-form.tsx`, `updateProjectForm.tsx`, `deleteProjectSection.tsx`, `setDefaultButton.tsx`
-- [x] Default project functionality (auto-select on login) — implemented: `/s/main` redirects to default project, star button on project header to set default
-- [ ] User settings page — dedicated page or modal for per-user preferences (default project, notification prefs, display settings)
-- [x] Project selection architecture — dropdown in navbar (desktop) + modal sidebar (mobile) implemented
-- [ ] Button hover explanations (tooltips) — `Tooltip` component exists but only used in one place; icon buttons use `aria-label` instead of visible tooltips
-- [ ] Estimated duration input — explore scroll/stepper input instead of plain text field
+Daily notes only — no work state here. Work lives in GitHub issues (`gh issue list`); contract in CLAUDE.md.
