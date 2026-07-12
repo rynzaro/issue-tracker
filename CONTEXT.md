@@ -73,6 +73,8 @@ Derived from datetime flags, no enum (ADR-0007): `completedAt`, `archivedAt`, `d
 
 ## Architecture rules
 
+- **Stack**: Next.js 16 App Router, React 19, Prisma 7, MySQL 8 (Docker), NextAuth 5 (credentials-only), Tailwind 4, Zod, pnpm.
+- **Route boundary**: authenticated app under `app/s/`, public pages under `app/public/`; session middleware in `proxy.ts`.
 - **Three layers**: Component → Server Action (`lib/actions/`) → Service (`lib/services/`) → Prisma. Business logic in services only. Reads: server components call services directly. API routes only for external integrations.
 - **Security boundary (ADR-0017 → ADR-0019)**: actions + server components authenticate via `auth()`. Ownership checks today: 19 scattered sites inside services. Decided target: central `lib/authz/policy.ts`, pure `can()`/`assertCan()`, `NOT_FOUND`-masked errors — **deliberately deferred until multiplayer** (#22; plan: `docs/AUTHORIZATION_PLAN.md`).
 - **Hierarchy transitions (ADR-0018)**: complete/uncomplete/archive/unarchive/delete/restore all flow through `lib/services/taskHierarchyPolicy.ts` — `validateTransition()` → `buildTransitionPlan()` → execute. Never inline hierarchy validation in service functions. Per-operation rules table: the ADR.

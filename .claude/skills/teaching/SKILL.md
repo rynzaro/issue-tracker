@@ -31,7 +31,7 @@ After the sections:
 
 ## Storage
 
-Lessons live in `docs/learning/` (see its README). Extend an existing note on the topic in place rather than creating siblings — one recitable home per concept cluster. Notes are Felix's personal study material: extended when he asks, allowed to lag the code.
+Lessons live in `~/mem/learning/traces/` (cross-project learning traces — see its README for the slot format; decided 2026-07-12, never in the repo). Extend the existing trace for the concept cluster in place rather than creating siblings — one recitable home per cluster. Traces must be self-contained: snapshot the code excerpt, `file:line` refs carry repo + date. A concept this repo re-touches gets a new **sighting** in its existing trace. Traces are Felix's personal study material: extended when he asks, allowed to lag the code.
 
 ## At the ticket gate
 

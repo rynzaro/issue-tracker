@@ -30,7 +30,7 @@ Layering after this decision:
 
 Rules of placement: resource-free checks (session exists; future global role gates) stay at the entry point; resource-dependent checks live in services via the policy module.
 
-**Error semantics:** `assertCan` masks unauthorized as `NOT_FOUND`, preserving the current non-leaking behavior — no service can accidentally return a `FORBIDDEN` that leaks resource existence.
+**Error semantics:** `assertCan` masks unauthorized as `NOT_FOUND`, ~~preserving the current non-leaking behavior~~ ⚠️ *this claim is wrong — see addendum below* — no service can accidentally return a `FORBIDDEN` that leaks resource existence.
 
 **Rationale:**
 
