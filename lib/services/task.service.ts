@@ -8,6 +8,7 @@ import {
 import {
   validateTransition,
   buildTransitionPlan,
+  type LineageNode,
   type TransitionPlan,
 } from "./taskHierarchyPolicy";
 
@@ -24,26 +25,34 @@ type AncestorRow = {
 };
 
 /**
- * BFS to collect a task and all its descendants within a project.
+ * BFS to collect a task and all its descendants within a project, with the
+ * three state flags so the transition policy can decide what to touch.
  * Only traverses non-deleted and non-archived tasks.
  * Accepts an optional `db` client to run inside an interactive transaction.
  */
-async function collectDescendantIds(
+async function collectDescendantNodes(
   taskId: string,
   projectId: string,
   db: DbClient = client,
   includeArchived = false,
   includeDeleted = false,
-): Promise<string[]> {
+): Promise<LineageNode[]> {
   const projectTasks = await db.task.findMany({
     where: {
       projectId,
       deletedAt: includeDeleted ? undefined : null,
       archivedAt: includeArchived ? undefined : null,
     },
-    select: { id: true, parentId: true },
+    select: {
+      id: true,
+      parentId: true,
+      completedAt: true,
+      archivedAt: true,
+      deletedAt: true,
+    },
   });
 
+  const byId = new Map(projectTasks.map((t) => [t.id, t]));
   const childrenMap = new Map<string, string[]>();
   for (const t of projectTasks) {
     if (t.parentId) {
@@ -52,15 +61,16 @@ async function collectDescendantIds(
     }
   }
 
-  const allIds: string[] = [];
+  const nodes: LineageNode[] = [];
   const queue = [taskId];
   while (queue.length > 0) {
     const current = queue.shift()!;
-    allIds.push(current);
+    const node = byId.get(current);
+    if (node) nodes.push(node);
     const children = childrenMap.get(current) ?? [];
     queue.push(...children);
   }
-  return allIds;
+  return nodes;
 }
 
 async function executePlan(plan: TransitionPlan, tx: DbClient): Promise<void> {
@@ -277,7 +287,7 @@ export function deleteTask({
         );
       }
 
-      const descendantIds = await collectDescendantIds(
+      const descendants = await collectDescendantNodes(
         taskId,
         task.projectId,
         tx,
@@ -285,7 +295,7 @@ export function deleteTask({
       );
 
       const activeTimer = await tx.activeTimer.findFirst({
-        where: { taskId: { in: descendantIds } },
+        where: { taskId: { in: descendants.map((d) => d.id) } },
       });
 
       if (activeTimer) {
@@ -295,17 +305,12 @@ export function deleteTask({
         );
       }
 
-      const plan = buildTransitionPlan(
-        "DELETE",
-        task,
-        ancestors,
-        descendantIds,
-      );
+      const plan = buildTransitionPlan("DELETE", task, ancestors, descendants);
       await executePlan(plan, tx);
 
       return createSuccessResponseWithData({
         id: taskId,
-        deletedCount: descendantIds.length,
+        deletedCount: plan.setDeletedAt.ids.length,
       });
     });
   }, "Failed to delete task");
@@ -319,10 +324,10 @@ export function hasActiveDescendants({ taskId }: { taskId: string }) {
     });
     if (!task) return createServiceErrorResponse("NOT_FOUND", "Task not found");
 
-    const descendantIds = await collectDescendantIds(taskId, task.projectId);
+    const descendants = await collectDescendantNodes(taskId, task.projectId);
 
     const activeTimer = await client.activeTimer.findFirst({
-      where: { taskId: { in: descendantIds } },
+      where: { taskId: { in: descendants.map((d) => d.id) } },
     });
     return createSuccessResponseWithData(!!activeTimer);
   }, "Failed to check active timers for task");
@@ -369,14 +374,14 @@ export function completeTask({
         );
       }
 
-      const descendantIds = await collectDescendantIds(
+      const descendants = await collectDescendantNodes(
         taskId,
         task.projectId,
         tx,
       );
 
       const activeTimer = await tx.activeTimer.findFirst({
-        where: { taskId: { in: descendantIds } },
+        where: { taskId: { in: descendants.map((d) => d.id) } },
       });
       if (activeTimer) {
         return createServiceErrorResponse(
@@ -389,13 +394,13 @@ export function completeTask({
         "COMPLETE",
         task,
         ancestors,
-        descendantIds,
+        descendants,
       );
       await executePlan(plan, tx);
 
       return createSuccessResponseWithData({
         id: taskId,
-        completedCount: descendantIds.length,
+        completedCount: plan.setCompletedAt.ids.length,
       });
     });
   }, "Failed to complete task");
@@ -498,14 +503,14 @@ export function archiveTask({
         );
       }
 
-      const descendantIds = await collectDescendantIds(
+      const descendants = await collectDescendantNodes(
         taskId,
         task.projectId,
         tx,
       );
 
       const activeTimer = await tx.activeTimer.findFirst({
-        where: { taskId: { in: descendantIds } },
+        where: { taskId: { in: descendants.map((d) => d.id) } },
       });
       if (activeTimer) {
         return createServiceErrorResponse(
@@ -518,13 +523,13 @@ export function archiveTask({
         "ARCHIVE",
         task,
         ancestors,
-        descendantIds,
+        descendants,
       );
       await executePlan(plan, tx);
 
       return createSuccessResponseWithData({
         id: taskId,
-        archivedCount: descendantIds.length,
+        archivedCount: plan.setArchivedAt.ids.length,
       });
     });
   }, "Failed to archive task");
