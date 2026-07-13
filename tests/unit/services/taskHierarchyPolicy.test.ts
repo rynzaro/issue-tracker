@@ -79,6 +79,20 @@ describe("validateTransition — COMPLETE", () => {
       valid: true,
     });
   });
+
+  it("fails when the task itself is archived", () => {
+    const task = node("t1", null, { archivedAt: now });
+    const result = validateTransition("COMPLETE", task, []);
+    expect(result.valid).toBe(false);
+    if (!result.valid) expect(result.error.message).toBe("Task is archived");
+  });
+
+  it("fails when the task itself is deleted", () => {
+    const task = node("t1", null, { deletedAt: now });
+    const result = validateTransition("COMPLETE", task, []);
+    expect(result.valid).toBe(false);
+    if (!result.valid) expect(result.error.message).toBe("Task is deleted");
+  });
 });
 
 // ─── validateTransition: UNCOMPLETE ────────────────────────────────────────────
@@ -128,6 +142,20 @@ describe("validateTransition — UNCOMPLETE", () => {
     expect(result.valid).toBe(false);
     if (!result.valid) expect(result.error.code).toBe("UNEXPECTED_ERROR");
   });
+
+  it("fails when the task itself is archived", () => {
+    const task = node("t1", null, { completedAt: now, archivedAt: now });
+    const result = validateTransition("UNCOMPLETE", task, []);
+    expect(result.valid).toBe(false);
+    if (!result.valid) expect(result.error.message).toBe("Task is archived");
+  });
+
+  it("fails when the task itself is deleted", () => {
+    const task = node("t1", null, { completedAt: now, deletedAt: now });
+    const result = validateTransition("UNCOMPLETE", task, []);
+    expect(result.valid).toBe(false);
+    if (!result.valid) expect(result.error.message).toBe("Task is deleted");
+  });
 });
 
 // ─── validateTransition: ARCHIVE ───────────────────────────────────────────────
@@ -160,6 +188,21 @@ describe("validateTransition — ARCHIVE", () => {
     const result = validateTransition("ARCHIVE", task, ancestors);
     expect(result.valid).toBe(false);
     if (!result.valid) expect(result.error.code).toBe("UNEXPECTED_ERROR");
+  });
+
+  it("fails when the task itself is already archived", () => {
+    const task = node("t1", null, { archivedAt: now });
+    const result = validateTransition("ARCHIVE", task, []);
+    expect(result.valid).toBe(false);
+    if (!result.valid)
+      expect(result.error.message).toBe("Task is already archived");
+  });
+
+  it("fails when the task itself is deleted", () => {
+    const task = node("t1", null, { deletedAt: now });
+    const result = validateTransition("ARCHIVE", task, []);
+    expect(result.valid).toBe(false);
+    if (!result.valid) expect(result.error.message).toBe("Task is deleted");
   });
 });
 
@@ -199,6 +242,21 @@ describe("validateTransition — UNARCHIVE", () => {
     expect(result.valid).toBe(false);
     if (!result.valid) expect(result.error.code).toBe("UNEXPECTED_ERROR");
   });
+
+  it("fails when the task itself is not archived", () => {
+    const task = node("t1", null);
+    const result = validateTransition("UNARCHIVE", task, []);
+    expect(result.valid).toBe(false);
+    if (!result.valid)
+      expect(result.error.message).toBe("Task is not archived");
+  });
+
+  it("fails when the task itself is deleted", () => {
+    const task = node("t1", null, { archivedAt: now, deletedAt: now });
+    const result = validateTransition("UNARCHIVE", task, []);
+    expect(result.valid).toBe(false);
+    if (!result.valid) expect(result.error.message).toBe("Task is deleted");
+  });
 });
 
 // ─── validateTransition: DELETE ────────────────────────────────────────────────
@@ -223,6 +281,13 @@ describe("validateTransition — DELETE", () => {
     const result = validateTransition("DELETE", task, ancestors);
     expect(result.valid).toBe(false);
     if (!result.valid) expect(result.error.code).toBe("UNEXPECTED_ERROR");
+  });
+
+  it("fails when the task itself is already deleted", () => {
+    const task = node("t1", null, { deletedAt: now });
+    const result = validateTransition("DELETE", task, []);
+    expect(result.valid).toBe(false);
+    if (!result.valid) expect(result.error.message).toBe("Task is deleted");
   });
 });
 
@@ -264,6 +329,13 @@ describe("validateTransition — UNDELETE", () => {
     expect(validateTransition("UNDELETE", task, ancestors)).toEqual({
       valid: true,
     });
+  });
+
+  it("fails when the task itself is not deleted", () => {
+    const task = node("t1", null);
+    const result = validateTransition("UNDELETE", task, []);
+    expect(result.valid).toBe(false);
+    if (!result.valid) expect(result.error.message).toBe("Task is not deleted");
   });
 });
 

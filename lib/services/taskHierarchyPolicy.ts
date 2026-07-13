@@ -52,14 +52,49 @@ function ok(): ValidationResult {
 }
 
 /**
- * Validate whether a hierarchy transition is legal given the ancestor chain.
- * `ancestors` is ordered nearest-parent → root.
+ * Self-state legality: whether the task's own flags permit this transition.
+ * Services additionally filter their fetches (e.g. `deletedAt: null`) for
+ * visibility and NOT_FOUND masking; legality itself is judged here.
+ */
+function validateSelfState(
+  kind: TransitionKind,
+  task: LineageNode,
+): ValidationResult {
+  if (task.deletedAt && kind !== "UNDELETE")
+    return fail("UNEXPECTED_ERROR", "Task is deleted");
+  switch (kind) {
+    case "COMPLETE":
+    case "UNCOMPLETE":
+      if (task.archivedAt) return fail("UNEXPECTED_ERROR", "Task is archived");
+      return ok();
+    case "ARCHIVE":
+      if (task.archivedAt)
+        return fail("UNEXPECTED_ERROR", "Task is already archived");
+      return ok();
+    case "UNARCHIVE":
+      if (!task.archivedAt)
+        return fail("UNEXPECTED_ERROR", "Task is not archived");
+      return ok();
+    case "UNDELETE":
+      if (!task.deletedAt)
+        return fail("UNEXPECTED_ERROR", "Task is not deleted");
+      return ok();
+    case "DELETE":
+      return ok();
+  }
+}
+
+/**
+ * Validate whether a hierarchy transition is legal given the task's own state
+ * and the ancestor chain. `ancestors` is ordered nearest-parent → root.
  */
 export function validateTransition(
   kind: TransitionKind,
   task: LineageNode,
   ancestors: LineageNode[],
 ): ValidationResult {
+  const self = validateSelfState(kind, task);
+  if (!self.valid) return self;
   switch (kind) {
     case "COMPLETE":
       return validateComplete(ancestors);
