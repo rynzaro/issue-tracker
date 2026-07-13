@@ -98,6 +98,12 @@ export function updateTimeEntry({
         "User does not own this time entry",
       );
 
+    const task = await client.task.findUnique({
+      where: { id: existing.taskId, deletedAt: null },
+      select: { id: true },
+    });
+    if (!task) return createServiceErrorResponse("NOT_FOUND", "Task not found");
+
     const updated = await client.timeEntry.update({
       where: { id: timeEntryId },
       data: {
@@ -129,6 +135,12 @@ export function deleteTimeEntry({
         "AUTHORIZATION_ERROR",
         "User does not own this time entry",
       );
+
+    const task = await client.task.findUnique({
+      where: { id: existing.taskId, deletedAt: null },
+      select: { id: true },
+    });
+    if (!task) return createServiceErrorResponse("NOT_FOUND", "Task not found");
 
     await client.timeEntry.delete({
       where: { id: timeEntryId },

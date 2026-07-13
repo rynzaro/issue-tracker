@@ -61,6 +61,7 @@ describe("getActiveTimer", () => {
 
     expect(db.activeTimer.findUnique).toHaveBeenCalledWith({
       where: { userId: "specific-user" },
+      include: { task: { select: { title: true } } },
     });
   });
 });
