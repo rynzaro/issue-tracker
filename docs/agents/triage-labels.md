@@ -12,12 +12,9 @@ The skills speak in terms of five canonical triage roles. This file maps those r
 
 When a skill mentions a role (e.g. "apply the AFK-ready triage label"), use the corresponding label string from this table.
 
-## Repo-specific extras (not part of the canonical five)
+## Commitment labels
 
-| Label          | Meaning                                                          |
-| -------------- | ---------------------------------------------------------------- |
-| `gate:passed`  | Learning gate passed before ticket creation (evidence on ticket) |
-| `gate:waived`  | Felix explicitly waived the gate ("pass")                        |
-| `gate:pending` | Bulk-migrated legacy ticket — gate runs before implementation    |
+Two labels say how decided a piece of work is:
 
-`ready-for-human` is the default state for well-specified work: Felix implements by default (CLAUDE.md contract). `ready-for-agent` only after explicit delegation.
+- `backlog` — accepted, not scheduled. We want this, someday.
+- `idea` — not decided. Explore first (research / prototype / grill); build maybe never. Never milestoned. The issue body must have a **Warnings** section: the decisions elsewhere that would hurt or kill the idea. After exploring: promote to `backlog`, or close as `wontfix` and write down what we learned.

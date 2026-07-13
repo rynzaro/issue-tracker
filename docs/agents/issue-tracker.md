@@ -13,10 +13,6 @@ Issues and PRDs for this repo live as GitHub issues on `rynzaro/issue-tracker`. 
 
 Infer the repo from `git remote -v` — `gh` does this automatically when run inside a clone.
 
-## Repo-specific: learning-gate labels
-
-Every ticket carries one gate label (see CLAUDE.md contract): `gate:passed`, `gate:waived`, or `gate:pending` (bulk-migrated legacy tickets only). A ticket moving into implementation with `gate:pending` should trigger the gate first.
-
 ## Pull requests as a triage surface
 
 **PRs as a request surface: no.** _(Set to `yes` if this repo treats external PRs as feature requests; `/triage` reads this flag.)_

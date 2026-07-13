@@ -22,3 +22,13 @@ If the concept you need isn't in the glossary yet, that's a signal — either yo
 If your output contradicts an existing ADR, surface it explicitly rather than silently overriding:
 
 > _Contradicts ADR-0007 (task status via datetime flags) — but worth reopening because…_
+
+## Check idea warnings
+
+Ideas (`gh issue list --label idea`) are not planned work, but each body has a **Warnings** section: decisions that would hurt or kill that idea.
+
+Before a hard-to-reverse decision — schema migration, event shapes, anything ADR-worthy — read the Warnings of the open ideas. If your decision matches one, tell Felix before making it:
+
+> _This hurts idea #39 (Toggl import): no source field on TimeEntry means imported entries can never be told apart. Decide anyway?_
+
+Felix decides at the fork. Never quietly design an idea out; never secretly build for one either.
