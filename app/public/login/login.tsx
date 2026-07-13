@@ -6,9 +6,8 @@ import { Checkbox, CheckboxField } from "@/components/checkbox";
 import { Field, Label } from "@/components/fieldset";
 import { Heading } from "@/components/heading";
 import { Input } from "@/components/input";
-import { Strong, SecondaryText, TextLink } from "@/components/text";
+import { ErrorText, Strong, SecondaryText, TextLink } from "@/components/text";
 import { authenticate } from "@/lib/actions/auth.actions";
-import { ExclamationCircleIcon } from "@heroicons/react/16/solid";
 import { useSearchParams } from "next/navigation";
 import { useActionState } from "react";
 
@@ -47,9 +46,16 @@ export default function Login() {
           </SecondaryText>
         </div>
         <input type="hidden" name="redirectTo" value={callbackUrl} />
-        <Button type="submit" className="w-full" aria-disabled={isPending}>
-          Login
-        </Button>
+        <div>
+          {errorMessage && (
+            <ErrorText className="mb-4" role="alert">
+              {errorMessage}
+            </ErrorText>
+          )}
+          <Button type="submit" className="w-full" aria-disabled={isPending}>
+            Login
+          </Button>
+        </div>
         <SecondaryText>
           Don’t have an account?{" "}
           <TextLink href="/public/sign-up">
