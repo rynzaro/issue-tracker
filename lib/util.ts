@@ -1,5 +1,3 @@
-import { TaskNode } from "./schema/task";
-
 export type ApiErrorCode =
   | "ZOD_VALIDATION_ERROR"
   | "INTERNAL_SERVER_ERROR"
@@ -103,29 +101,4 @@ export function formatTime(
   }
 }
 
-export function getActiveDescendantElapsed(task: TaskNode): number {
-  if (task.activeTimerStartedAt) {
-    const start = new Date(task.activeTimerStartedAt).getTime();
-    return Math.floor((Date.now() - start) / 1000);
-  }
 
-  for (const child of task.children) {
-    const elapsed = getActiveDescendantElapsed(child);
-    if (elapsed > 0) return elapsed;
-  }
-
-  return 0;
-}
-
-export function getActiveDescendantStartedAt(task: TaskNode): Date | null {
-  if (task.activeTimerStartedAt) {
-    return task.activeTimerStartedAt;
-  }
-
-  for (const child of task.children) {
-    const startedAt = getActiveDescendantStartedAt(child);
-    if (startedAt) return startedAt;
-  }
-
-  return null;
-}
