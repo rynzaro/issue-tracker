@@ -64,8 +64,14 @@ function validateSelfState(
     return fail("UNEXPECTED_ERROR", "Task is deleted");
   switch (kind) {
     case "COMPLETE":
+      if (task.archivedAt) return fail("UNEXPECTED_ERROR", "Task is archived");
+      if (task.completedAt)
+        return fail("UNEXPECTED_ERROR", "Task is already completed");
+      return ok();
     case "UNCOMPLETE":
       if (task.archivedAt) return fail("UNEXPECTED_ERROR", "Task is archived");
+      if (!task.completedAt)
+        return fail("UNEXPECTED_ERROR", "Task is not completed");
       return ok();
     case "ARCHIVE":
       if (task.archivedAt)

@@ -87,6 +87,14 @@ describe("validateTransition — COMPLETE", () => {
     if (!result.valid) expect(result.error.message).toBe("Task is archived");
   });
 
+  it("fails when the task itself is already completed", () => {
+    const task = node("t1", null, { completedAt: now });
+    const result = validateTransition("COMPLETE", task, []);
+    expect(result.valid).toBe(false);
+    if (!result.valid)
+      expect(result.error.message).toBe("Task is already completed");
+  });
+
   it("fails when the task itself is deleted", () => {
     const task = node("t1", null, { deletedAt: now });
     const result = validateTransition("COMPLETE", task, []);
@@ -148,6 +156,14 @@ describe("validateTransition — UNCOMPLETE", () => {
     const result = validateTransition("UNCOMPLETE", task, []);
     expect(result.valid).toBe(false);
     if (!result.valid) expect(result.error.message).toBe("Task is archived");
+  });
+
+  it("fails when the task itself is not completed", () => {
+    const task = node("t1", null);
+    const result = validateTransition("UNCOMPLETE", task, []);
+    expect(result.valid).toBe(false);
+    if (!result.valid)
+      expect(result.error.message).toBe("Task is not completed");
   });
 
   it("fails when the task itself is deleted", () => {
