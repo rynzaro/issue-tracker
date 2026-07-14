@@ -1,5 +1,7 @@
+import { TaskEventType } from "@prisma/client";
 import client from "@/lib/prisma";
 import { CreateTaskParams, UpdateTaskParams } from "../schema/task";
+import { emitEvent } from "./event.service";
 import {
   createServiceErrorResponse,
   createSuccessResponseWithData,
@@ -163,29 +165,51 @@ export function createTask({
       }
     }
 
-    const task = await client.task.create({
-      data: {
-        title: createTaskParams.title,
-        description: createTaskParams.description,
-        estimate: createTaskParams.estimate,
-        project: { connect: { id: createTaskParams.projectId } },
-        createdBy: { connect: { id: userId } },
-        ...(createTaskParams.parentId
-          ? { parent: { connect: { id: createTaskParams.parentId } } }
-          : {}),
-        todoItems: {
-          create: createTaskParams.todoItems?.map((todo) => ({
-            title: todo.title,
-            estimate: todo.estimate,
-          })),
+    const task = await client.$transaction(async (tx) => {
+      const created = await tx.task.create({
+        data: {
+          title: createTaskParams.title,
+          description: createTaskParams.description,
+          estimate: createTaskParams.estimate,
+          project: { connect: { id: createTaskParams.projectId } },
+          createdBy: { connect: { id: userId } },
+          ...(createTaskParams.parentId
+            ? { parent: { connect: { id: createTaskParams.parentId } } }
+            : {}),
+          todoItems: {
+            create: createTaskParams.todoItems?.map((todo) => ({
+              title: todo.title,
+              estimate: todo.estimate,
+            })),
+          },
+          taskTags: {
+            create: createTaskParams.tagIds?.map((tagId) => ({
+              tag: { connect: { id: tagId } },
+              user: { connect: { id: userId } },
+            })),
+          },
         },
-        taskTags: {
-          create: createTaskParams.tagIds?.map((tagId) => ({
-            tag: { connect: { id: tagId } },
-            user: { connect: { id: userId } },
-          })),
+      });
+
+      // CREATED marks the task's birth: title always, estimate/parentId only
+      // when set. A task born with an estimate is fully covered here — no
+      // separate ESTIMATE_CHANGED fires at creation (#51).
+      await emitEvent(tx, {
+        taskId: created.id,
+        userId,
+        type: TaskEventType.CREATED,
+        payload: {
+          title: createTaskParams.title,
+          ...(createTaskParams.estimate !== undefined
+            ? { estimate: createTaskParams.estimate }
+            : {}),
+          ...(createTaskParams.parentId
+            ? { parentId: createTaskParams.parentId }
+            : {}),
         },
-      },
+      });
+
+      return created;
     });
     return createSuccessResponseWithData(task);
   }, "Failed to create task");
@@ -204,7 +228,7 @@ export function updateTask({
   return serviceAction(async () => {
     const task = await client.task.findUnique({
       where: { id: updateTaskParams.id, deletedAt: null, archivedAt: null },
-      select: { project: { select: { userId: true } } },
+      select: { estimate: true, project: { select: { userId: true } } },
     });
     if (!task) {
       return createServiceErrorResponse("NOT_FOUND", "Task not found");
@@ -222,24 +246,46 @@ export function updateTask({
       );
     }
 
-    const updatedTask = await client.task.update({
-      where: { id: updateTaskParams.id },
-      data: {
-        title: updateTaskParams.title,
-        description: updateTaskParams.description,
-        estimate: updateTaskParams.estimate,
-        ...(updateTaskParams.tagIds !== null
-          ? {
-              taskTags: {
-                deleteMany: { userId },
-                create: updateTaskParams.tagIds.map((tagId) => ({
-                  tag: { connect: { id: tagId } },
-                  user: { connect: { id: userId } },
-                })),
-              },
-            }
-          : {}),
-      },
+    const oldEstimate = task.estimate;
+
+    const updatedTask = await client.$transaction(async (tx) => {
+      const updated = await tx.task.update({
+        where: { id: updateTaskParams.id },
+        data: {
+          title: updateTaskParams.title,
+          description: updateTaskParams.description,
+          estimate: updateTaskParams.estimate,
+          ...(updateTaskParams.tagIds !== null
+            ? {
+                taskTags: {
+                  deleteMany: { userId },
+                  create: updateTaskParams.tagIds.map((tagId) => ({
+                    tag: { connect: { id: tagId } },
+                    user: { connect: { id: userId } },
+                  })),
+                },
+              }
+            : {}),
+        },
+      });
+
+      // ESTIMATE_CHANGED fires only on a real change. `undefined` means the
+      // caller left estimate untouched (Prisma skips it), and an equal value is
+      // a no-op — neither belongs in the audit trail. `old` is nullable since
+      // the task may have had no estimate.
+      if (
+        updateTaskParams.estimate !== undefined &&
+        updateTaskParams.estimate !== oldEstimate
+      ) {
+        await emitEvent(tx, {
+          taskId: updateTaskParams.id,
+          userId,
+          type: TaskEventType.ESTIMATE_CHANGED,
+          payload: { old: oldEstimate, new: updateTaskParams.estimate },
+        });
+      }
+
+      return updated;
     });
     return createSuccessResponseWithData(updatedTask);
   }, "Failed to update task");
