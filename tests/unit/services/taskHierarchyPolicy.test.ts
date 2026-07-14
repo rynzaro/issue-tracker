@@ -360,11 +360,24 @@ describe("validateTransition — UNDELETE", () => {
 describe("buildTransitionPlan — COMPLETE", () => {
   it("completes all descendants", () => {
     const task = node("t1", null);
-    const plan = buildTransitionPlan("COMPLETE", task, [], ["t1", "t2", "t3"]);
+    const descendants = [task, node("t2", "t1"), node("t3", "t2")];
+    const plan = buildTransitionPlan("COMPLETE", task, [], descendants);
     expect(plan.setCompletedAt.ids).toEqual(["t1", "t2", "t3"]);
     expect(plan.setCompletedAt.value).toBeInstanceOf(Date);
     expect(plan.setArchivedAt.ids).toEqual([]);
     expect(plan.setDeletedAt.ids).toEqual([]);
+  });
+
+  it("stops at an already-completed descendant and keeps its date", () => {
+    const task = node("t1", null);
+    const descendants = [
+      task,
+      node("t2", "t1", { completedAt: now }), // finished earlier — keep its date
+      node("t3", "t1"),
+      node("t4", "t2", { completedAt: now }), // below the stop — not walked
+    ];
+    const plan = buildTransitionPlan("COMPLETE", task, [], descendants);
+    expect(plan.setCompletedAt.ids).toEqual(["t1", "t3"]);
   });
 });
 
@@ -406,9 +419,22 @@ describe("buildTransitionPlan — UNCOMPLETE", () => {
 describe("buildTransitionPlan — ARCHIVE", () => {
   it("archives all descendants", () => {
     const task = node("t1", null);
-    const plan = buildTransitionPlan("ARCHIVE", task, [], ["t1", "t2"]);
+    const descendants = [task, node("t2", "t1")];
+    const plan = buildTransitionPlan("ARCHIVE", task, [], descendants);
     expect(plan.setArchivedAt.ids).toEqual(["t1", "t2"]);
     expect(plan.setArchivedAt.value).toBeInstanceOf(Date);
+  });
+
+  it("stops at an already-archived descendant and keeps its date", () => {
+    const task = node("t1", null);
+    const descendants = [
+      task,
+      node("t2", "t1", { archivedAt: now }), // archived earlier — keep its date
+      node("t3", "t1"),
+      node("t4", "t2", { archivedAt: now }), // below the stop — not walked
+    ];
+    const plan = buildTransitionPlan("ARCHIVE", task, [], descendants);
+    expect(plan.setArchivedAt.ids).toEqual(["t1", "t3"]);
   });
 });
 
@@ -447,11 +473,28 @@ describe("buildTransitionPlan — UNARCHIVE", () => {
 // ─── buildTransitionPlan: DELETE ───────────────────────────────────────────────
 
 describe("buildTransitionPlan — DELETE", () => {
-  it("deletes all descendants", () => {
+  it("deletes all descendants including archived ones", () => {
     const task = node("t1", null);
-    const plan = buildTransitionPlan("DELETE", task, [], ["t1", "t2", "t3"]);
+    const descendants = [
+      task,
+      node("t2", "t1", { archivedAt: now }), // archived but not deleted — still deleted
+      node("t3", "t2"),
+    ];
+    const plan = buildTransitionPlan("DELETE", task, [], descendants);
     expect(plan.setDeletedAt.ids).toEqual(["t1", "t2", "t3"]);
     expect(plan.setDeletedAt.value).toBeInstanceOf(Date);
+  });
+
+  it("stops at an already-deleted descendant and keeps its date", () => {
+    const task = node("t1", null);
+    const descendants = [
+      task,
+      node("t2", "t1", { deletedAt: now }), // deleted earlier — keep its date
+      node("t3", "t1"),
+      node("t4", "t2", { deletedAt: now }), // below the stop — not walked
+    ];
+    const plan = buildTransitionPlan("DELETE", task, [], descendants);
+    expect(plan.setDeletedAt.ids).toEqual(["t1", "t3"]);
   });
 });
 
