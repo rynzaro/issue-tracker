@@ -1,0 +1,53 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Glossary — codebase design</title>
+<link rel="stylesheet" href="../assets/course.css">
+<main>
+  <h1>Glossary</h1>
+  <p class="kicker">The eight words this course uses, exactly as <code>.claude/skills/codebase-design/SKILL.md</code> defines them. Print me.</p>
+
+  <table>
+    <tr><th>Term</th><th>Meaning</th><th>Do not say</th></tr>
+    <tr><td class="term" id="module">Module</td>
+      <td>Anything with an interface and an implementation. Scale-agnostic: a function, a class, a package, a tier-spanning slice.</td>
+      <td>unit, component, service</td></tr>
+    <tr><td class="term" id="interface">Interface</td>
+      <td>Everything a caller must know to use the module correctly — types, but also invariants, ordering rules, error modes, config, performance.</td>
+      <td>API, signature</td></tr>
+    <tr><td class="term" id="implementation">Implementation</td>
+      <td>What is inside the module — its body of code.</td>
+      <td>—</td></tr>
+    <tr><td class="term" id="depth">Depth</td>
+      <td>Behaviour per unit of interface. <b>Deep</b> = a lot of behaviour behind a small interface. <b>Shallow</b> = interface almost as complex as the implementation.</td>
+      <td>—</td></tr>
+    <tr><td class="term" id="seam">Seam</td>
+      <td>A place where you can change behaviour without editing at that place; where a module's interface lives. Term from Michael Feathers.</td>
+      <td>boundary</td></tr>
+    <tr><td class="term" id="adapter">Adapter</td>
+      <td>A concrete thing that fills an interface at a seam. Names the role, not the substance.</td>
+      <td>—</td></tr>
+    <tr><td class="term" id="leverage">Leverage</td>
+      <td>What <em>callers</em> get from depth: more capability per unit of interface learned. One implementation pays back across N call sites and M tests.</td>
+      <td>—</td></tr>
+    <tr><td class="term" id="locality">Locality</td>
+      <td>What <em>maintainers</em> get from depth: changes, bugs, knowledge, verification concentrate in one place. Fix once, fixed everywhere.</td>
+      <td>—</td></tr>
+  </table>
+
+  <h2>The four principles</h2>
+  <table>
+    <tr><td class="term" id="deletion-test">Deletion test</td>
+      <td>Imagine deleting the module. Complexity vanishes → it was a pass-through. Complexity reappears across N callers → it was earning its keep.</td></tr>
+    <tr><td class="term" id="test-surface">Interface is the test surface</td>
+      <td>Callers and tests cross the same seam. Wanting to test <em>past</em> the interface means the module is probably the wrong shape.</td></tr>
+    <tr><td class="term" id="two-adapters">One adapter, two adapters</td>
+      <td>One adapter = a hypothetical seam. Two adapters = a real one. Don't add a seam unless something actually varies across it.</td></tr>
+    <tr><td class="term" id="depth-of-interface">Depth lives at the interface</td>
+      <td>A deep module may be built of small swappable parts inside — they just are not part of the interface.</td></tr>
+  </table>
+
+  <div class="footerlinks">
+    Back to <a href="../lessons/0001-depth-the-one-measurement.html">Lesson 1</a> ·
+    Source vocabulary: <code>.claude/skills/codebase-design/SKILL.md</code>
+  </div>
+</main>

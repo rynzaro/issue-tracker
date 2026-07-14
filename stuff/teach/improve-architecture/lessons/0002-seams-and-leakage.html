@@ -1,0 +1,95 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lesson 2 — Seams and leakage</title>
+<link rel="stylesheet" href="../assets/course.css">
+<main>
+  <h1>Seams — and what leaks across them</h1>
+  <p class="kicker">Lesson 2 · ~10 minutes · reads your own <code>tasks.tsx</code> and <code>lib/util.ts</code></p>
+
+  <div class="note">
+    <b>First, from memory</b> (no peeking at <a href="0001-depth-the-one-measurement.html">Lesson 1</a>): what does the deletion test ask? Say it out loud, then check the <a href="../reference/glossary.html#deletion-test">glossary</a>. Retrieval like this is what makes it stick.
+  </div>
+
+  <h2>The idea</h2>
+  <p>A <a href="../reference/glossary.html#seam">seam</a> is a spot in the code where <em>what actually runs is decided somewhere else</em> — by what a caller passes in, what adapter is plugged in, what data arrives. You can make that spot behave differently (a test passes a fake, production passes the real thing) without ever editing the spot itself. That is where a module's <a href="../reference/glossary.html#interface">interface</a> lives. The term is Michael Feathers'. Your biggest seam is server → client: everything the server hands the client is interface, whether you meant it or not.</p>
+  <p><b>Leakage</b> (Ousterhout: <em>information leakage</em>) is when implementation knowledge shows up on the caller's side of the seam. The caller now depends on <em>how</em> the module works, not just <em>what</em> it answers. Change the how, and code beyond the seam breaks — the whole point of the module is defeated.</p>
+
+  <div class="note">
+    <b>The quick probe: who recomputes?</b> If a caller recomputes something the implementation already knew, the seam leaks. The knowledge crossed in a shrunken form, and the caller had to grow it back.
+  </div>
+
+  <h2>Leak 1 — the boolean that used to be a Date</h2>
+  <p>Open <code>lib/services/project.service.ts:302-314</code>. The server walks the whole task tree, post-order, and while doing so it <em>knows</em> which descendant timer is running and when it started. Then it ships only <code>hasActiveDescendant: boolean</code> (<code>lib/schema/task.ts:51</code>).</p>
+  <p>Now open <code>app/s/project/[project-id]/tasks.tsx:86-91</code>: the client needs that start Date after all — so it calls <code>getActiveDescendantStartedAt</code> (<code>lib/util.ts:120-131</code>), which <b>re-walks the subtree</b> to recover what the server threw away.</p>
+  <pre>server:  walks tree, knows Date  →  ships boolean   ✂ answer shrunk
+client:  needs Date              →  walks tree again ↻ leak made visible</pre>
+  <p>The client now contains tree-traversal knowledge — pure implementation. If the server changes how activity is derived (say, multiple timers), <code>lib/util.ts</code> silently disagrees. Same disease as Lesson 1's six loaders: one fact, two owners. Fix: nodes carry <code>activeDescendantStartedAt: Date | null</code> — the seam ships the <em>full answer</em>, and the client function gets deleted.</p>
+
+  <h2>Leak 2 — the type that snuck into the interface</h2>
+  <p><code>archiveTaskList.tsx:4</code> (a <code>'use client'</code> file) imports <code>TaskParentInfo</code> from <code>project.service.ts:460</code>. A service-internal type is now part of the client's world — nobody decided that; an import made it so. Reshape the service's internals and a client file breaks. That's the definition of leakage: the seam grew without a design decision.</p>
+
+  <h2>Practice — 5 minutes, real code</h2>
+  <p>Apply <b>who recomputes?</b> to one more place yourself: the archive page's <code>getRestoreCheck</code> (<code>archiveTaskList.tsx</code>) versus the policy's <code>validateUndelete</code> (<code>taskHierarchyPolicy.ts</code>). Both decide restore legality. Which side owns the rule? Do they agree? Write your answer down in one sentence — we'll compare it against the review's finding next session.</p>
+
+  <div class="quiz" data-quiz></div>
+
+  <h2>Primary source</h2>
+  <p>Ousterhout, <em>A Philosophy of Software Design</em>, ch. 5 "Information Hiding (and Leakage)" — the chapter this lesson compresses. No book at hand? The <a href="https://www.youtube.com/watch?v=bmSAYlu0NcY">Talks at Google video</a> covers it around the middle. Seam origin: Feathers, <em>Working Effectively with Legacy Code</em>, ch. 4.</p>
+
+  <div class="footerlinks">
+    <a href="0001-depth-the-one-measurement.html">← Lesson 1</a> ·
+    <a href="../reference/glossary.html">Glossary</a> ·
+    <a href="../reference/architecture-review-20260710-201757.html">Your architecture review</a> ·
+    next: design the applyTransition interface yourself
+    <p class="ask">Anything unclear? Ask your agent — it can open any of these files with you and trace the leak line by line.</p>
+  </div>
+</main>
+<script src="../assets/quiz.js"></script>
+<script>
+renderQuiz(document.querySelector('[data-quiz]'), [
+  {
+    stem: "A seam is…",
+    options: [
+      "where behaviour can change without editing",
+      "where two files import each other",
+      "where the client meets the server",
+      "where a module's tests are located"
+    ],
+    answer: 0,
+    explain: "Feathers' definition. Server→client is one seam of many — any interface location is a seam."
+  },
+  {
+    stem: "Leakage means…",
+    options: [
+      "implementation knowledge shows up in callers",
+      "private data escapes to the network",
+      "modules share a common database table",
+      "errors cross from server to client"
+    ],
+    answer: 0,
+    explain: "It is about knowledge, not data or security. The caller learns how the module works and now depends on it."
+  },
+  {
+    stem: "The hasActiveDescendant leak — what should cross the seam instead?",
+    options: [
+      "the full answer: the start Date",
+      "the whole timer object every render",
+      "a callback the server can invoke",
+      "a flag plus the tree depth"
+    ],
+    answer: 0,
+    explain: "Ship what callers actually need (activeDescendantStartedAt: Date | null), and the client's re-walk gets deleted."
+  },
+  {
+    stem: "TaskParentInfo imported into a 'use client' file is a problem because…",
+    options: [
+      "an internal type silently became interface",
+      "client bundles grow with server code",
+      "types cannot cross the network safely",
+      "the import creates a circular dependency"
+    ],
+    answer: 0,
+    explain: "The seam widened without a decision. Everything a caller can see is interface — imports included."
+  }
+]);
+</script>

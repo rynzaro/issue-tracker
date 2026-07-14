@@ -1,0 +1,102 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lesson 1 — Depth, the one measurement</title>
+<link rel="stylesheet" href="../assets/course.css">
+<main>
+  <h1>Depth — the one measurement</h1>
+  <p class="kicker">Lesson 1 · ~10 minutes · reads your own <code>task.service.ts</code></p>
+
+  <p><b>Why this lesson:</b> your architecture reviews rank everything by one idea — <a href="../reference/glossary.html#depth">depth</a>. If you can measure depth yourself, you can rank refactors yourself. That is the mission.</p>
+
+  <h2>The idea</h2>
+  <p>A <a href="../reference/glossary.html#module">module</a> has two sizes: the size of its <a href="../reference/glossary.html#interface">interface</a> (everything a caller must know) and the size of its <a href="../reference/glossary.html#implementation">implementation</a> (everything it does). <b>Depth is the ratio.</b></p>
+
+  <div class="depth-figure">
+    <figure>
+      <div class="module-box" style="width:11rem">
+        <div class="iface">small interface</div>
+        <div class="impl" style="height:9rem">a lot of behaviour</div>
+      </div>
+      <figcaption>deep — good</figcaption>
+    </figure>
+    <figure>
+      <div class="module-box" style="width:16rem">
+        <div class="iface" style="padding:1rem .6rem">large, complicated interface</div>
+        <div class="impl" style="height:2.2rem">thin pass-through</div>
+      </div>
+      <figcaption>shallow — the interface costs almost as much to learn as the code it hides</figcaption>
+    </figure>
+  </div>
+
+  <p>This is John Ousterhout's core claim: the point of a module is to <em>hide complexity</em>. A shallow module makes you learn an interface but hides nothing in return — it adds cost without paying anything back.</p>
+
+  <div class="note">
+    <b>The deletion test</b> — the fastest depth probe. Imagine deleting the module. If the complexity just <em>vanishes</em>, it was a shallow pass-through. If the complexity <em>reappears, copied into every caller</em>, the module was deep — it was earning its keep. (<a href="../reference/glossary.html#deletion-test">glossary</a>)
+  </div>
+
+  <h2>Now look at your own code</h2>
+  <p>Open <code>lib/services/task.service.ts</code>. Six functions — delete, complete, uncomplete, archive, unarchive, restore — each re-type the same sequence: <code>load → auth → validate → timer&nbsp;guard → plan → execute</code>.</p>
+  <p>Run the deletion test <em>in reverse</em>: the deep module (<code>applyTransition</code>) does not exist yet, so its implementation is already living "copied into every caller" — six times. The <code>completeTask</code>/<code>archivedAt</code> bug from your review exists <em>only because</em> there are six copies of the load step. That is what missing <a href="../reference/glossary.html#locality">locality</a> looks like: one fix needed six times.</p>
+  <p>Contrast: <code>taskHierarchyPolicy.ts</code> <em>passes</em> the deletion test. Delete it, and ancestor-legality rules reappear in every mutation. It is deep — small interface (<code>validateTransition</code>), 280 lines of rules and a 401-line test behind it.</p>
+
+  <div class="quiz" data-quiz></div>
+
+  <h2>Primary source</h2>
+  <p>Watch <a href="https://www.youtube.com/watch?v=bmSAYlu0NcY">Ousterhout — “A Philosophy of Software Design”, Talks at Google (2018)</a>. One hour; the deep/shallow section is the heart of it. His book of the same name (2nd ed.) is the course backbone if you want more.</p>
+
+  <div class="footerlinks">
+    <a href="../reference/glossary.html">Glossary</a> ·
+    <a href="../reference/architecture-review-20260710-201757.html">Your architecture review</a> ·
+    <a href="0002-seams-and-leakage.html">Lesson 2 — Seams and leakage →</a>
+    <p class="ask">Anything unclear? Ask your agent — it wrote this lesson, knows the reviews, and can walk through any file in the repo with you.</p>
+  </div>
+</main>
+<script src="../assets/quiz.js"></script>
+<script>
+renderQuiz(document.querySelector('[data-quiz]'), [
+  {
+    stem: "A module is deep when…",
+    options: [
+      "much behaviour hides behind small interface",
+      "much behaviour sits behind large interface",
+      "little behaviour hides behind small interface",
+      "internal code is split into layers"
+    ],
+    answer: 0,
+    explain: "Depth = behaviour per unit of interface. Both sizes matter; only the ratio counts."
+  },
+  {
+    stem: "The deletion test asks: if this module vanished…",
+    options: [
+      "would its complexity reappear across callers",
+      "would its tests still pass unchanged",
+      "would its interface become more simple",
+      "would its callers compile without errors"
+    ],
+    answer: 0,
+    explain: "Reappearing complexity means the module was concentrating something real. Vanishing complexity means pass-through."
+  },
+  {
+    stem: "Six transition functions in task.service.ts repeat load → auth → validate → plan → execute. The depth problem is…",
+    options: [
+      "the orchestration knowledge spreads across callers",
+      "the functions accept too many parameters",
+      "the policy module is too pure",
+      "the functions are too long individually"
+    ],
+    answer: 0,
+    explain: "The sequence is implementation knowledge with no home — so every bug fix must land six times. Missing locality."
+  },
+  {
+    stem: "Depth is a property of…",
+    options: [
+      "the interface, not the implementation inside",
+      "the implementation, not the interface outside",
+      "the test suite, not the module",
+      "the caller count, not the code"
+    ],
+    answer: 0,
+    explain: "A deep module may be made of small swappable parts inside — they just are not part of the interface."
+  }
+]);
+</script>
