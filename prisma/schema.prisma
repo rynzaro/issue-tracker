@@ -24,6 +24,7 @@ model User {
     tags            Tag[]
     appliedTaskTags TaskTag[]    @relation("AppliedTaskTags")
     activeTimer     ActiveTimer?
+    taskEvents      TaskEvent[]
 }
 
 model Project {
@@ -110,9 +111,14 @@ model TaskEvent {
     id        String        @id @default(cuid())
     taskId    String
     task      Task          @relation(fields: [taskId], references: [id])
+    userId    String // the acting user (actor)
+    user      User          @relation(fields: [userId], references: [id])
     eventType TaskEventType
     payload   Json
     createdAt DateTime      @default(now())
+
+    @@index([taskId])
+    @@index([userId])
 }
 
 model TodoItem {
@@ -188,17 +194,21 @@ model CheckpointTask {
 }
 
 enum TaskEventType {
-    ESTIMATE_SET
+    CREATED
+    STARTED
+    COMPLETED
+    UNCOMPLETED
+    ARCHIVED
+    UNARCHIVED
+    DELETED
+    RESTORED
     ESTIMATE_CHANGED
     SUBTASK_CREATED
     SUBTASK_REMOVED
+    TAGS_CHANGED
     TODO_ADDED
     TODO_CONVERTED
     TODO_COMPLETED
-    TASK_STARTED
-    TASK_COMPLETED
-    TASK_STATUS_CHANGED
-    TAGS_CHANGED
     CHECKPOINT_CREATED
 }
 
