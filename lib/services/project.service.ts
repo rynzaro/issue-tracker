@@ -315,9 +315,11 @@ export function getProjectTaskTree({
         (c) => c.status === "IN_PROGRESS" || c.hasActiveDescendant,
       );
       node.hasActiveDescendant = activeDescendant !== undefined;
+      // Shallowest wins: a shared subtree's viewer can't see ancestors,
+      // so the subtree root's own timer must take priority over deeper ones.
       node.activeDescendantStartedAt = activeDescendant
-        ? (activeDescendant.activeDescendantStartedAt ??
-          activeDescendant.activeTimerStartedAt)
+        ? (activeDescendant.activeTimerStartedAt ??
+          activeDescendant.activeDescendantStartedAt)
         : null;
 
       node.totalTimeSpent = node.children.reduce(
