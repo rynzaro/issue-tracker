@@ -104,6 +104,39 @@ describe("startActiveTimer", () => {
     }
   });
 
+  it("returns VALIDATION_ERROR when the task is archived", async () => {
+    db.task.findUnique.mockResolvedValue(
+      buildTask({ createdById: "test-user-1", archivedAt: new Date() }),
+    );
+
+    const result = await startActiveTimer({
+      userId: "test-user-1",
+      taskId: "test-task-1",
+    });
+
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.code).toBe("VALIDATION_ERROR");
+    }
+    expect(db.$transaction).not.toHaveBeenCalled();
+  });
+
+  it("checks ownership before the archived state (archived is not leaked to non-owners)", async () => {
+    db.task.findUnique.mockResolvedValue(
+      buildTask({ createdById: "other-user", archivedAt: new Date() }),
+    );
+
+    const result = await startActiveTimer({
+      userId: "test-user-1",
+      taskId: "test-task-1",
+    });
+
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.code).toBe("AUTHORIZATION_ERROR");
+    }
+  });
+
   it("creates ActiveTimer when no existing timer exists", async () => {
     db.task.findUnique.mockResolvedValue(
       buildTask({ createdById: "test-user-1" }),

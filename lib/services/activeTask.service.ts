@@ -49,13 +49,20 @@ export function startActiveTimer({
     // TODO: Replace with project membership/role check when collaboration is implemented
     const task = await client.task.findUnique({
       where: { id: taskId, deletedAt: null },
-      select: { createdById: true },
+      select: { createdById: true, archivedAt: true },
     });
     if (!task) return createServiceErrorResponse("NOT_FOUND", "Task not found");
     if (task.createdById !== userId)
       return createServiceErrorResponse(
         "AUTHORIZATION_ERROR",
         "User does not have access to this task",
+      );
+    // Archive is frozen state: an archived subtree must hold no running timer
+    // (the reverse direction of archiveTask's running-descendant-timer block).
+    if (task.archivedAt)
+      return createServiceErrorResponse(
+        "VALIDATION_ERROR",
+        "Cannot start a timer on an archived task",
       );
 
     const result = await client.$transaction(async (tx) => {
