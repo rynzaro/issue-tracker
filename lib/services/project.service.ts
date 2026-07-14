@@ -285,6 +285,7 @@ export function getProjectTaskTree({
         totalTimeSpent,
         activeTimerStartedAt:
           task.id === activeTaskId ? activeTimerStartedAt : null,
+        activeDescendantStartedAt: null,
         sumOfChildrenEstimates: 0,
         hasEstimateOverflow: false,
       });
@@ -309,9 +310,16 @@ export function getProjectTaskTree({
         : node.id === activeTaskId
           ? "IN_PROGRESS"
           : "OPEN";
-      node.hasActiveDescendant = node.children.some(
+
+      const activeDescendant = node.children.find(
         (c) => c.status === "IN_PROGRESS" || c.hasActiveDescendant,
       );
+      node.hasActiveDescendant = activeDescendant !== undefined;
+      node.activeDescendantStartedAt = activeDescendant
+        ? (activeDescendant.activeDescendantStartedAt ??
+          activeDescendant.activeTimerStartedAt)
+        : null;
+
       node.totalTimeSpent = node.children.reduce(
         (sum, c) => sum + c.totalTimeSpent,
         node.totalTimeSpent,
@@ -362,6 +370,7 @@ function buildTaskNodeTree(flatTasks: TaskWithIncludes[]): TaskNode[] {
       hasActiveDescendant: false,
       totalTimeSpent,
       activeTimerStartedAt: null,
+      activeDescendantStartedAt: null,
       sumOfChildrenEstimates: 0,
       hasEstimateOverflow: false,
     });
