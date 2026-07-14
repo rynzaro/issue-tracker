@@ -1,5 +1,7 @@
+import { Prisma, TaskEventType } from "@prisma/client";
 import client from "@/lib/prisma";
 import { CreateTaskParams, UpdateTaskParams } from "../schema/task";
+import { emitEvent, type EmitEventInput } from "./event.service";
 import {
   createServiceErrorResponse,
   createSuccessResponseWithData,
@@ -91,6 +93,61 @@ async function executePlan(plan: TransitionPlan, tx: DbClient): Promise<void> {
       where: { id: { in: plan.setDeletedAt.ids } },
       data: { deletedAt: plan.setDeletedAt.value },
     });
+  }
+}
+
+/**
+ * The six hierarchy-transition verbs. All share `statusTransitionPayload`
+ * (`{at, causedBy?}`) in event.service, so a single payload shape is valid for
+ * whichever verb this helper is handed.
+ */
+type TransitionEventType =
+  | typeof TaskEventType.COMPLETED
+  | typeof TaskEventType.UNCOMPLETED
+  | typeof TaskEventType.ARCHIVED
+  | typeof TaskEventType.UNARCHIVED
+  | typeof TaskEventType.DELETED
+  | typeof TaskEventType.RESTORED;
+
+/**
+ * Emit one TaskEvent per task changed by a hierarchy transition (ADR-0020).
+ *
+ * `changed` is the transition plan's slot for the flag this verb touches. Its
+ * `ids` are already pruned, so descendants halted by the #44 stop rule — and any
+ * task the transition left unchanged — are absent and emit nothing. Its `value`
+ * is the stamped date, or null when the verb clears the flag (upward repairs) —
+ * then the event time is the act's time, now. The direct target (`targetTaskId`)
+ * gets `{at}`; every other changed task (a cascaded descendant, or an ancestor
+ * repaired by an upward transition) gets `{at, causedBy: targetTaskId}` under
+ * the SAME event `type`. Runs on the caller's `tx`, so a failure here rolls the
+ * whole transition back.
+ */
+async function emitTransitionEvents(
+  tx: Prisma.TransactionClient,
+  {
+    type,
+    userId,
+    targetTaskId,
+    changed,
+  }: {
+    type: TransitionEventType;
+    userId: string;
+    targetTaskId: string;
+    changed: { ids: string[]; value: Date | null };
+  },
+): Promise<void> {
+  const at = changed.value ?? new Date();
+  for (const id of changed.ids) {
+    // Every `TransitionEventType` maps to the same `statusTransitionPayload`, so
+    // this input satisfies whichever of the six arms `type` selects — TS checks
+    // that by distributing the literal over the extracted union, no cast needed.
+    const input: Extract<EmitEventInput, { type: TransitionEventType }> = {
+      taskId: id,
+      userId,
+      type,
+      payload: id === targetTaskId ? { at } : { at, causedBy: targetTaskId },
+    };
+    await emitEvent(tx, input);
   }
 }
 
@@ -307,6 +364,12 @@ export function deleteTask({
 
       const plan = buildTransitionPlan("DELETE", task, ancestors, descendants);
       await executePlan(plan, tx);
+      await emitTransitionEvents(tx, {
+        type: TaskEventType.DELETED,
+        userId,
+        targetTaskId: task.id,
+        changed: plan.setDeletedAt,
+      });
 
       return createSuccessResponseWithData({
         id: taskId,
@@ -397,6 +460,12 @@ export function completeTask({
         descendants,
       );
       await executePlan(plan, tx);
+      await emitTransitionEvents(tx, {
+        type: TaskEventType.COMPLETED,
+        userId,
+        targetTaskId: task.id,
+        changed: plan.setCompletedAt,
+      });
 
       return createSuccessResponseWithData({
         id: taskId,
@@ -451,6 +520,12 @@ export function uncompleteTask({
 
       const plan = buildTransitionPlan("UNCOMPLETE", task, ancestors);
       await executePlan(plan, tx);
+      await emitTransitionEvents(tx, {
+        type: TaskEventType.UNCOMPLETED,
+        userId,
+        targetTaskId: task.id,
+        changed: plan.setCompletedAt,
+      });
 
       return createSuccessResponseWithData({
         id: taskId,
@@ -526,6 +601,12 @@ export function archiveTask({
         descendants,
       );
       await executePlan(plan, tx);
+      await emitTransitionEvents(tx, {
+        type: TaskEventType.ARCHIVED,
+        userId,
+        targetTaskId: task.id,
+        changed: plan.setArchivedAt,
+      });
 
       return createSuccessResponseWithData({
         id: taskId,
@@ -577,6 +658,12 @@ export function unarchiveTask({
 
       const plan = buildTransitionPlan("UNARCHIVE", task, ancestors);
       await executePlan(plan, tx);
+      await emitTransitionEvents(tx, {
+        type: TaskEventType.UNARCHIVED,
+        userId,
+        targetTaskId: task.id,
+        changed: plan.setArchivedAt,
+      });
 
       return createSuccessResponseWithData({ id: taskId });
     });
@@ -625,6 +712,12 @@ export function restoreDeletedTask({
 
       const plan = buildTransitionPlan("UNDELETE", task, ancestors);
       await executePlan(plan, tx);
+      await emitTransitionEvents(tx, {
+        type: TaskEventType.RESTORED,
+        userId,
+        targetTaskId: task.id,
+        changed: plan.setDeletedAt,
+      });
 
       return createSuccessResponseWithData({
         id: taskId,
