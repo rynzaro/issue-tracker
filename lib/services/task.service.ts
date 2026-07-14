@@ -191,6 +191,24 @@ export function createTask({
         },
       });
 
+      // CREATED marks the task's birth: title always, estimate/parentId only
+      // when set. A task born with an estimate is fully covered here — no
+      // separate ESTIMATE_CHANGED fires at creation (#51).
+      await emitEvent(tx, {
+        taskId: created.id,
+        userId,
+        type: TaskEventType.CREATED,
+        payload: {
+          title: createTaskParams.title,
+          ...(createTaskParams.estimate !== undefined
+            ? { estimate: createTaskParams.estimate }
+            : {}),
+          ...(createTaskParams.parentId
+            ? { parentId: createTaskParams.parentId }
+            : {}),
+        },
+      });
+
       // Record the new subtask on its direct parent's event trail (#52).
       // Emitted on the parent only; creation has no cascade to exclude.
       if (createTaskParams.parentId) {
@@ -221,7 +239,7 @@ export function updateTask({
   return serviceAction(async () => {
     const task = await client.task.findUnique({
       where: { id: updateTaskParams.id, deletedAt: null, archivedAt: null },
-      select: { project: { select: { userId: true } } },
+      select: { estimate: true, project: { select: { userId: true } } },
     });
     if (!task) {
       return createServiceErrorResponse("NOT_FOUND", "Task not found");
@@ -241,6 +259,7 @@ export function updateTask({
 
     // null means "leave tags untouched"; an array (even empty) edits the set.
     const tagIds = updateTaskParams.tagIds;
+    const oldEstimate = task.estimate;
 
     const updatedTask = await client.$transaction(async (tx) => {
       // Snapshot the tag set before the update so a TAGS_CHANGED event can record
@@ -274,6 +293,22 @@ export function updateTask({
             : {}),
         },
       });
+
+      // ESTIMATE_CHANGED fires only on a real change. `undefined` means the
+      // caller left estimate untouched (Prisma skips it), and an equal value is
+      // a no-op — neither belongs in the audit trail. `old` is nullable since
+      // the task may have had no estimate.
+      if (
+        updateTaskParams.estimate !== undefined &&
+        updateTaskParams.estimate !== oldEstimate
+      ) {
+        await emitEvent(tx, {
+          taskId: updateTaskParams.id,
+          userId,
+          type: TaskEventType.ESTIMATE_CHANGED,
+          payload: { old: oldEstimate, new: updateTaskParams.estimate },
+        });
+      }
 
       // Emit only on a real change: re-submitting the same set (in any order)
       // is a no-op and must not leave a spurious audit event.
