@@ -165,29 +165,44 @@ export function createTask({
       }
     }
 
-    const task = await client.task.create({
-      data: {
-        title: createTaskParams.title,
-        description: createTaskParams.description,
-        estimate: createTaskParams.estimate,
-        project: { connect: { id: createTaskParams.projectId } },
-        createdBy: { connect: { id: userId } },
-        ...(createTaskParams.parentId
-          ? { parent: { connect: { id: createTaskParams.parentId } } }
-          : {}),
-        todoItems: {
-          create: createTaskParams.todoItems?.map((todo) => ({
-            title: todo.title,
-            estimate: todo.estimate,
-          })),
+    const task = await client.$transaction(async (tx) => {
+      const created = await tx.task.create({
+        data: {
+          title: createTaskParams.title,
+          description: createTaskParams.description,
+          estimate: createTaskParams.estimate,
+          project: { connect: { id: createTaskParams.projectId } },
+          createdBy: { connect: { id: userId } },
+          ...(createTaskParams.parentId
+            ? { parent: { connect: { id: createTaskParams.parentId } } }
+            : {}),
+          todoItems: {
+            create: createTaskParams.todoItems?.map((todo) => ({
+              title: todo.title,
+              estimate: todo.estimate,
+            })),
+          },
+          taskTags: {
+            create: createTaskParams.tagIds?.map((tagId) => ({
+              tag: { connect: { id: tagId } },
+              user: { connect: { id: userId } },
+            })),
+          },
         },
-        taskTags: {
-          create: createTaskParams.tagIds?.map((tagId) => ({
-            tag: { connect: { id: tagId } },
-            user: { connect: { id: userId } },
-          })),
-        },
-      },
+      });
+
+      // Record the new subtask on its direct parent's event trail (#52).
+      // Emitted on the parent only; creation has no cascade to exclude.
+      if (createTaskParams.parentId) {
+        await emitEvent(tx, {
+          taskId: createTaskParams.parentId,
+          userId,
+          type: TaskEventType.SUBTASK_CREATED,
+          payload: { childTaskId: created.id, childTitle: created.title },
+        });
+      }
+
+      return created;
     });
     return createSuccessResponseWithData(task);
   }, "Failed to create task");
@@ -296,6 +311,7 @@ export function deleteTask({
       where: { id: taskId, deletedAt: null },
       select: {
         id: true,
+        title: true, // for the SUBTASK_REMOVED payload on the parent (#52)
         parentId: true,
         projectId: true,
         completedAt: true,
@@ -346,6 +362,18 @@ export function deleteTask({
 
       const plan = buildTransitionPlan("DELETE", task, ancestors, descendants);
       await executePlan(plan, tx);
+
+      // Record the removal on the former direct parent's trail (#52). Only the
+      // directly-deleted task notifies its parent; descendants swept up by the
+      // same cascade do not emit (ADR-0020 boundary).
+      if (task.parentId) {
+        await emitEvent(tx, {
+          taskId: task.parentId,
+          userId,
+          type: TaskEventType.SUBTASK_REMOVED,
+          payload: { childTaskId: task.id, childTitle: task.title },
+        });
+      }
 
       return createSuccessResponseWithData({
         id: taskId,
