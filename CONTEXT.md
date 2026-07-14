@@ -66,7 +66,7 @@ Lightweight pre-task checklist entry on a task; convertible to sub-task, lineage
 M:N; tags scoped per-user (ADR-0013); junction records who applied it (ADR-0014).
 
 **TaskEvent**:
-Append-only audit row per mutation, 12 types, Zod-validated payloads. Records the acting user. Pure audit trail: task state (datetime flags, ADR-0007) stays authoritative; events describe changes, never define them. A missed emission is a logging bug, not corruption.
+Append-only audit row per domain-meaningful mutation, 16 types, Zod-validated payloads. Records the acting user. Write-once: later corrections live in state, never in past events. Purpose: raw material for estimation-misjudgement analysis (alongside Checkpoints); no UI surface of its own. Pure audit trail: task state (datetime flags, ADR-0007) stays authoritative; events describe changes, never define them. A missed emission is a logging bug, not corruption.
 
 **Status**:
 Derived from datetime flags, no enum (ADR-0007): `completedAt`, `archivedAt`, `deletedAt` (soft delete, ADR-0009). All three restorable via hierarchy transitions.
