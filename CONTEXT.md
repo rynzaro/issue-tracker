@@ -90,10 +90,10 @@ Derived from datetime flags, no enum (ADR-0007): `completedAt`, `archivedAt`, `d
 6. Soft-deleted rows filtered from every query.
 7. Toggl optional everywhere.
 
-## Current state (verified against code 2026-07-12)
+## Current state (verified against code 2026-07-14)
 
-- **Implemented**: auth, project/task CRUD, hierarchy transitions incl. archive/restore/undelete, timers (ActiveTimer→TimeEntry), soft delete, default project, sidebar layout, toast system.
-- **Modeled, not wired**: tags (schema + service params; zero UI, no tag CRUD — #5), TaskEvent emission (`event.service.ts` exists; zero `emitEvent` call sites in mutating services), checkpoint auto-triggers, analysis dashboard, TodoItem UI, Toggl integration.
+- **Implemented**: auth, project/task CRUD, hierarchy transitions incl. archive/restore/undelete, timers (ActiveTimer→TimeEntry), soft delete, default project, sidebar layout, toast system, TaskEvent emission (Iteration 2, #23: emitEvent in event.service.ts + wiring for CREATED/STARTED/ESTIMATE_CHANGED/SUBTASK_*/TAGS_CHANGED/hierarchy verbs; TODO_*/CHECKPOINT_CREATED types dormant).
+- **Modeled, not wired**: tags (schema + service params; zero UI, no tag CRUD — #5), checkpoint auto-triggers, analysis dashboard, TodoItem UI, Toggl integration.
 - Schema source of truth: `prisma/schema.prisma` — never trust a doc's schema copy over it.
 - Backlog + pending decisions: GitHub issues (`docs/agents/issue-tracker.md`).
 

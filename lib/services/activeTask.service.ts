@@ -6,6 +6,7 @@ import {
   serviceQuery,
   serviceQueryOrNotFound,
 } from "./serviceUtil";
+import { emitStartedOnce } from "./startedEvent";
 import { calculateDurationInSeconds } from "../util";
 
 export function getActiveTimer({ userId }: { userId: string }) {
@@ -81,6 +82,9 @@ export function startActiveTimer({
       const newActiveTimer = await tx.activeTimer.create({
         data: { userId, taskId, startedAt: now },
       });
+
+      // Record the task's first work; no-op if a STARTED already exists (#55).
+      await emitStartedOnce(tx, { taskId, userId, startedAt: now });
 
       return { activeTimer: newActiveTimer, timeEntry: createdTimeEntry };
     });

@@ -1,7 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { TaskEventType } from "@prisma/client";
 import {
   createMockPrismaClient,
+  mockTx,
   type MockPrismaClient,
+  type MockTx,
 } from "@/tests/helpers/prisma-mock";
 import { buildTask, buildTimeEntry } from "@/tests/helpers/factories";
 
@@ -19,6 +22,7 @@ import {
 import prisma from "@/lib/prisma";
 
 const db = prisma as unknown as MockPrismaClient;
+const tx = mockTx as MockTx;
 
 // ─── getTimeEntriesForTask ─────────────────────────────────────────────────────
 
@@ -179,8 +183,10 @@ describe("createManualTimeEntry", () => {
     db.task.findUnique.mockResolvedValue(
       buildTask({ createdById: "test-user-1" }),
     );
+    // Runs inside a $transaction since #55, so the create rides the tx client.
+    db.$transaction.mockImplementation((fn) => fn(tx));
     const created = buildTimeEntry({ duration: 3600 });
-    db.timeEntry.create.mockResolvedValue(created);
+    tx.timeEntry.create.mockResolvedValue(created);
 
     const result = await createManualTimeEntry({
       userId: "test-user-1",
@@ -193,7 +199,7 @@ describe("createManualTimeEntry", () => {
     if (result.success) {
       expect(result.data).toEqual(created);
     }
-    expect(db.timeEntry.create).toHaveBeenCalledWith({
+    expect(tx.timeEntry.create).toHaveBeenCalledWith({
       data: {
         task: { connect: { id: "test-task-1" } },
         user: { connect: { id: "test-user-1" } },
@@ -218,6 +224,90 @@ describe("createManualTimeEntry", () => {
       where: { id: "test-task-1", deletedAt: null },
       select: { createdById: true },
     });
+  });
+});
+
+// ─── createManualTimeEntry — STARTED event ───────────────────────────────────────
+
+describe("createManualTimeEntry — STARTED event", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    db.$transaction.mockImplementation((fn) => fn(tx));
+    db.task.findUnique.mockResolvedValue(
+      buildTask({ createdById: "test-user-1" }),
+    );
+    tx.timeEntry.create.mockResolvedValue(buildTimeEntry());
+  });
+
+  it("emits STARTED with the entry's start time when the task has no prior STARTED", async () => {
+    tx.taskEvent.findFirst.mockResolvedValue(null);
+
+    await createManualTimeEntry({
+      userId: "test-user-1",
+      taskId: "test-task-1",
+      startedAt: new Date("2026-01-01T10:00:00Z"),
+      stoppedAt: new Date("2026-01-01T11:00:00Z"),
+    });
+
+    expect(tx.taskEvent.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          taskId: "test-task-1",
+          userId: "test-user-1",
+          eventType: TaskEventType.STARTED,
+          payload: { startedAt: "2026-01-01T10:00:00.000Z" },
+        }),
+      }),
+    );
+  });
+
+  it("does not re-emit STARTED for a backdated entry when one already exists", async () => {
+    // Task already started (via timer or an earlier entry); a later, backdated
+    // manual entry must not move or duplicate STARTED (#23: corrections live in state).
+    tx.taskEvent.findFirst.mockResolvedValue({ id: "existing-started" });
+
+    await createManualTimeEntry({
+      userId: "test-user-1",
+      taskId: "test-task-1",
+      startedAt: new Date("2025-12-01T08:00:00Z"), // backdated before the existing STARTED
+      stoppedAt: new Date("2025-12-01T09:00:00Z"),
+    });
+
+    expect(tx.taskEvent.create).not.toHaveBeenCalled();
+  });
+
+  it("scopes the prior-STARTED guard to this task and event type", async () => {
+    tx.taskEvent.findFirst.mockResolvedValue(null);
+
+    await createManualTimeEntry({
+      userId: "test-user-1",
+      taskId: "test-task-1",
+      startedAt: new Date("2026-01-01T10:00:00Z"),
+      stoppedAt: new Date("2026-01-01T11:00:00Z"),
+    });
+
+    expect(tx.taskEvent.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          taskId: "test-task-1",
+          eventType: TaskEventType.STARTED,
+        }),
+      }),
+    );
+  });
+
+  it("fails the action (rolls back) when the STARTED emit throws", async () => {
+    tx.taskEvent.findFirst.mockResolvedValue(null);
+    tx.taskEvent.create.mockRejectedValue(new Error("emit failed"));
+
+    const result = await createManualTimeEntry({
+      userId: "test-user-1",
+      taskId: "test-task-1",
+      startedAt: new Date("2026-01-01T10:00:00Z"),
+      stoppedAt: new Date("2026-01-01T11:00:00Z"),
+    });
+
+    expect(result.success).toBe(false);
   });
 });
 

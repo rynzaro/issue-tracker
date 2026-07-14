@@ -4,6 +4,7 @@ import {
   createSuccessResponseWithData,
   serviceAction,
 } from "./serviceUtil";
+import { emitStartedOnce } from "./startedEvent";
 import { calculateDurationInSeconds } from "../util";
 
 // ─── Reads ─────────────────────────────────────────────────────────────────────
@@ -61,14 +62,24 @@ export function createManualTimeEntry({
         "User does not have access to this task",
       );
 
-    const entry = await client.timeEntry.create({
-      data: {
-        task: { connect: { id: taskId } },
-        user: { connect: { id: userId } },
-        startedAt,
-        stoppedAt,
-        duration: calculateDurationInSeconds(startedAt, stoppedAt),
-      },
+    // Transaction so the entry and any first-work STARTED event commit together
+    // (emit failure rolls back the entry). This path was single-statement before #55.
+    const entry = await client.$transaction(async (tx) => {
+      const created = await tx.timeEntry.create({
+        data: {
+          task: { connect: { id: taskId } },
+          user: { connect: { id: userId } },
+          startedAt,
+          stoppedAt,
+          duration: calculateDurationInSeconds(startedAt, stoppedAt),
+        },
+      });
+
+      // Record the task's first work; no-op if a STARTED already exists —
+      // a backdated entry never moves or re-emits it (#55).
+      await emitStartedOnce(tx, { taskId, userId, startedAt });
+
+      return created;
     });
 
     return createSuccessResponseWithData(entry);
