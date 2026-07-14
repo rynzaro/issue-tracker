@@ -1,5 +1,3 @@
-import { ServiceErrorResponse } from "./serviceUtil";
-
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
 export type TransitionKind =
@@ -32,11 +30,17 @@ const EMPTY_PLAN: TransitionPlan = {
 
 // ─── Validation ────────────────────────────────────────────────────────────────
 
-type ValidationError = {
-  code: ServiceErrorResponse["error"]["code"];
+/**
+ * The policy's own error type — deliberately not the service error shape, so
+ * this domain module stays importable from client code (#57, #59). Splitting
+ * a dedicated TRANSITION_INVALID code out of UNEXPECTED_ERROR is #14.
+ */
+export type TransitionErrorCode = "UNEXPECTED_ERROR";
+export type ValidationError = {
+  code: TransitionErrorCode;
   message: string;
 };
-type ValidationResult =
+export type ValidationResult =
   | { valid: true }
   | { valid: false; error: ValidationError };
 

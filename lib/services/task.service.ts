@@ -12,7 +12,7 @@ import {
   buildTransitionPlan,
   type LineageNode,
   type TransitionPlan,
-} from "./taskHierarchyPolicy";
+} from "../domain/taskHierarchyPolicy";
 
 // ─── Shared Helpers ────────────────────────────────────────────────────────────
 

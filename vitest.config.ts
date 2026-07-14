@@ -10,6 +10,7 @@ export default defineConfig({
     coverage: {
       provider: "v8",
       include: [
+        "lib/domain/**",
         "lib/services/**",
         "lib/schema/**",
         "lib/util.ts",
@@ -20,6 +21,7 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": path.resolve(__dirname),
+      "server-only": path.resolve(__dirname, "tests/stubs/server-only.ts"),
     },
   },
 });

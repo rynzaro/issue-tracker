@@ -102,7 +102,9 @@ issue-tracker/
 │   │   ├── task.ts                   # CreateTaskSchema, UpdateTaskSchema, TaskStatus, TaskNode type
 │   │   ├── project.ts               # Project schemas
 │   │   └── timeEntry.ts             # Time entry schemas (placeholder)
-│   ├── services/                     # Business logic (pure functions, Prisma calls)
+│   ├── domain/                       # Pure domain logic, client-importable (no prisma, no server-only)
+│   │   └── taskHierarchyPolicy.ts    # Hierarchy transition validation + plan building (ADR-0018)
+│   ├── services/                     # Business logic (pure functions, Prisma calls) — server-only
 │   │   ├── project.service.ts        # Project reads
 │   │   ├── task.service.ts           # Task CRUD (create, update, hasActiveTimers)
 │   │   ├── timeEntry.service.ts      # Historical time entry queries (future)

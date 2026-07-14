@@ -3,7 +3,7 @@ import {
   validateTransition,
   buildTransitionPlan,
   type LineageNode,
-} from "@/lib/services/taskHierarchyPolicy";
+} from "@/lib/domain/taskHierarchyPolicy";
 
 // ─── Helpers ───────────────────────────────────────────────────────────────────
 

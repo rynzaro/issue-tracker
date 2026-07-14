@@ -1,3 +1,8 @@
+// Guard: fail the build if client code ever imports service utilities (and
+// with them prisma) — domain logic importable from the client lives in
+// lib/domain/ instead (#59).
+import "server-only";
+
 import { Prisma } from "@prisma/client";
 import { z } from "zod";
 

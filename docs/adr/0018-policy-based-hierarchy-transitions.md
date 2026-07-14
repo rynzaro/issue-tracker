@@ -2,7 +2,7 @@
 
 **Context:** Task hierarchy operations (complete, uncomplete, archive, unarchive, delete, restore) each have different rules about which ancestor states are forbidden and how state changes propagate up/down the tree. Inline validation logic was duplicated across service functions.
 
-**Decision:** Extract validation and plan-building into `lib/services/taskHierarchyPolicy.ts`. Each operation is a `TransitionKind`. `validateTransition()` checks ancestor legality; `buildTransitionPlan()` returns a `TransitionPlan` with IDs and values for `completedAt`, `archivedAt`, `deletedAt`. Service functions call validate → build plan → execute plan.
+**Decision:** Extract validation and plan-building into `lib/services/taskHierarchyPolicy.ts` (moved to `lib/domain/taskHierarchyPolicy.ts` in #59 — pure domain logic, client-importable, owns its own error type). Each operation is a `TransitionKind`. `validateTransition()` checks ancestor legality; `buildTransitionPlan()` returns a `TransitionPlan` with IDs and values for `completedAt`, `archivedAt`, `deletedAt`. Service functions call validate → build plan → execute plan.
 
 **Rules per operation:**
 | Operation | Self forbidden states | Downward cascade | Ancestor forbidden states | Ancestor propagation |
