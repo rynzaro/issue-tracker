@@ -33,9 +33,9 @@ export default function SetDefaultButton({
 
     setLoading(false);
 
-    if (result.success) {
-      setShowConfirm(false);
-    } else {
+    setShowConfirm(false);
+
+    if (!result.success) {
       showToast(
         <ErrorToast
           title="Standardprojekt konnte nicht gesetzt werden"

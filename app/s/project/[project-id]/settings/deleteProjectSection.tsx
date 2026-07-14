@@ -35,6 +35,9 @@ export default function DeleteProjectSection({
       router.push("/s/main");
     } else {
       setLoading(false);
+      // Close the dialog first: while it is open the page outside is inert,
+      // so a toast behind it could not be dismissed or read.
+      setShowConfirm(false);
       showToast(
         <ErrorToast
           title="Projekt konnte nicht gelöscht werden"
