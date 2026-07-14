@@ -1,5 +1,7 @@
+import { TaskEventType } from "@prisma/client";
 import client from "@/lib/prisma";
 import { CreateTaskParams, UpdateTaskParams } from "../schema/task";
+import { emitEvent } from "./event.service";
 import {
   createServiceErrorResponse,
   createSuccessResponseWithData,
@@ -222,24 +224,61 @@ export function updateTask({
       );
     }
 
-    const updatedTask = await client.task.update({
-      where: { id: updateTaskParams.id },
-      data: {
-        title: updateTaskParams.title,
-        description: updateTaskParams.description,
-        estimate: updateTaskParams.estimate,
-        ...(updateTaskParams.tagIds !== null
-          ? {
-              taskTags: {
-                deleteMany: { userId },
-                create: updateTaskParams.tagIds.map((tagId) => ({
-                  tag: { connect: { id: tagId } },
-                  user: { connect: { id: userId } },
-                })),
-              },
-            }
-          : {}),
-      },
+    // null means "leave tags untouched"; an array (even empty) edits the set.
+    const tagIds = updateTaskParams.tagIds;
+
+    const updatedTask = await client.$transaction(async (tx) => {
+      // Snapshot the tag set before the update so a TAGS_CHANGED event can record
+      // before/after. Tags are per-user, so scope the read to this actor.
+      const oldTagIds =
+        tagIds !== null
+          ? (
+              await tx.taskTag.findMany({
+                where: { taskId: updateTaskParams.id, userId },
+                select: { tagId: true },
+              })
+            ).map((t) => t.tagId)
+          : [];
+
+      const updated = await tx.task.update({
+        where: { id: updateTaskParams.id },
+        data: {
+          title: updateTaskParams.title,
+          description: updateTaskParams.description,
+          estimate: updateTaskParams.estimate,
+          ...(tagIds !== null
+            ? {
+                taskTags: {
+                  deleteMany: { userId },
+                  create: tagIds.map((tagId) => ({
+                    tag: { connect: { id: tagId } },
+                    user: { connect: { id: userId } },
+                  })),
+                },
+              }
+            : {}),
+        },
+      });
+
+      // Emit only on a real change: re-submitting the same set (in any order)
+      // is a no-op and must not leave a spurious audit event.
+      if (tagIds !== null) {
+        const oldSet = new Set(oldTagIds);
+        const newSet = new Set(tagIds);
+        const tagSetChanged =
+          oldSet.size !== newSet.size ||
+          [...newSet].some((id) => !oldSet.has(id));
+        if (tagSetChanged) {
+          await emitEvent(tx, {
+            taskId: updateTaskParams.id,
+            userId,
+            type: TaskEventType.TAGS_CHANGED,
+            payload: { old: oldTagIds, new: tagIds },
+          });
+        }
+      }
+
+      return updated;
     });
     return createSuccessResponseWithData(updatedTask);
   }, "Failed to update task");
