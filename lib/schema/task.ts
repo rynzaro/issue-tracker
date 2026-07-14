@@ -51,6 +51,7 @@ export type TaskNode = Prisma.TaskGetPayload<{
   hasActiveDescendant: boolean;
   totalTimeSpent: number; // seconds
   activeTimerStartedAt: Date | null;
+  activeDescendantStartedAt: Date | null;
   sumOfChildrenEstimates: number; // minutes
   hasEstimateOverflow: boolean; // true if sumOfChildrenEstimates > estimate
   addSubtaskEstimates: boolean;
