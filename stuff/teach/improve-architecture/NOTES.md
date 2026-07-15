@@ -24,11 +24,19 @@ SHIPPED 2026-07-14: PR #48 (his impl) + PR #49 (order flipped to
 self-first/shallowest wins — his call, reasoning: with future task
 sharing a sharee sees only the subtree, so root's own timer must win).
 Both merged to main-vibe; branches deleted; he's back on main-vibe.
-Next: Lesson 2 homework probe still open (getRestoreCheck vs
-validateUndelete — who owns restore legality, do they agree; answer =
-finding 2 in reference/architecture-review-20260710-185006.html).
-Then: Lesson 3 — he designs applyTransition, I grill (can be demanding,
-see learning record 0002).
+2026-07-14 session 2: Lesson 2 homework CLOSED — he found the drift
+himself, derived restoreLegality-as-derived-state (echoing his
+activeDescendantStartedAt move: derive, don't store). Lesson 3 grill
+DONE: applyTransition design settled, full spec in issue #57. His key
+find: one strength order delete > archive > complete runs both
+transition families (forward cascade stop rule + backward inherit
+rule) — his own generalization from three per-kind lists.
+Side find: bug #56 (timer can start on archived task), filed.
+Next: HE IMPLEMENTS #57 (blocked by #56 — small fix, good warm-up).
+Suggested first slice: pure policy changes (order-driven config + own
+error type + move to lib/domain/), tests through validateTransition/
+buildTransitionPlan only. Agent reviews, does not write practice code.
+Then: spaced retrieval check (mission step 4).
 
 ## Working notes
 
