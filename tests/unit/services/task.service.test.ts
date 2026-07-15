@@ -347,7 +347,9 @@ describe("applyTransition — the policy alone judges legality", () => {
     expect(result.success).toBe(false);
     if (!result.success) {
       expect(result.error.message).toBe(reason);
-      expect(result.error.code).not.toBe("NOT_FOUND");
+      // The tree is fine, the move just is not allowed — and that reaches the
+      // caller as its own code, not as NOT_FOUND and not as a fault (#14).
+      expect(result.error.code).toBe("TRANSITION_INVALID");
     }
   });
 

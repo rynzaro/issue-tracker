@@ -13,6 +13,10 @@ export type ServiceErrorCode =
   | "AUTHORIZATION_ERROR"
   | "UNEXPECTED_ERROR"
   | "VALIDATION_ERROR"
+  // A hierarchy move the rules do not allow on a sound tree — the user's to
+  // fix, not a fault. Raised by the transition policy (#14); UNEXPECTED_ERROR
+  // keeps its meaning of "this should not be possible".
+  | "TRANSITION_INVALID"
   | "NOT_FOUND";
 
 // ─── Response Types ────────────────────────────────────────────────────────────

@@ -65,7 +65,7 @@ describe("validateTransition — COMPLETE", () => {
     const ancestors = [node("t1", null, { deletedAt: now })];
     const result = validateTransition("COMPLETE", task, ancestors);
     expect(result.valid).toBe(false);
-    if (!result.valid) expect(result.error.code).toBe("UNEXPECTED_ERROR");
+    if (!result.valid) expect(result.error.code).toBe("TRANSITION_INVALID");
   });
 
   it("fails when an ancestor is archived", () => {
@@ -73,7 +73,7 @@ describe("validateTransition — COMPLETE", () => {
     const ancestors = [node("t1", null, { archivedAt: now })];
     const result = validateTransition("COMPLETE", task, ancestors);
     expect(result.valid).toBe(false);
-    if (!result.valid) expect(result.error.code).toBe("UNEXPECTED_ERROR");
+    if (!result.valid) expect(result.error.code).toBe("TRANSITION_INVALID");
   });
 
   it("fails when there is a completion gap in ancestors", () => {
@@ -85,8 +85,12 @@ describe("validateTransition — COMPLETE", () => {
     ];
     const result = validateTransition("COMPLETE", task, ancestors);
     expect(result.valid).toBe(false);
-    if (!result.valid)
+    // A gap means invariant 5 is already broken — no user act can ask for
+    // this, so it stays UNEXPECTED_ERROR (#14).
+    if (!result.valid) {
       expect(result.error.message).toBe("Invalid ancestor completion chain");
+      expect(result.error.code).toBe("UNEXPECTED_ERROR");
+    }
   });
 
   it("valid when ancestors are contiguously completed from parent up", () => {
@@ -151,8 +155,12 @@ describe("validateTransition — UNCOMPLETE", () => {
     ];
     const result = validateTransition("UNCOMPLETE", task, ancestors);
     expect(result.valid).toBe(false);
-    if (!result.valid)
+    // A gap means invariant 5 is already broken — no user act can ask for
+    // this, so it stays UNEXPECTED_ERROR (#14).
+    if (!result.valid) {
       expect(result.error.message).toBe("Invalid ancestor completion chain");
+      expect(result.error.code).toBe("UNEXPECTED_ERROR");
+    }
   });
 
   it("fails when an ancestor is deleted", () => {
@@ -160,7 +168,7 @@ describe("validateTransition — UNCOMPLETE", () => {
     const ancestors = [node("t1", null, { deletedAt: now })];
     const result = validateTransition("UNCOMPLETE", task, ancestors);
     expect(result.valid).toBe(false);
-    if (!result.valid) expect(result.error.code).toBe("UNEXPECTED_ERROR");
+    if (!result.valid) expect(result.error.code).toBe("TRANSITION_INVALID");
   });
 
   it("fails when an ancestor is archived", () => {
@@ -168,7 +176,7 @@ describe("validateTransition — UNCOMPLETE", () => {
     const ancestors = [node("t1", null, { archivedAt: now })];
     const result = validateTransition("UNCOMPLETE", task, ancestors);
     expect(result.valid).toBe(false);
-    if (!result.valid) expect(result.error.code).toBe("UNEXPECTED_ERROR");
+    if (!result.valid) expect(result.error.code).toBe("TRANSITION_INVALID");
   });
 
   it("fails when the task itself is archived", () => {
@@ -215,7 +223,7 @@ describe("validateTransition — ARCHIVE", () => {
     const ancestors = [node("t1", null, { archivedAt: now })];
     const result = validateTransition("ARCHIVE", task, ancestors);
     expect(result.valid).toBe(false);
-    if (!result.valid) expect(result.error.code).toBe("UNEXPECTED_ERROR");
+    if (!result.valid) expect(result.error.code).toBe("TRANSITION_INVALID");
   });
 
   it("fails when an ancestor is deleted", () => {
@@ -223,7 +231,7 @@ describe("validateTransition — ARCHIVE", () => {
     const ancestors = [node("t1", null, { deletedAt: now })];
     const result = validateTransition("ARCHIVE", task, ancestors);
     expect(result.valid).toBe(false);
-    if (!result.valid) expect(result.error.code).toBe("UNEXPECTED_ERROR");
+    if (!result.valid) expect(result.error.code).toBe("TRANSITION_INVALID");
   });
 
   it("fails when the task itself is already archived", () => {
@@ -267,8 +275,12 @@ describe("validateTransition — UNARCHIVE", () => {
     const ancestors = [node("t2", "t1"), node("t1", null, { archivedAt: now })];
     const result = validateTransition("UNARCHIVE", task, ancestors);
     expect(result.valid).toBe(false);
-    if (!result.valid)
+    // A gap means invariant 5 is already broken — no user act can ask for
+    // this, so it stays UNEXPECTED_ERROR (#14).
+    if (!result.valid) {
       expect(result.error.message).toBe("Invalid ancestor archive chain");
+      expect(result.error.code).toBe("UNEXPECTED_ERROR");
+    }
   });
 
   it("fails when an ancestor is deleted", () => {
@@ -276,7 +288,7 @@ describe("validateTransition — UNARCHIVE", () => {
     const ancestors = [node("t1", null, { deletedAt: now })];
     const result = validateTransition("UNARCHIVE", task, ancestors);
     expect(result.valid).toBe(false);
-    if (!result.valid) expect(result.error.code).toBe("UNEXPECTED_ERROR");
+    if (!result.valid) expect(result.error.code).toBe("TRANSITION_INVALID");
   });
 
   it("fails when the task itself is not archived", () => {
@@ -316,7 +328,7 @@ describe("validateTransition — DELETE", () => {
     const ancestors = [node("t1", null, { deletedAt: now })];
     const result = validateTransition("DELETE", task, ancestors);
     expect(result.valid).toBe(false);
-    if (!result.valid) expect(result.error.code).toBe("UNEXPECTED_ERROR");
+    if (!result.valid) expect(result.error.code).toBe("TRANSITION_INVALID");
   });
 
   it("fails when the task itself is already deleted", () => {
@@ -352,8 +364,12 @@ describe("validateTransition — UNDELETE", () => {
     const ancestors = [node("t2", "t1"), node("t1", null, { deletedAt: now })];
     const result = validateTransition("UNDELETE", task, ancestors);
     expect(result.valid).toBe(false);
-    if (!result.valid)
+    // A gap means invariant 5 is already broken — no user act can ask for
+    // this, so it stays UNEXPECTED_ERROR (#14).
+    if (!result.valid) {
       expect(result.error.message).toBe("Invalid ancestor deletion chain");
+      expect(result.error.code).toBe("UNEXPECTED_ERROR");
+    }
   });
 
   it("valid when all ancestors are deleted (full chain)", () => {
