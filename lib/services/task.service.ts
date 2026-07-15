@@ -1,7 +1,5 @@
-import { Prisma, TaskEventType } from "@prisma/client";
 import client from "@/lib/prisma";
 import { CreateTaskParams, UpdateTaskParams } from "../schema/task";
-import { emitEvent, type EmitEventInput } from "./event.service";
 import {
   createServiceErrorResponse,
   createSuccessResponseWithData,
@@ -96,61 +94,6 @@ async function executePlan(plan: TransitionPlan, tx: DbClient): Promise<void> {
   }
 }
 
-/**
- * The six hierarchy-transition verbs. All share `statusTransitionPayload`
- * (`{at, causedBy?}`) in event.service, so a single payload shape is valid for
- * whichever verb this helper is handed.
- */
-type TransitionEventType =
-  | typeof TaskEventType.COMPLETED
-  | typeof TaskEventType.UNCOMPLETED
-  | typeof TaskEventType.ARCHIVED
-  | typeof TaskEventType.UNARCHIVED
-  | typeof TaskEventType.DELETED
-  | typeof TaskEventType.RESTORED;
-
-/**
- * Emit one TaskEvent per task changed by a hierarchy transition (ADR-0020).
- *
- * `changed` is the transition plan's slot for the flag this verb touches. Its
- * `ids` are already pruned, so descendants halted by the #44 stop rule — and any
- * task the transition left unchanged — are absent and emit nothing. Its `value`
- * is the stamped date, or null when the verb clears the flag (upward repairs) —
- * then the event time is the act's time, now. The direct target (`targetTaskId`)
- * gets `{at}`; every other changed task (a cascaded descendant, or an ancestor
- * repaired by an upward transition) gets `{at, causedBy: targetTaskId}` under
- * the SAME event `type`. Runs on the caller's `tx`, so a failure here rolls the
- * whole transition back.
- */
-async function emitTransitionEvents(
-  tx: Prisma.TransactionClient,
-  {
-    type,
-    userId,
-    targetTaskId,
-    changed,
-  }: {
-    type: TransitionEventType;
-    userId: string;
-    targetTaskId: string;
-    changed: { ids: string[]; value: Date | null };
-  },
-): Promise<void> {
-  const at = changed.value ?? new Date();
-  for (const id of changed.ids) {
-    // Every `TransitionEventType` maps to the same `statusTransitionPayload`, so
-    // this input satisfies whichever of the six arms `type` selects — TS checks
-    // that by distributing the literal over the extracted union, no cast needed.
-    const input: Extract<EmitEventInput, { type: TransitionEventType }> = {
-      taskId: id,
-      userId,
-      type,
-      payload: id === targetTaskId ? { at } : { at, causedBy: targetTaskId },
-    };
-    await emitEvent(tx, input);
-  }
-}
-
 async function getAllAncestors(
   startingParentId: string | null,
   db: DbClient,
@@ -220,62 +163,29 @@ export function createTask({
       }
     }
 
-    const task = await client.$transaction(async (tx) => {
-      const created = await tx.task.create({
-        data: {
-          title: createTaskParams.title,
-          description: createTaskParams.description,
-          estimate: createTaskParams.estimate,
-          project: { connect: { id: createTaskParams.projectId } },
-          createdBy: { connect: { id: userId } },
-          ...(createTaskParams.parentId
-            ? { parent: { connect: { id: createTaskParams.parentId } } }
-            : {}),
-          todoItems: {
-            create: createTaskParams.todoItems?.map((todo) => ({
-              title: todo.title,
-              estimate: todo.estimate,
-            })),
-          },
-          taskTags: {
-            create: createTaskParams.tagIds?.map((tagId) => ({
-              tag: { connect: { id: tagId } },
-              user: { connect: { id: userId } },
-            })),
-          },
+    const task = await client.task.create({
+      data: {
+        title: createTaskParams.title,
+        description: createTaskParams.description,
+        estimate: createTaskParams.estimate,
+        project: { connect: { id: createTaskParams.projectId } },
+        createdBy: { connect: { id: userId } },
+        ...(createTaskParams.parentId
+          ? { parent: { connect: { id: createTaskParams.parentId } } }
+          : {}),
+        todoItems: {
+          create: createTaskParams.todoItems?.map((todo) => ({
+            title: todo.title,
+            estimate: todo.estimate,
+          })),
         },
-      });
-
-      // CREATED marks the task's birth: title always, estimate/parentId only
-      // when set. A task born with an estimate is fully covered here — no
-      // separate ESTIMATE_CHANGED fires at creation (#51).
-      await emitEvent(tx, {
-        taskId: created.id,
-        userId,
-        type: TaskEventType.CREATED,
-        payload: {
-          title: createTaskParams.title,
-          ...(createTaskParams.estimate !== undefined
-            ? { estimate: createTaskParams.estimate }
-            : {}),
-          ...(createTaskParams.parentId
-            ? { parentId: createTaskParams.parentId }
-            : {}),
+        taskTags: {
+          create: createTaskParams.tagIds?.map((tagId) => ({
+            tag: { connect: { id: tagId } },
+            user: { connect: { id: userId } },
+          })),
         },
-      });
-
-      // Record the new subtask on its direct parent's event trail (#52).
-      // Emitted on the parent only; creation has no cascade to exclude.
-      if (createTaskParams.parentId) {
-        await emitEvent(tx, {
-          taskId: createTaskParams.parentId,
-          userId,
-          type: TaskEventType.SUBTASK_CREATED,
-          payload: { childTaskId: created.id, childTitle: created.title },
-        });
-      }
-
-      return created;
+      },
     });
     return createSuccessResponseWithData(task);
   }, "Failed to create task");
@@ -294,7 +204,7 @@ export function updateTask({
   return serviceAction(async () => {
     const task = await client.task.findUnique({
       where: { id: updateTaskParams.id, deletedAt: null, archivedAt: null },
-      select: { estimate: true, project: { select: { userId: true } } },
+      select: { project: { select: { userId: true } } },
     });
     if (!task) {
       return createServiceErrorResponse("NOT_FOUND", "Task not found");
@@ -312,78 +222,24 @@ export function updateTask({
       );
     }
 
-    // null means "leave tags untouched"; an array (even empty) edits the set.
-    const tagIds = updateTaskParams.tagIds;
-    const oldEstimate = task.estimate;
-
-    const updatedTask = await client.$transaction(async (tx) => {
-      // Snapshot the tag set before the update so a TAGS_CHANGED event can record
-      // before/after. Tags are per-user, so scope the read to this actor.
-      const oldTagIds =
-        tagIds !== null
-          ? (
-              await tx.taskTag.findMany({
-                where: { taskId: updateTaskParams.id, userId },
-                select: { tagId: true },
-              })
-            ).map((t) => t.tagId)
-          : [];
-
-      const updated = await tx.task.update({
-        where: { id: updateTaskParams.id },
-        data: {
-          title: updateTaskParams.title,
-          description: updateTaskParams.description,
-          estimate: updateTaskParams.estimate,
-          ...(tagIds !== null
-            ? {
-                taskTags: {
-                  deleteMany: { userId },
-                  create: tagIds.map((tagId) => ({
-                    tag: { connect: { id: tagId } },
-                    user: { connect: { id: userId } },
-                  })),
-                },
-              }
-            : {}),
-        },
-      });
-
-      // ESTIMATE_CHANGED fires only on a real change. `undefined` means the
-      // caller left estimate untouched (Prisma skips it), and an equal value is
-      // a no-op — neither belongs in the audit trail. `old` is nullable since
-      // the task may have had no estimate.
-      if (
-        updateTaskParams.estimate !== undefined &&
-        updateTaskParams.estimate !== oldEstimate
-      ) {
-        await emitEvent(tx, {
-          taskId: updateTaskParams.id,
-          userId,
-          type: TaskEventType.ESTIMATE_CHANGED,
-          payload: { old: oldEstimate, new: updateTaskParams.estimate },
-        });
-      }
-
-      // Emit only on a real change: re-submitting the same set (in any order)
-      // is a no-op and must not leave a spurious audit event.
-      if (tagIds !== null) {
-        const oldSet = new Set(oldTagIds);
-        const newSet = new Set(tagIds);
-        const tagSetChanged =
-          oldSet.size !== newSet.size ||
-          [...newSet].some((id) => !oldSet.has(id));
-        if (tagSetChanged) {
-          await emitEvent(tx, {
-            taskId: updateTaskParams.id,
-            userId,
-            type: TaskEventType.TAGS_CHANGED,
-            payload: { old: oldTagIds, new: tagIds },
-          });
-        }
-      }
-
-      return updated;
+    const updatedTask = await client.task.update({
+      where: { id: updateTaskParams.id },
+      data: {
+        title: updateTaskParams.title,
+        description: updateTaskParams.description,
+        estimate: updateTaskParams.estimate,
+        ...(updateTaskParams.tagIds !== null
+          ? {
+              taskTags: {
+                deleteMany: { userId },
+                create: updateTaskParams.tagIds.map((tagId) => ({
+                  tag: { connect: { id: tagId } },
+                  user: { connect: { id: userId } },
+                })),
+              },
+            }
+          : {}),
+      },
     });
     return createSuccessResponseWithData(updatedTask);
   }, "Failed to update task");
@@ -401,7 +257,6 @@ export function deleteTask({
       where: { id: taskId, deletedAt: null },
       select: {
         id: true,
-        title: true, // for the SUBTASK_REMOVED payload on the parent (#52)
         parentId: true,
         projectId: true,
         completedAt: true,
@@ -452,24 +307,6 @@ export function deleteTask({
 
       const plan = buildTransitionPlan("DELETE", task, ancestors, descendants);
       await executePlan(plan, tx);
-      await emitTransitionEvents(tx, {
-        type: TaskEventType.DELETED,
-        userId,
-        targetTaskId: task.id,
-        changed: plan.setDeletedAt,
-      });
-
-      // Record the removal on the former direct parent's trail (#52). Only the
-      // directly-deleted task notifies its parent; descendants swept up by the
-      // same cascade do not emit (ADR-0020 boundary).
-      if (task.parentId) {
-        await emitEvent(tx, {
-          taskId: task.parentId,
-          userId,
-          type: TaskEventType.SUBTASK_REMOVED,
-          payload: { childTaskId: task.id, childTitle: task.title },
-        });
-      }
 
       return createSuccessResponseWithData({
         id: taskId,
@@ -560,12 +397,6 @@ export function completeTask({
         descendants,
       );
       await executePlan(plan, tx);
-      await emitTransitionEvents(tx, {
-        type: TaskEventType.COMPLETED,
-        userId,
-        targetTaskId: task.id,
-        changed: plan.setCompletedAt,
-      });
 
       return createSuccessResponseWithData({
         id: taskId,
@@ -620,12 +451,6 @@ export function uncompleteTask({
 
       const plan = buildTransitionPlan("UNCOMPLETE", task, ancestors);
       await executePlan(plan, tx);
-      await emitTransitionEvents(tx, {
-        type: TaskEventType.UNCOMPLETED,
-        userId,
-        targetTaskId: task.id,
-        changed: plan.setCompletedAt,
-      });
 
       return createSuccessResponseWithData({
         id: taskId,
@@ -694,19 +519,8 @@ export function archiveTask({
         );
       }
 
-      const plan = buildTransitionPlan(
-        "ARCHIVE",
-        task,
-        ancestors,
-        descendants,
-      );
+      const plan = buildTransitionPlan("ARCHIVE", task, ancestors, descendants);
       await executePlan(plan, tx);
-      await emitTransitionEvents(tx, {
-        type: TaskEventType.ARCHIVED,
-        userId,
-        targetTaskId: task.id,
-        changed: plan.setArchivedAt,
-      });
 
       return createSuccessResponseWithData({
         id: taskId,
@@ -758,12 +572,6 @@ export function unarchiveTask({
 
       const plan = buildTransitionPlan("UNARCHIVE", task, ancestors);
       await executePlan(plan, tx);
-      await emitTransitionEvents(tx, {
-        type: TaskEventType.UNARCHIVED,
-        userId,
-        targetTaskId: task.id,
-        changed: plan.setArchivedAt,
-      });
 
       return createSuccessResponseWithData({ id: taskId });
     });
@@ -812,12 +620,6 @@ export function restoreDeletedTask({
 
       const plan = buildTransitionPlan("UNDELETE", task, ancestors);
       await executePlan(plan, tx);
-      await emitTransitionEvents(tx, {
-        type: TaskEventType.RESTORED,
-        userId,
-        targetTaskId: task.id,
-        changed: plan.setDeletedAt,
-      });
 
       return createSuccessResponseWithData({
         id: taskId,
