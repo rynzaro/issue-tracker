@@ -55,8 +55,10 @@ export type PlanWrite = {
 
 /**
  * One entry for the audit ledger: this task changed, at this time, because of
- * this transition. `causedBy` names the task the user actually acted on, and
- * is set on every task except that target (ADR-0020).
+ * this transition. `causedBy` names the task that caused the change: the task
+ * the user actually acted on for cascade and repair events, or the ancestor
+ * whose state was taken on for inherit events. Only the acted-on target
+ * itself carries no `causedBy` (ADR-0020).
  *
  * `kind` stays domain vocabulary — mapping it to a stored event type is the
  * service's job, which is what keeps this module free of prisma (#59).
@@ -94,9 +96,10 @@ function writeOne(
  * The state a kind is *about* — the flag it sets or clears on the target. Both
  * directions of a pair share one state, since they move along the same axis.
  *
- * Only writes to this state are the transition's own act, so only they are
- * worth an event. A write to any other state is a side effect the transition
- * makes to keep the tree legal (#63's backdated inherits), and stays silent.
+ * Only writes to this state are the transition's own act. A write to any other
+ * state is a repair the transition makes to keep the tree legal (#63's
+ * backdated inherits) — still a state change, so it gets its own event too,
+ * planned where the repair is decided (`inheritWeakerStates`).
  */
 const OWN_STATE: Record<TransitionKind, TransitionState> = {
   COMPLETE: "completedAt",
@@ -105,6 +108,17 @@ const OWN_STATE: Record<TransitionKind, TransitionState> = {
   UNARCHIVE: "archivedAt",
   DELETE: "deletedAt",
   UNDELETE: "deletedAt",
+};
+
+/**
+ * The forward kind that sets each state — `OWN_STATE` read backwards, keeping
+ * only the setting direction. An inherit event uses it: a task taking on
+ * `archivedAt` was archived, whichever transition made it happen.
+ */
+const KIND_THAT_SETS: Record<TransitionState, TransitionKind> = {
+  completedAt: "COMPLETE",
+  archivedAt: "ARCHIVE",
+  deletedAt: "DELETE",
 };
 
 /**
@@ -392,16 +406,27 @@ export function buildTransitionPlan(
   ancestors: LineageNode[],
   descendants: LineageNode[] = [],
 ): TransitionPlan {
-  const writes = buildWrites(kind, task, ancestors, descendants);
-  return { writes, events: planEvents(kind, task, writes) };
+  const { writes, events: inheritEvents } = buildWrites(
+    kind,
+    task,
+    ancestors,
+    descendants,
+  );
+  return { writes, events: [...planEvents(kind, task, writes), ...inheritEvents] };
 }
 
+/**
+ * The writes, plus the events only the write-building knows about: inherit
+ * events name the ancestor a state came from, and `inheritWeakerStates` is
+ * the only place that knows the source. Own-act events are planned from the
+ * finished writes in `planEvents`.
+ */
 function buildWrites(
   kind: TransitionKind,
   task: LineageNode,
   ancestors: LineageNode[],
   descendants: LineageNode[],
-): PlanWrite[] {
+): TransitionPlan {
   switch (kind) {
     case "COMPLETE":
       return cascade("completedAt", task, descendants);
@@ -426,20 +451,126 @@ function cascade(
   state: TransitionState,
   task: LineageNode,
   descendants: LineageNode[],
-): PlanWrite[] {
+): TransitionPlan {
   const ids = pruneCascade(task.id, descendants, state);
-  return writeOne(state, ids, new Date());
+  return { writes: writeOne(state, ids, new Date()), events: [] };
 }
 
 /**
  * Backward kinds: clear the state on the target and the unbroken run of
  * ancestors that share it, so no task is left below one still in that state.
+ *
+ * Clearing it also removes the cover it gave. A task parked under a stronger
+ * state is allowed to sit outside the weaker ones its ancestors hold — the
+ * forward cascade stopped at it and kept its date (#44). Take the stronger
+ * state away and that becomes a gap the tree forbids (invariant 5), so the
+ * repaired tasks take those weaker states on, backdated to the ancestor's own
+ * date rather than stamped with now (#57, #63).
  */
 function repair(
   state: TransitionState,
   task: LineageNode,
   ancestors: LineageNode[],
-): PlanWrite[] {
+): TransitionPlan {
   const ids = ownStateRun(task, ancestors, state);
-  return writeOne(state, ids, null);
+  if (ids.length === 0) return { writes: [], events: [] };
+  const inherited = inheritWeakerStates(state, ids, [task, ...ancestors]);
+  return {
+    writes: [{ state, ids, value: null }, ...inherited.writes],
+    events: inherited.events,
+  };
+}
+
+/**
+ * What the repaired tasks must take on from the ancestors above them.
+ *
+ * Reads the chain from the root down, carrying each weaker state's date as far
+ * as it applies. A task that holds something stronger is already covered and
+ * takes on nothing; a task whose parent does not hold the state has nothing to
+ * take. Strongest state first, so a cover pulled in on one pass is known to
+ * the next.
+ *
+ * Each state taken on is a change of its own, so it also gets an event: the
+ * forward kind that sets the state, caused by the ancestor the state came
+ * from (#54, ADR-0020). The write backdates to the source's date; the event
+ * carries `now`, because that is when it happened (#57). Only this function
+ * knows which ancestor supplied a date, so the events are planned here.
+ *
+ * `chain` runs deepest → root; `clearedIds` are the tasks losing `cleared`.
+ */
+function inheritWeakerStates(
+  cleared: TransitionState,
+  clearedIds: string[],
+  chain: LineageNode[],
+): TransitionPlan {
+  const repaired = new Set(clearedIds);
+  const now = new Date();
+
+  // How each task in the chain stands once the transition has run: the state
+  // it is losing is gone, and anything it takes on below is added as we go.
+  const after = new Map<string, Record<TransitionState, Date | null>>(
+    chain.map((n) => [
+      n.id,
+      {
+        completedAt: n.completedAt,
+        archivedAt: n.archivedAt,
+        deletedAt: n.deletedAt,
+        ...(repaired.has(n.id) ? { [cleared]: null } : {}),
+      },
+    ]),
+  );
+
+  const weaker = STATES.filter((s) => STRENGTH[s] < STRENGTH[cleared]).sort(
+    (a, b) => STRENGTH[b] - STRENGTH[a],
+  );
+
+  const writes: PlanWrite[] = [];
+  const events: PlanEvent[] = [];
+  for (const state of weaker) {
+    const taken: { id: string; value: Date; from: string }[] = [];
+    let source: { value: Date; from: string } | null = null;
+
+    for (const node of [...chain].reverse()) {
+      const held = after.get(node.id)!;
+      if (held[state]) {
+        // a task that holds it becomes the source below
+        source = { value: held[state], from: node.id };
+      } else if (!repaired.has(node.id)) {
+        source = null; // an untouched task without it breaks the run
+      } else if (source && !coveredByStronger(held, state)) {
+        held[state] = source.value;
+        taken.push({ id: node.id, ...source });
+      }
+    }
+
+    // Each task takes the date of the nearest source above it, and those can
+    // differ down one chain — hence one write per distinct date (#60).
+    for (const value of new Set(taken.map((t) => t.value))) {
+      writes.push({
+        state,
+        ids: taken.filter((t) => t.value === value).map((t) => t.id),
+        value,
+      });
+    }
+
+    // Two sources can hold the same date, so the event's `causedBy` comes
+    // from the tracked source id, never from grouping dates back apart.
+    for (const t of taken) {
+      events.push({
+        kind: KIND_THAT_SETS[state],
+        taskId: t.id,
+        at: now,
+        causedBy: t.from,
+      });
+    }
+  }
+  return { writes, events };
+}
+
+/** Whether anything the task holds outranks `state`, making it unnecessary. */
+function coveredByStronger(
+  held: Record<TransitionState, Date | null>,
+  state: TransitionState,
+): boolean {
+  return STATES.some((s) => STRENGTH[s] > STRENGTH[state] && held[s] !== null);
 }
