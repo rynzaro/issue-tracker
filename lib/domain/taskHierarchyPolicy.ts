@@ -16,17 +16,38 @@ export type LineageNode = {
   deletedAt: Date | null;
 };
 
-export type TransitionPlan = {
-  setCompletedAt: { ids: string[]; value: Date | null };
-  setArchivedAt: { ids: string[]; value: Date | null };
-  setDeletedAt: { ids: string[]; value: Date | null };
+/** The three date columns a hierarchy transition can write. */
+export type TransitionState = "completedAt" | "archivedAt" | "deletedAt";
+
+/** Set `state` to `value` on every task in `ids`. */
+export type PlanWrite = {
+  state: TransitionState;
+  ids: string[];
+  value: Date | null;
 };
 
-const EMPTY_PLAN: TransitionPlan = {
-  setCompletedAt: { ids: [], value: null },
-  setArchivedAt: { ids: [], value: null },
-  setDeletedAt: { ids: [], value: null },
+/**
+ * Everything a transition changes, as a flat list the executor replays in
+ * order — it needs no knowledge of the kind that produced it (#57, #60).
+ *
+ * A plan lists only what it actually writes: a kind with nothing to do plans
+ * no writes at all. The same state may appear more than once with different
+ * values, which is how #63 backdates some ids while clearing others.
+ */
+export type TransitionPlan = {
+  writes: PlanWrite[];
 };
+
+const EMPTY_PLAN: TransitionPlan = { writes: [] };
+
+/** A plan of one write, dropped entirely when it would touch no task. */
+function planWrite(
+  state: TransitionState,
+  ids: string[],
+  value: Date | null,
+): TransitionPlan {
+  return ids.length > 0 ? { writes: [{ state, ids, value }] } : EMPTY_PLAN;
+}
 
 // ─── Validation ────────────────────────────────────────────────────────────────
 
@@ -252,6 +273,27 @@ function pruneCascade(
 }
 
 /**
+ * The task plus the unbroken run of ancestors already in the same state,
+ * nearest parent outward. A backward transition clears exactly this run: it
+ * stops at the first ancestor not in the state, so an ancestor sitting beyond
+ * a gap is left alone. Whether such a gap is legal at all is validation's
+ * business, not the plan's.
+ */
+function ownStateRun(
+  task: LineageNode,
+  ancestors: LineageNode[],
+  inState: (n: LineageNode) => boolean,
+): string[] {
+  const ids: string[] = [];
+  if (inState(task)) ids.push(task.id);
+  for (const a of ancestors) {
+    if (!inState(a)) break;
+    ids.push(a.id);
+  }
+  return ids;
+}
+
+/**
  * Build the set of mutations required for a hierarchy transition.
  *
  * `task` is the target. `ancestors` ordered nearest-parent → root.
@@ -284,94 +326,46 @@ function buildCompletePlan(
   task: LineageNode,
   descendants: LineageNode[],
 ): TransitionPlan {
-  return {
-    ...EMPTY_PLAN,
-    setCompletedAt: {
-      ids: pruneCascade(task.id, descendants, (n) => !!n.completedAt),
-      value: new Date(),
-    },
-  };
+  const ids = pruneCascade(task.id, descendants, (n) => !!n.completedAt);
+  return planWrite("completedAt", ids, new Date());
 }
 
 function buildUncompletePlan(
   task: LineageNode,
   ancestors: LineageNode[],
 ): TransitionPlan {
-  const ids: string[] = [];
-  if (task.completedAt) ids.push(task.id);
-  for (const a of ancestors) {
-    if (a.completedAt) {
-      ids.push(a.id);
-    } else {
-      break; // stop at first uncompleted ancestor (contiguous prefix)
-    }
-  }
-  return {
-    ...EMPTY_PLAN,
-    setCompletedAt: { ids, value: null },
-  };
+  const ids = ownStateRun(task, ancestors, (n) => !!n.completedAt);
+  return planWrite("completedAt", ids, null);
 }
 
 function buildArchivePlan(
   task: LineageNode,
   descendants: LineageNode[],
 ): TransitionPlan {
-  return {
-    ...EMPTY_PLAN,
-    setArchivedAt: {
-      ids: pruneCascade(task.id, descendants, (n) => !!n.archivedAt),
-      value: new Date(),
-    },
-  };
+  const ids = pruneCascade(task.id, descendants, (n) => !!n.archivedAt);
+  return planWrite("archivedAt", ids, new Date());
 }
 
 function buildUnarchivePlan(
   task: LineageNode,
   ancestors: LineageNode[],
 ): TransitionPlan {
-  const ids: string[] = [];
-  if (task.archivedAt) ids.push(task.id);
-  for (const a of ancestors) {
-    if (a.archivedAt) {
-      ids.push(a.id);
-    } else {
-      break; // stop at first unarchived ancestor (contiguous prefix)
-    }
-  }
-  return {
-    ...EMPTY_PLAN,
-    setArchivedAt: { ids, value: null },
-  };
+  const ids = ownStateRun(task, ancestors, (n) => !!n.archivedAt);
+  return planWrite("archivedAt", ids, null);
 }
 
 function buildDeletePlan(
   task: LineageNode,
   descendants: LineageNode[],
 ): TransitionPlan {
-  return {
-    ...EMPTY_PLAN,
-    setDeletedAt: {
-      ids: pruneCascade(task.id, descendants, (n) => !!n.deletedAt),
-      value: new Date(),
-    },
-  };
+  const ids = pruneCascade(task.id, descendants, (n) => !!n.deletedAt);
+  return planWrite("deletedAt", ids, new Date());
 }
 
 function buildUndeletePlan(
   task: LineageNode,
   ancestors: LineageNode[],
 ): TransitionPlan {
-  const ids: string[] = [];
-  if (task.deletedAt) ids.push(task.id);
-  for (const a of ancestors) {
-    if (a.deletedAt) {
-      ids.push(a.id);
-    } else {
-      break; // stop at first non-deleted ancestor (repair contiguous gap only)
-    }
-  }
-  return {
-    ...EMPTY_PLAN,
-    setDeletedAt: { ids, value: null },
-  };
+  const ids = ownStateRun(task, ancestors, (n) => !!n.deletedAt);
+  return planWrite("deletedAt", ids, null);
 }

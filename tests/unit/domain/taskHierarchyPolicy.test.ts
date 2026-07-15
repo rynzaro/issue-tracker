@@ -3,6 +3,8 @@ import {
   validateTransition,
   buildTransitionPlan,
   type LineageNode,
+  type TransitionPlan,
+  type TransitionState,
 } from "@/lib/domain/taskHierarchyPolicy";
 
 // ─── Helpers ───────────────────────────────────────────────────────────────────
@@ -22,6 +24,24 @@ function node(
     deletedAt: null,
     ...overrides,
   };
+}
+
+/** Every id the plan writes for one state, in plan order. */
+function ids(plan: TransitionPlan, state: TransitionState): string[] {
+  return plan.writes.filter((w) => w.state === state).flatMap((w) => w.ids);
+}
+
+/** The states the plan touches, in order — asserts nothing else is written. */
+function states(plan: TransitionPlan): TransitionState[] {
+  return plan.writes.map((w) => w.state);
+}
+
+/** The value the plan stores for one state; undefined when it does not write it. */
+function value(
+  plan: TransitionPlan,
+  state: TransitionState,
+): Date | null | undefined {
+  return plan.writes.find((w) => w.state === state)?.value;
 }
 
 // ─── validateTransition: COMPLETE ──────────────────────────────────────────────
@@ -362,10 +382,9 @@ describe("buildTransitionPlan — COMPLETE", () => {
     const task = node("t1", null);
     const descendants = [task, node("t2", "t1"), node("t3", "t2")];
     const plan = buildTransitionPlan("COMPLETE", task, [], descendants);
-    expect(plan.setCompletedAt.ids).toEqual(["t1", "t2", "t3"]);
-    expect(plan.setCompletedAt.value).toBeInstanceOf(Date);
-    expect(plan.setArchivedAt.ids).toEqual([]);
-    expect(plan.setDeletedAt.ids).toEqual([]);
+    expect(ids(plan, "completedAt")).toEqual(["t1", "t2", "t3"]);
+    expect(value(plan, "completedAt")).toBeInstanceOf(Date);
+    expect(states(plan)).toEqual(["completedAt"]);
   });
 
   it("stops at an already-completed descendant and keeps its date", () => {
@@ -377,7 +396,7 @@ describe("buildTransitionPlan — COMPLETE", () => {
       node("t4", "t2", { completedAt: now }), // below the stop — not walked
     ];
     const plan = buildTransitionPlan("COMPLETE", task, [], descendants);
-    expect(plan.setCompletedAt.ids).toEqual(["t1", "t3"]);
+    expect(ids(plan, "completedAt")).toEqual(["t1", "t3"]);
   });
 });
 
@@ -391,8 +410,8 @@ describe("buildTransitionPlan — UNCOMPLETE", () => {
       node("t1", null), // uncompleted
     ];
     const plan = buildTransitionPlan("UNCOMPLETE", task, ancestors);
-    expect(plan.setCompletedAt.ids).toEqual(["t3", "t2"]);
-    expect(plan.setCompletedAt.value).toBeNull();
+    expect(ids(plan, "completedAt")).toEqual(["t3", "t2"]);
+    expect(value(plan, "completedAt")).toBeNull();
   });
 
   it("stops at first uncompleted ancestor", () => {
@@ -403,14 +422,14 @@ describe("buildTransitionPlan — UNCOMPLETE", () => {
       node("t1", null, { completedAt: now }), // should NOT be included (gap already validated)
     ];
     const plan = buildTransitionPlan("UNCOMPLETE", task, ancestors);
-    expect(plan.setCompletedAt.ids).toEqual(["t4", "t3"]);
+    expect(ids(plan, "completedAt")).toEqual(["t4", "t3"]);
   });
 
-  it("returns empty ids when task and ancestors are already uncompleted", () => {
+  it("plans no writes when task and ancestors are already uncompleted", () => {
     const task = node("t2", "t1");
     const ancestors = [node("t1", null)];
     const plan = buildTransitionPlan("UNCOMPLETE", task, ancestors);
-    expect(plan.setCompletedAt.ids).toEqual([]);
+    expect(plan.writes).toEqual([]);
   });
 });
 
@@ -421,8 +440,9 @@ describe("buildTransitionPlan — ARCHIVE", () => {
     const task = node("t1", null);
     const descendants = [task, node("t2", "t1")];
     const plan = buildTransitionPlan("ARCHIVE", task, [], descendants);
-    expect(plan.setArchivedAt.ids).toEqual(["t1", "t2"]);
-    expect(plan.setArchivedAt.value).toBeInstanceOf(Date);
+    expect(ids(plan, "archivedAt")).toEqual(["t1", "t2"]);
+    expect(value(plan, "archivedAt")).toBeInstanceOf(Date);
+    expect(states(plan)).toEqual(["archivedAt"]);
   });
 
   it("stops at an already-archived descendant and keeps its date", () => {
@@ -434,7 +454,7 @@ describe("buildTransitionPlan — ARCHIVE", () => {
       node("t4", "t2", { archivedAt: now }), // below the stop — not walked
     ];
     const plan = buildTransitionPlan("ARCHIVE", task, [], descendants);
-    expect(plan.setArchivedAt.ids).toEqual(["t1", "t3"]);
+    expect(ids(plan, "archivedAt")).toEqual(["t1", "t3"]);
   });
 });
 
@@ -448,8 +468,8 @@ describe("buildTransitionPlan — UNARCHIVE", () => {
       node("t1", null), // unarchived — stop
     ];
     const plan = buildTransitionPlan("UNARCHIVE", task, ancestors);
-    expect(plan.setArchivedAt.ids).toEqual(["t3", "t2"]);
-    expect(plan.setArchivedAt.value).toBeNull();
+    expect(ids(plan, "archivedAt")).toEqual(["t3", "t2"]);
+    expect(value(plan, "archivedAt")).toBeNull();
   });
 
   it("stops at first unarchived ancestor", () => {
@@ -459,14 +479,14 @@ describe("buildTransitionPlan — UNARCHIVE", () => {
       node("t1", null, { archivedAt: now }), // should NOT be included
     ];
     const plan = buildTransitionPlan("UNARCHIVE", task, ancestors);
-    expect(plan.setArchivedAt.ids).toEqual(["t3"]);
+    expect(ids(plan, "archivedAt")).toEqual(["t3"]);
   });
 
-  it("returns empty ids when task and ancestors are already unarchived", () => {
+  it("plans no writes when task and ancestors are already unarchived", () => {
     const task = node("t2", "t1");
     const ancestors = [node("t1", null)];
     const plan = buildTransitionPlan("UNARCHIVE", task, ancestors);
-    expect(plan.setArchivedAt.ids).toEqual([]);
+    expect(plan.writes).toEqual([]);
   });
 });
 
@@ -481,8 +501,9 @@ describe("buildTransitionPlan — DELETE", () => {
       node("t3", "t2"),
     ];
     const plan = buildTransitionPlan("DELETE", task, [], descendants);
-    expect(plan.setDeletedAt.ids).toEqual(["t1", "t2", "t3"]);
-    expect(plan.setDeletedAt.value).toBeInstanceOf(Date);
+    expect(ids(plan, "deletedAt")).toEqual(["t1", "t2", "t3"]);
+    expect(value(plan, "deletedAt")).toBeInstanceOf(Date);
+    expect(states(plan)).toEqual(["deletedAt"]);
   });
 
   it("stops at an already-deleted descendant and keeps its date", () => {
@@ -494,7 +515,7 @@ describe("buildTransitionPlan — DELETE", () => {
       node("t4", "t2", { deletedAt: now }), // below the stop — not walked
     ];
     const plan = buildTransitionPlan("DELETE", task, [], descendants);
-    expect(plan.setDeletedAt.ids).toEqual(["t1", "t3"]);
+    expect(ids(plan, "deletedAt")).toEqual(["t1", "t3"]);
   });
 });
 
@@ -508,8 +529,8 @@ describe("buildTransitionPlan — UNDELETE", () => {
       node("t1", null), // not deleted — stop
     ];
     const plan = buildTransitionPlan("UNDELETE", task, ancestors);
-    expect(plan.setDeletedAt.ids).toEqual(["t3", "t2"]);
-    expect(plan.setDeletedAt.value).toBeNull();
+    expect(ids(plan, "deletedAt")).toEqual(["t3", "t2"]);
+    expect(value(plan, "deletedAt")).toBeNull();
   });
 
   it("stops at first non-deleted ancestor", () => {
@@ -519,14 +540,14 @@ describe("buildTransitionPlan — UNDELETE", () => {
       node("t1", null, { deletedAt: now }), // should NOT be included
     ];
     const plan = buildTransitionPlan("UNDELETE", task, ancestors);
-    expect(plan.setDeletedAt.ids).toEqual(["t3"]);
+    expect(ids(plan, "deletedAt")).toEqual(["t3"]);
   });
 
   it("does not touch archivedAt", () => {
     const task = node("t2", "t1", { deletedAt: now, archivedAt: now });
     const ancestors = [node("t1", null, { deletedAt: now, archivedAt: now })];
     const plan = buildTransitionPlan("UNDELETE", task, ancestors);
-    expect(plan.setDeletedAt.ids).toEqual(["t2", "t1"]);
-    expect(plan.setArchivedAt.ids).toEqual([]);
+    expect(ids(plan, "deletedAt")).toEqual(["t2", "t1"]);
+    expect(states(plan)).toEqual(["deletedAt"]);
   });
 });
