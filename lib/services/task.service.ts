@@ -12,6 +12,7 @@ import {
   buildTransitionPlan,
   type LineageNode,
   type TransitionPlan,
+  type TransitionState,
 } from "../domain/taskHierarchyPolicy";
 
 // ─── Shared Helpers ────────────────────────────────────────────────────────────
@@ -75,25 +76,31 @@ async function collectDescendantNodes(
   return nodes;
 }
 
+/**
+ * Replay a plan's writes in order. The plan already decided which tasks change
+ * and to what, so this stays a loop with no per-kind knowledge (#60).
+ */
 async function executePlan(plan: TransitionPlan, tx: DbClient): Promise<void> {
-  if (plan.setCompletedAt.ids.length > 0) {
+  for (const write of plan.writes) {
     await tx.task.updateMany({
-      where: { id: { in: plan.setCompletedAt.ids } },
-      data: { completedAt: plan.setCompletedAt.value },
+      where: { id: { in: write.ids } },
+      data: { [write.state]: write.value },
     });
   }
-  if (plan.setArchivedAt.ids.length > 0) {
-    await tx.task.updateMany({
-      where: { id: { in: plan.setArchivedAt.ids } },
-      data: { archivedAt: plan.setArchivedAt.value },
-    });
-  }
-  if (plan.setDeletedAt.ids.length > 0) {
-    await tx.task.updateMany({
-      where: { id: { in: plan.setDeletedAt.ids } },
-      data: { deletedAt: plan.setDeletedAt.value },
-    });
-  }
+}
+
+/**
+ * What the plan does to one state: the ids it writes and the value it stores.
+ * Every plan today writes a given state at most once, so callers reporting a
+ * count or emitting one event per changed task read it through here rather
+ * than indexing into the write list. #62 moves event planning into the policy
+ * and removes these lookups.
+ */
+function writeFor(
+  plan: TransitionPlan,
+  state: TransitionState,
+): { ids: string[]; value: Date | null } {
+  return plan.writes.find((w) => w.state === state) ?? { ids: [], value: null };
 }
 
 /**
@@ -456,7 +463,7 @@ export function deleteTask({
         type: TaskEventType.DELETED,
         userId,
         targetTaskId: task.id,
-        changed: plan.setDeletedAt,
+        changed: writeFor(plan, "deletedAt"),
       });
 
       // Record the removal on the former direct parent's trail (#52). Only the
@@ -473,7 +480,7 @@ export function deleteTask({
 
       return createSuccessResponseWithData({
         id: taskId,
-        deletedCount: plan.setDeletedAt.ids.length,
+        deletedCount: writeFor(plan, "deletedAt").ids.length,
       });
     });
   }, "Failed to delete task");
@@ -564,12 +571,12 @@ export function completeTask({
         type: TaskEventType.COMPLETED,
         userId,
         targetTaskId: task.id,
-        changed: plan.setCompletedAt,
+        changed: writeFor(plan, "completedAt"),
       });
 
       return createSuccessResponseWithData({
         id: taskId,
-        completedCount: plan.setCompletedAt.ids.length,
+        completedCount: writeFor(plan, "completedAt").ids.length,
       });
     });
   }, "Failed to complete task");
@@ -624,12 +631,12 @@ export function uncompleteTask({
         type: TaskEventType.UNCOMPLETED,
         userId,
         targetTaskId: task.id,
-        changed: plan.setCompletedAt,
+        changed: writeFor(plan, "completedAt"),
       });
 
       return createSuccessResponseWithData({
         id: taskId,
-        uncompletedCount: plan.setCompletedAt.ids.length,
+        uncompletedCount: writeFor(plan, "completedAt").ids.length,
       });
     });
   }, "Failed to uncomplete task");
@@ -705,12 +712,12 @@ export function archiveTask({
         type: TaskEventType.ARCHIVED,
         userId,
         targetTaskId: task.id,
-        changed: plan.setArchivedAt,
+        changed: writeFor(plan, "archivedAt"),
       });
 
       return createSuccessResponseWithData({
         id: taskId,
-        archivedCount: plan.setArchivedAt.ids.length,
+        archivedCount: writeFor(plan, "archivedAt").ids.length,
       });
     });
   }, "Failed to archive task");
@@ -762,7 +769,7 @@ export function unarchiveTask({
         type: TaskEventType.UNARCHIVED,
         userId,
         targetTaskId: task.id,
-        changed: plan.setArchivedAt,
+        changed: writeFor(plan, "archivedAt"),
       });
 
       return createSuccessResponseWithData({ id: taskId });
@@ -816,12 +823,12 @@ export function restoreDeletedTask({
         type: TaskEventType.RESTORED,
         userId,
         targetTaskId: task.id,
-        changed: plan.setDeletedAt,
+        changed: writeFor(plan, "deletedAt"),
       });
 
       return createSuccessResponseWithData({
         id: taskId,
-        restoredCount: plan.setDeletedAt.ids.length,
+        restoredCount: writeFor(plan, "deletedAt").ids.length,
       });
     });
   }, "Failed to restore task");
