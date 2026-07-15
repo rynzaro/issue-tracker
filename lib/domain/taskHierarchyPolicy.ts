@@ -19,6 +19,33 @@ export type LineageNode = {
 /** The three date columns a hierarchy transition can write. */
 export type TransitionState = "completedAt" | "archivedAt" | "deletedAt";
 
+const STATES = ["completedAt", "archivedAt", "deletedAt"] as const;
+
+/**
+ * How strongly a state holds a task: **delete > archive > complete** (#57).
+ *
+ * One order runs both directions. Forward kinds cascade down through states
+ * strictly weaker than their own and stop at equal-or-stronger: the stronger
+ * state already covers everything below it, and its date is estimation
+ * evidence worth keeping (#44). Backward kinds read the same order upward,
+ * inheriting the strictly weaker states their ancestors still hold (#63).
+ *
+ * Illegal moves fall out of it too — uncompleting through an archived ancestor
+ * asks to leave a task in a state its ancestor's stronger one forbids.
+ */
+const STRENGTH: Record<TransitionState, number> = {
+  completedAt: 1,
+  archivedAt: 2,
+  deletedAt: 3,
+};
+
+/** Whether the node is held by `state` or by anything stronger than it. */
+function heldBySameOrStronger(node: LineageNode, state: TransitionState): boolean {
+  return STATES.some(
+    (s) => STRENGTH[s] >= STRENGTH[state] && node[s] !== null,
+  );
+}
+
 /** Set `state` to `value` on every task in `ids`. */
 export type PlanWrite = {
   state: TransitionState;
@@ -27,26 +54,80 @@ export type PlanWrite = {
 };
 
 /**
- * Everything a transition changes, as a flat list the executor replays in
+ * One entry for the audit ledger: this task changed, at this time, because of
+ * this transition. `causedBy` names the task the user actually acted on, and
+ * is set on every task except that target (ADR-0020).
+ *
+ * `kind` stays domain vocabulary — mapping it to a stored event type is the
+ * service's job, which is what keeps this module free of prisma (#59).
+ */
+export type PlanEvent = {
+  kind: TransitionKind;
+  taskId: string;
+  at: Date;
+  causedBy?: string;
+};
+
+/**
+ * Everything a transition changes, as flat lists the executor replays in
  * order — it needs no knowledge of the kind that produced it (#57, #60).
  *
- * A plan lists only what it actually writes: a kind with nothing to do plans
- * no writes at all. The same state may appear more than once with different
- * values, which is how #63 backdates some ids while clearing others.
+ * A plan lists only what it actually does: a kind with nothing to do plans no
+ * writes and no events. The same state may appear in more than one write with
+ * different values, which is how #63 backdates some ids while clearing others.
  */
 export type TransitionPlan = {
   writes: PlanWrite[];
+  events: PlanEvent[];
 };
 
-const EMPTY_PLAN: TransitionPlan = { writes: [] };
-
-/** A plan of one write, dropped entirely when it would touch no task. */
-function planWrite(
+/** One write, or none at all when it would touch no task. */
+function writeOne(
   state: TransitionState,
   ids: string[],
   value: Date | null,
-): TransitionPlan {
-  return ids.length > 0 ? { writes: [{ state, ids, value }] } : EMPTY_PLAN;
+): PlanWrite[] {
+  return ids.length > 0 ? [{ state, ids, value }] : [];
+}
+
+/**
+ * The state a kind is *about* — the flag it sets or clears on the target. Both
+ * directions of a pair share one state, since they move along the same axis.
+ *
+ * Only writes to this state are the transition's own act, so only they are
+ * worth an event. A write to any other state is a side effect the transition
+ * makes to keep the tree legal (#63's backdated inherits), and stays silent.
+ */
+const OWN_STATE: Record<TransitionKind, TransitionState> = {
+  COMPLETE: "completedAt",
+  UNCOMPLETE: "completedAt",
+  ARCHIVE: "archivedAt",
+  UNARCHIVE: "archivedAt",
+  DELETE: "deletedAt",
+  UNDELETE: "deletedAt",
+};
+
+/**
+ * One event per task the transition's own-state write touches.
+ *
+ * Forward kinds stamp a date and the event carries it. Backward kinds store
+ * null, so the event carries the time of the act instead — the stored fact and
+ * the audit trail are allowed to differ (#57).
+ */
+function planEvents(
+  kind: TransitionKind,
+  task: LineageNode,
+  writes: PlanWrite[],
+): PlanEvent[] {
+  const own = writes.find((w) => w.state === OWN_STATE[kind]);
+  if (!own) return [];
+  const at = own.value ?? new Date();
+  return own.ids.map((id) => ({
+    kind,
+    taskId: id,
+    at,
+    ...(id === task.id ? {} : { causedBy: task.id }),
+  }));
 }
 
 // ─── Validation ────────────────────────────────────────────────────────────────
@@ -240,16 +321,21 @@ function validateUndelete(ancestors: LineageNode[]): ValidationResult {
 // ─── Plan Building ─────────────────────────────────────────────────────────────
 
 /**
- * Downward-cascade stop rule (#44): a descendant already in the target state
- * keeps its original date — it is not re-stamped, and the walk does not
- * continue below it. The no-gaps invariant (CONTEXT.md invariant 5) means
- * everything below it is already in the target state, so nothing is missed.
- * The dates are estimation evidence; overwriting them destroys it.
+ * Downward-cascade stop rule (#44), read through the strength order.
+ *
+ * A descendant already held by `state` — or by anything stronger — keeps its
+ * original date: it is not re-stamped, and the walk does not continue below
+ * it. The no-gaps invariant (CONTEXT.md invariant 5) means everything under it
+ * is at least as strongly held, so nothing is missed. The dates are estimation
+ * evidence; overwriting them destroys it.
+ *
+ * The order does the deciding here, so the caller may hand over the whole
+ * subtree and does not have to pre-filter it into agreement (#62).
  */
 function pruneCascade(
   taskId: string,
   descendants: LineageNode[],
-  inTargetState: (n: LineageNode) => boolean,
+  state: TransitionState,
 ): string[] {
   const byId = new Map(descendants.map((n) => [n.id, n]));
   const childrenMap = new Map<string, string[]>();
@@ -265,7 +351,7 @@ function pruneCascade(
   while (queue.length > 0) {
     const current = queue.shift()!;
     const node = byId.get(current);
-    if (!node || inTargetState(node)) continue; // stop: keep its date, skip its subtree
+    if (!node || heldBySameOrStronger(node, state)) continue; // stop: keep its date, skip its subtree
     ids.push(current);
     queue.push(...(childrenMap.get(current) ?? []));
   }
@@ -282,12 +368,12 @@ function pruneCascade(
 function ownStateRun(
   task: LineageNode,
   ancestors: LineageNode[],
-  inState: (n: LineageNode) => boolean,
+  state: TransitionState,
 ): string[] {
   const ids: string[] = [];
-  if (inState(task)) ids.push(task.id);
+  if (task[state]) ids.push(task.id);
   for (const a of ancestors) {
-    if (!inState(a)) break;
+    if (!a[state]) break;
     ids.push(a.id);
   }
   return ids;
@@ -306,66 +392,54 @@ export function buildTransitionPlan(
   ancestors: LineageNode[],
   descendants: LineageNode[] = [],
 ): TransitionPlan {
+  const writes = buildWrites(kind, task, ancestors, descendants);
+  return { writes, events: planEvents(kind, task, writes) };
+}
+
+function buildWrites(
+  kind: TransitionKind,
+  task: LineageNode,
+  ancestors: LineageNode[],
+  descendants: LineageNode[],
+): PlanWrite[] {
   switch (kind) {
     case "COMPLETE":
-      return buildCompletePlan(task, descendants);
-    case "UNCOMPLETE":
-      return buildUncompletePlan(task, ancestors);
+      return cascade("completedAt", task, descendants);
     case "ARCHIVE":
-      return buildArchivePlan(task, descendants);
-    case "UNARCHIVE":
-      return buildUnarchivePlan(task, ancestors);
+      return cascade("archivedAt", task, descendants);
     case "DELETE":
-      return buildDeletePlan(task, descendants);
+      return cascade("deletedAt", task, descendants);
+    case "UNCOMPLETE":
+      return repair("completedAt", task, ancestors);
+    case "UNARCHIVE":
+      return repair("archivedAt", task, ancestors);
     case "UNDELETE":
-      return buildUndeletePlan(task, ancestors);
+      return repair("deletedAt", task, ancestors);
   }
 }
 
-function buildCompletePlan(
+/**
+ * Forward kinds: stamp the state on the target and every descendant below it
+ * that is not already in it, all sharing one date.
+ */
+function cascade(
+  state: TransitionState,
   task: LineageNode,
   descendants: LineageNode[],
-): TransitionPlan {
-  const ids = pruneCascade(task.id, descendants, (n) => !!n.completedAt);
-  return planWrite("completedAt", ids, new Date());
+): PlanWrite[] {
+  const ids = pruneCascade(task.id, descendants, state);
+  return writeOne(state, ids, new Date());
 }
 
-function buildUncompletePlan(
+/**
+ * Backward kinds: clear the state on the target and the unbroken run of
+ * ancestors that share it, so no task is left below one still in that state.
+ */
+function repair(
+  state: TransitionState,
   task: LineageNode,
   ancestors: LineageNode[],
-): TransitionPlan {
-  const ids = ownStateRun(task, ancestors, (n) => !!n.completedAt);
-  return planWrite("completedAt", ids, null);
-}
-
-function buildArchivePlan(
-  task: LineageNode,
-  descendants: LineageNode[],
-): TransitionPlan {
-  const ids = pruneCascade(task.id, descendants, (n) => !!n.archivedAt);
-  return planWrite("archivedAt", ids, new Date());
-}
-
-function buildUnarchivePlan(
-  task: LineageNode,
-  ancestors: LineageNode[],
-): TransitionPlan {
-  const ids = ownStateRun(task, ancestors, (n) => !!n.archivedAt);
-  return planWrite("archivedAt", ids, null);
-}
-
-function buildDeletePlan(
-  task: LineageNode,
-  descendants: LineageNode[],
-): TransitionPlan {
-  const ids = pruneCascade(task.id, descendants, (n) => !!n.deletedAt);
-  return planWrite("deletedAt", ids, new Date());
-}
-
-function buildUndeletePlan(
-  task: LineageNode,
-  ancestors: LineageNode[],
-): TransitionPlan {
-  const ids = ownStateRun(task, ancestors, (n) => !!n.deletedAt);
-  return planWrite("deletedAt", ids, null);
+): PlanWrite[] {
+  const ids = ownStateRun(task, ancestors, state);
+  return writeOne(state, ids, null);
 }
