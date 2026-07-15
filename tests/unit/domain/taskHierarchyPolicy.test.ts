@@ -551,3 +551,127 @@ describe("buildTransitionPlan — UNDELETE", () => {
     expect(states(plan)).toEqual(["deletedAt"]);
   });
 });
+
+// ─── buildTransitionPlan: the strength order ───────────────────────────────────
+
+// delete > archive > complete (#57). A forward kind cascades through states
+// strictly weaker than its own and stops at equal-or-stronger, keeping the
+// stronger state's date. The order alone decides — the caller does not get to
+// pre-filter the subtree into agreement.
+describe("buildTransitionPlan — strength order delete > archive > complete", () => {
+  it("COMPLETE stops at an archived descendant and never walks below it", () => {
+    const task = node("t1", null);
+    const descendants = [
+      task,
+      node("t2", "t1", { archivedAt: now }), // stronger — stop, keep its date
+      node("t3", "t2"), // below the stop — untouched
+      node("t4", "t1"), // sibling — still completed
+    ];
+    const plan = buildTransitionPlan("COMPLETE", task, [], descendants);
+    expect(ids(plan, "completedAt")).toEqual(["t1", "t4"]);
+  });
+
+  it("COMPLETE stops at a deleted descendant", () => {
+    const task = node("t1", null);
+    const descendants = [task, node("t2", "t1", { deletedAt: now })];
+    const plan = buildTransitionPlan("COMPLETE", task, [], descendants);
+    expect(ids(plan, "completedAt")).toEqual(["t1"]);
+  });
+
+  it("ARCHIVE stops at a deleted descendant but cascades through a completed one", () => {
+    const task = node("t1", null);
+    const descendants = [
+      task,
+      node("t2", "t1", { completedAt: now }), // weaker — archive passes through
+      node("t3", "t2"), // still reached, below the completed one
+      node("t4", "t1", { deletedAt: now }), // stronger — stop
+      node("t5", "t4"), // below the stop — untouched
+    ];
+    const plan = buildTransitionPlan("ARCHIVE", task, [], descendants);
+    expect(ids(plan, "archivedAt")).toEqual(["t1", "t2", "t3"]);
+  });
+
+  it("DELETE cascades through both weaker states, stopping only at deleted", () => {
+    const task = node("t1", null);
+    const descendants = [
+      task,
+      node("t2", "t1", { completedAt: now }), // weaker — pass through
+      node("t3", "t1", { archivedAt: now }), // weaker — pass through
+      node("t4", "t3"), // still reached, below the archived one
+      node("t5", "t1", { deletedAt: now }), // equal — stop, keep its date
+    ];
+    const plan = buildTransitionPlan("DELETE", task, [], descendants);
+    expect(ids(plan, "deletedAt")).toEqual(["t1", "t2", "t3", "t4"]);
+  });
+});
+
+// ─── buildTransitionPlan: events ───────────────────────────────────────────────
+
+describe("buildTransitionPlan — events", () => {
+  it("plans one event per changed task, target first and without causedBy", () => {
+    const task = node("t1", null);
+    const descendants = [task, node("t2", "t1"), node("t3", "t2")];
+    const plan = buildTransitionPlan("COMPLETE", task, [], descendants);
+    expect(plan.events).toEqual([
+      { kind: "COMPLETE", taskId: "t1", at: value(plan, "completedAt") },
+      {
+        kind: "COMPLETE",
+        taskId: "t2",
+        at: value(plan, "completedAt"),
+        causedBy: "t1",
+      },
+      {
+        kind: "COMPLETE",
+        taskId: "t3",
+        at: value(plan, "completedAt"),
+        causedBy: "t1",
+      },
+    ]);
+  });
+
+  it("stamps forward events with the date the plan stores", () => {
+    const task = node("t1", null);
+    const plan = buildTransitionPlan("ARCHIVE", task, [], [task]);
+    expect(plan.events[0].at).toBe(value(plan, "archivedAt"));
+  });
+
+  it("stamps backward events with now, since the plan stores null", () => {
+    const task = node("t2", "t1", { completedAt: now });
+    const ancestors = [node("t1", null, { completedAt: now })];
+    const plan = buildTransitionPlan("UNCOMPLETE", task, ancestors);
+    expect(value(plan, "completedAt")).toBeNull();
+    expect(plan.events.map((e) => e.at)).toEqual([
+      expect.any(Date),
+      expect.any(Date),
+    ]);
+    expect(plan.events[0].at.getTime()).toBeGreaterThan(now.getTime());
+  });
+
+  it("marks ancestors repaired by a backward transition as caused by the target", () => {
+    const task = node("t2", "t1", { archivedAt: now });
+    const ancestors = [node("t1", null, { archivedAt: now })];
+    const plan = buildTransitionPlan("UNARCHIVE", task, ancestors);
+    expect(plan.events.map((e) => [e.taskId, e.causedBy])).toEqual([
+      ["t2", undefined],
+      ["t1", "t2"],
+    ]);
+  });
+
+  it("skips descendants the stop rule pruned", () => {
+    const task = node("t1", null);
+    const descendants = [
+      task,
+      node("t2", "t1", { deletedAt: now }), // stop — keeps its date, emits nothing
+      node("t3", "t1"),
+    ];
+    const plan = buildTransitionPlan("DELETE", task, [], descendants);
+    expect(plan.events.map((e) => e.taskId)).toEqual(["t1", "t3"]);
+  });
+
+  it("plans no events when the transition writes nothing", () => {
+    const task = node("t2", "t1");
+    const plan = buildTransitionPlan("UNCOMPLETE", task, [node("t1", null)]);
+    expect(plan.writes).toEqual([]);
+    expect(plan.events).toEqual([]);
+  });
+});

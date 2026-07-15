@@ -11,8 +11,8 @@ import {
   validateTransition,
   buildTransitionPlan,
   type LineageNode,
+  type TransitionKind,
   type TransitionPlan,
-  type TransitionState,
 } from "../domain/taskHierarchyPolicy";
 
 // ─── Shared Helpers ────────────────────────────────────────────────────────────
@@ -77,36 +77,9 @@ async function collectDescendantNodes(
 }
 
 /**
- * Replay a plan's writes in order. The plan already decided which tasks change
- * and to what, so this stays a loop with no per-kind knowledge (#60).
- */
-async function executePlan(plan: TransitionPlan, tx: DbClient): Promise<void> {
-  for (const write of plan.writes) {
-    await tx.task.updateMany({
-      where: { id: { in: write.ids } },
-      data: { [write.state]: write.value },
-    });
-  }
-}
-
-/**
- * What the plan does to one state: the ids it writes and the value it stores.
- * Every plan today writes a given state at most once, so callers reporting a
- * count or emitting one event per changed task read it through here rather
- * than indexing into the write list. #62 moves event planning into the policy
- * and removes these lookups.
- */
-function writeFor(
-  plan: TransitionPlan,
-  state: TransitionState,
-): { ids: string[]; value: Date | null } {
-  return plan.writes.find((w) => w.state === state) ?? { ids: [], value: null };
-}
-
-/**
- * The six hierarchy-transition verbs. All share `statusTransitionPayload`
- * (`{at, causedBy?}`) in event.service, so a single payload shape is valid for
- * whichever verb this helper is handed.
+ * The six hierarchy-transition verbs as stored. All share
+ * `statusTransitionPayload` (`{at, causedBy?}`) in event.service, so a single
+ * payload shape is valid for whichever verb an event entry names.
  */
 type TransitionEventType =
   | typeof TaskEventType.COMPLETED
@@ -117,45 +90,205 @@ type TransitionEventType =
   | typeof TaskEventType.RESTORED;
 
 /**
- * Emit one TaskEvent per task changed by a hierarchy transition (ADR-0020).
- *
- * `changed` is the transition plan's slot for the flag this verb touches. Its
- * `ids` are already pruned, so descendants halted by the #44 stop rule — and any
- * task the transition left unchanged — are absent and emit nothing. Its `value`
- * is the stamped date, or null when the verb clears the flag (upward repairs) —
- * then the event time is the act's time, now. The direct target (`targetTaskId`)
- * gets `{at}`; every other changed task (a cascaded descendant, or an ancestor
- * repaired by an upward transition) gets `{at, causedBy: targetTaskId}` under
- * the SAME event `type`. Runs on the caller's `tx`, so a failure here rolls the
- * whole transition back.
+ * Domain kind → stored event type. The policy plans events in the domain's own
+ * words so it stays free of prisma (#59); this is the one place those words
+ * meet the ledger's.
  */
-async function emitTransitionEvents(
+const EVENT_TYPE_FOR: Record<TransitionKind, TransitionEventType> = {
+  COMPLETE: TaskEventType.COMPLETED,
+  UNCOMPLETE: TaskEventType.UNCOMPLETED,
+  ARCHIVE: TaskEventType.ARCHIVED,
+  UNARCHIVE: TaskEventType.UNARCHIVED,
+  DELETE: TaskEventType.DELETED,
+  UNDELETE: TaskEventType.RESTORED,
+};
+
+/**
+ * Run a plan: its writes, then its events, on the caller's transaction so a
+ * failure anywhere rolls the whole transition back (ADR-0020, CONTEXT.md
+ * invariant 2).
+ *
+ * The policy already decided which tasks change, to what, and who hears about
+ * it — including pruning the descendants the #44 stop rule halted — so this
+ * needs no knowledge of the kind that produced the plan (#60, #62).
+ */
+async function executePlan(
+  plan: TransitionPlan,
   tx: Prisma.TransactionClient,
-  {
-    type,
-    userId,
-    targetTaskId,
-    changed,
-  }: {
-    type: TransitionEventType;
-    userId: string;
-    targetTaskId: string;
-    changed: { ids: string[]; value: Date | null };
-  },
+  userId: string,
 ): Promise<void> {
-  const at = changed.value ?? new Date();
-  for (const id of changed.ids) {
+  for (const write of plan.writes) {
+    await tx.task.updateMany({
+      where: { id: { in: write.ids } },
+      data: { [write.state]: write.value },
+    });
+  }
+  for (const event of plan.events) {
     // Every `TransitionEventType` maps to the same `statusTransitionPayload`, so
-    // this input satisfies whichever of the six arms `type` selects — TS checks
+    // this input satisfies whichever of the six arms the type selects — TS checks
     // that by distributing the literal over the extracted union, no cast needed.
     const input: Extract<EmitEventInput, { type: TransitionEventType }> = {
-      taskId: id,
+      taskId: event.taskId,
       userId,
-      type,
-      payload: id === targetTaskId ? { at } : { at, causedBy: targetTaskId },
+      type: EVENT_TYPE_FOR[event.kind],
+      payload:
+        event.causedBy === undefined
+          ? { at: event.at }
+          : { at: event.at, causedBy: event.causedBy },
     };
     await emitEvent(tx, input);
   }
+}
+
+// ─── Hierarchy Transitions ─────────────────────────────────────────────────────
+
+/**
+ * All that differs between the six transitions. Everything else — the fetch,
+ * the auth check, the transaction, validate → plan → execute — is one fixed
+ * sequence in `applyTransition`, written once (#57, #62).
+ *
+ * `cascade` is set for exactly the three forward kinds. Reaching down the tree
+ * is what makes a kind need the descendant scan, and what makes a running
+ * timer somewhere below it a reason to refuse; backward kinds only repair
+ * upward, so they need neither.
+ *
+ * Which descendants a kind may touch is deliberately absent: that is the
+ * strength order's call, and the policy makes it (#62).
+ */
+const TRANSITIONS: Record<
+  TransitionKind,
+  {
+    failureMessage: string;
+    cascade: { timerBlockedMessage: string } | null;
+  }
+> = {
+  COMPLETE: {
+    failureMessage: "Failed to complete task",
+    cascade: {
+      timerBlockedMessage:
+        "Task with active Timer cannot be marked as complete",
+    },
+  },
+  ARCHIVE: {
+    failureMessage: "Failed to archive task",
+    cascade: { timerBlockedMessage: "Task with active Timer cannot be archived" },
+  },
+  DELETE: {
+    failureMessage: "Failed to delete task",
+    cascade: { timerBlockedMessage: "Task with active Timer cannot be deleted" },
+  },
+  UNCOMPLETE: { failureMessage: "Failed to uncomplete task", cascade: null },
+  UNARCHIVE: { failureMessage: "Failed to unarchive task", cascade: null },
+  UNDELETE: { failureMessage: "Failed to restore task", cascade: null },
+};
+
+/** The target as `applyTransition` fetches it: what the policy judges, plus
+ *  what the auth check and the parent-trail event need. */
+type TransitionTarget = LineageNode & {
+  title: string;
+  projectId: string;
+  project: { userId: string };
+};
+
+/** How many tasks a plan touches — a task counts once even if several writes name it. */
+function countChanged(plan: TransitionPlan): number {
+  return new Set(plan.writes.flatMap((w) => w.ids)).size;
+}
+
+/**
+ * The one path every hierarchy transition takes (#57, #62).
+ *
+ * Legality is the policy's alone: the fetch filters on nothing but the id, so
+ * a task in the wrong state reaches `validateTransition` and gets a real
+ * reason back, instead of being masked as NOT_FOUND by a `where` clause that
+ * quietly encoded the same rule a second time.
+ *
+ * `afterPlan` is for ledger work a kind owes beyond its own transition —
+ * today only DELETE, which also marks the removal on the parent's trail. It
+ * runs on the same transaction, so it rolls back with everything else.
+ */
+async function applyTransition({
+  kind,
+  taskId,
+  userId,
+  afterPlan,
+}: {
+  kind: TransitionKind;
+  taskId: string;
+  userId: string;
+  afterPlan?: (
+    tx: Prisma.TransactionClient,
+    task: TransitionTarget,
+  ) => Promise<void>;
+}) {
+  const config = TRANSITIONS[kind];
+  return serviceAction(async () => {
+    const task = await client.task.findUnique({
+      where: { id: taskId },
+      select: {
+        id: true,
+        title: true,
+        parentId: true,
+        projectId: true,
+        completedAt: true,
+        archivedAt: true,
+        deletedAt: true,
+        project: { select: { userId: true } },
+      },
+    });
+    if (!task) {
+      return createServiceErrorResponse("NOT_FOUND", "Task not found");
+    }
+    if (task.project.userId !== userId) {
+      return createServiceErrorResponse(
+        "AUTHORIZATION_ERROR",
+        "User does not have access to this task",
+      );
+    }
+
+    return await client.$transaction(async (tx) => {
+      const ancestors = await getAllAncestors(task.parentId, tx);
+      const validation = validateTransition(kind, task, ancestors);
+      if (!validation.valid) {
+        return createServiceErrorResponse(
+          validation.error.code,
+          validation.error.message,
+        );
+      }
+
+      let descendants: LineageNode[] = [];
+      if (config.cascade) {
+        // The whole subtree, in whatever state. The policy's strength order
+        // decides how far the cascade actually reaches, so filtering here
+        // would be the same rule written a second time (#62).
+        descendants = await collectDescendantNodes(
+          taskId,
+          task.projectId,
+          tx,
+          true,
+          true,
+        );
+        const activeTimer = await tx.activeTimer.findFirst({
+          where: { taskId: { in: descendants.map((d) => d.id) } },
+        });
+        if (activeTimer) {
+          return createServiceErrorResponse(
+            "VALIDATION_ERROR",
+            config.cascade.timerBlockedMessage,
+          );
+        }
+      }
+
+      const plan = buildTransitionPlan(kind, task, ancestors, descendants);
+      await executePlan(plan, tx, userId);
+      await afterPlan?.(tx, task);
+
+      return createSuccessResponseWithData({
+        id: taskId,
+        changedCount: countChanged(plan),
+      });
+    });
+  }, config.failureMessage);
 }
 
 async function getAllAncestors(
@@ -403,87 +536,24 @@ export function deleteTask({
   taskId: string;
   userId: string;
 }) {
-  return serviceAction(async () => {
-    const task = await client.task.findUnique({
-      where: { id: taskId, deletedAt: null },
-      select: {
-        id: true,
-        title: true, // for the SUBTASK_REMOVED payload on the parent (#52)
-        parentId: true,
-        projectId: true,
-        completedAt: true,
-        archivedAt: true,
-        deletedAt: true,
-        project: { select: { userId: true } },
-      },
-    });
-
-    if (!task) {
-      return createServiceErrorResponse("NOT_FOUND", "Task not found");
-    }
-
-    if (task.project.userId !== userId) {
-      return createServiceErrorResponse(
-        "AUTHORIZATION_ERROR",
-        "User does not have access to this task",
-      );
-    }
-
-    return await client.$transaction(async (tx) => {
-      const ancestors = await getAllAncestors(task.parentId, tx);
-      const validation = validateTransition("DELETE", task, ancestors);
-      if (!validation.valid) {
-        return createServiceErrorResponse(
-          validation.error.code,
-          validation.error.message,
-        );
-      }
-
-      const descendants = await collectDescendantNodes(
-        taskId,
-        task.projectId,
-        tx,
-        true,
-      );
-
-      const activeTimer = await tx.activeTimer.findFirst({
-        where: { taskId: { in: descendants.map((d) => d.id) } },
-      });
-
-      if (activeTimer) {
-        return createServiceErrorResponse(
-          "VALIDATION_ERROR",
-          "Task with active Timer cannot be deleted",
-        );
-      }
-
-      const plan = buildTransitionPlan("DELETE", task, ancestors, descendants);
-      await executePlan(plan, tx);
-      await emitTransitionEvents(tx, {
-        type: TaskEventType.DELETED,
-        userId,
-        targetTaskId: task.id,
-        changed: writeFor(plan, "deletedAt"),
-      });
-
+  return applyTransition({
+    kind: "DELETE",
+    taskId,
+    userId,
+    afterPlan: async (tx, task) => {
       // Record the removal on the former direct parent's trail (#52). Only the
       // directly-deleted task notifies its parent; descendants swept up by the
-      // same cascade do not emit (ADR-0020 boundary).
-      if (task.parentId) {
-        await emitEvent(tx, {
-          taskId: task.parentId,
-          userId,
-          type: TaskEventType.SUBTASK_REMOVED,
-          payload: { childTaskId: task.id, childTitle: task.title },
-        });
-      }
-
-      return createSuccessResponseWithData({
-        id: taskId,
-        deletedCount: writeFor(plan, "deletedAt").ids.length,
+      // same cascade do not emit (ADR-0020 boundary). Not a transition event,
+      // so it rides alongside the plan rather than in it.
+      if (!task.parentId) return;
+      await emitEvent(tx, {
+        taskId: task.parentId,
+        userId,
+        type: TaskEventType.SUBTASK_REMOVED,
+        payload: { childTaskId: task.id, childTitle: task.title },
       });
-    });
-  }, "Failed to delete task");
+    },
+  });
 }
 
 export function hasActiveDescendants({ taskId }: { taskId: string }) {
@@ -510,76 +580,7 @@ export function completeTask({
   taskId: string;
   userId: string;
 }) {
-  return serviceAction(async () => {
-    const task = await client.task.findUnique({
-      where: { id: taskId, deletedAt: null },
-      select: {
-        id: true,
-        parentId: true,
-        projectId: true,
-        completedAt: true,
-        archivedAt: true,
-        deletedAt: true,
-        project: { select: { userId: true } },
-      },
-    });
-
-    if (!task) {
-      return createServiceErrorResponse("NOT_FOUND", "Task not found");
-    }
-    if (task.project.userId !== userId) {
-      return createServiceErrorResponse(
-        "AUTHORIZATION_ERROR",
-        "User does not have access to this task",
-      );
-    }
-
-    return await client.$transaction(async (tx) => {
-      const ancestors = await getAllAncestors(task.parentId, tx);
-      const validation = validateTransition("COMPLETE", task, ancestors);
-      if (!validation.valid) {
-        return createServiceErrorResponse(
-          validation.error.code,
-          validation.error.message,
-        );
-      }
-
-      const descendants = await collectDescendantNodes(
-        taskId,
-        task.projectId,
-        tx,
-      );
-
-      const activeTimer = await tx.activeTimer.findFirst({
-        where: { taskId: { in: descendants.map((d) => d.id) } },
-      });
-      if (activeTimer) {
-        return createServiceErrorResponse(
-          "VALIDATION_ERROR",
-          "Task with active Timer cannot be marked as complete",
-        );
-      }
-
-      const plan = buildTransitionPlan(
-        "COMPLETE",
-        task,
-        ancestors,
-        descendants,
-      );
-      await executePlan(plan, tx);
-      await emitTransitionEvents(tx, {
-        type: TaskEventType.COMPLETED,
-        userId,
-        targetTaskId: task.id,
-        changed: writeFor(plan, "completedAt"),
-      });
-
-      return createSuccessResponseWithData({
-        id: taskId,
-        completedCount: writeFor(plan, "completedAt").ids.length,
-      });
-    });
-  }, "Failed to complete task");
+  return applyTransition({ kind: "COMPLETE", taskId, userId });
 }
 
 export function uncompleteTask({
@@ -589,60 +590,8 @@ export function uncompleteTask({
   taskId: string;
   userId: string;
 }) {
-  return serviceAction(async () => {
-    const task = await client.task.findUnique({
-      where: {
-        id: taskId,
-        deletedAt: null,
-      },
-      select: {
-        id: true,
-        parentId: true,
-        completedAt: true,
-        archivedAt: true,
-        deletedAt: true,
-        project: { select: { userId: true } },
-      },
-    });
-
-    if (!task) {
-      return createServiceErrorResponse("NOT_FOUND", "Task not found");
-    }
-    if (task.project.userId !== userId) {
-      return createServiceErrorResponse(
-        "AUTHORIZATION_ERROR",
-        "User does not have access to this task",
-      );
-    }
-
-    return await client.$transaction(async (tx) => {
-      const ancestors = await getAllAncestors(task.parentId, tx);
-      const validation = validateTransition("UNCOMPLETE", task, ancestors);
-      if (!validation.valid) {
-        return createServiceErrorResponse(
-          validation.error.code,
-          validation.error.message,
-        );
-      }
-
-      const plan = buildTransitionPlan("UNCOMPLETE", task, ancestors);
-      await executePlan(plan, tx);
-      await emitTransitionEvents(tx, {
-        type: TaskEventType.UNCOMPLETED,
-        userId,
-        targetTaskId: task.id,
-        changed: writeFor(plan, "completedAt"),
-      });
-
-      return createSuccessResponseWithData({
-        id: taskId,
-        uncompletedCount: writeFor(plan, "completedAt").ids.length,
-      });
-    });
-  }, "Failed to uncomplete task");
+  return applyTransition({ kind: "UNCOMPLETE", taskId, userId });
 }
-
-// ─── Archive / Unarchive / Restore ─────────────────────────────────────────────
 
 export function archiveTask({
   taskId,
@@ -651,76 +600,7 @@ export function archiveTask({
   taskId: string;
   userId: string;
 }) {
-  return serviceAction(async () => {
-    const task = await client.task.findUnique({
-      where: { id: taskId, deletedAt: null, archivedAt: null },
-      select: {
-        id: true,
-        parentId: true,
-        projectId: true,
-        completedAt: true,
-        archivedAt: true,
-        deletedAt: true,
-        project: { select: { userId: true } },
-      },
-    });
-
-    if (!task) {
-      return createServiceErrorResponse("NOT_FOUND", "Task not found");
-    }
-    if (task.project.userId !== userId) {
-      return createServiceErrorResponse(
-        "AUTHORIZATION_ERROR",
-        "User does not have access to this task",
-      );
-    }
-
-    return await client.$transaction(async (tx) => {
-      const ancestors = await getAllAncestors(task.parentId, tx);
-      const validation = validateTransition("ARCHIVE", task, ancestors);
-      if (!validation.valid) {
-        return createServiceErrorResponse(
-          validation.error.code,
-          validation.error.message,
-        );
-      }
-
-      const descendants = await collectDescendantNodes(
-        taskId,
-        task.projectId,
-        tx,
-      );
-
-      const activeTimer = await tx.activeTimer.findFirst({
-        where: { taskId: { in: descendants.map((d) => d.id) } },
-      });
-      if (activeTimer) {
-        return createServiceErrorResponse(
-          "VALIDATION_ERROR",
-          "Task with active Timer cannot be archived",
-        );
-      }
-
-      const plan = buildTransitionPlan(
-        "ARCHIVE",
-        task,
-        ancestors,
-        descendants,
-      );
-      await executePlan(plan, tx);
-      await emitTransitionEvents(tx, {
-        type: TaskEventType.ARCHIVED,
-        userId,
-        targetTaskId: task.id,
-        changed: writeFor(plan, "archivedAt"),
-      });
-
-      return createSuccessResponseWithData({
-        id: taskId,
-        archivedCount: writeFor(plan, "archivedAt").ids.length,
-      });
-    });
-  }, "Failed to archive task");
+  return applyTransition({ kind: "ARCHIVE", taskId, userId });
 }
 
 export function unarchiveTask({
@@ -730,51 +610,7 @@ export function unarchiveTask({
   taskId: string;
   userId: string;
 }) {
-  return serviceAction(async () => {
-    const task = await client.task.findUnique({
-      where: { id: taskId, archivedAt: { not: null }, deletedAt: null },
-      select: {
-        id: true,
-        parentId: true,
-        completedAt: true,
-        archivedAt: true,
-        deletedAt: true,
-        project: { select: { userId: true } },
-      },
-    });
-
-    if (!task) {
-      return createServiceErrorResponse("NOT_FOUND", "Task not found");
-    }
-    if (task.project.userId !== userId) {
-      return createServiceErrorResponse(
-        "AUTHORIZATION_ERROR",
-        "User does not have access to this task",
-      );
-    }
-
-    return await client.$transaction(async (tx) => {
-      const ancestors = await getAllAncestors(task.parentId, tx);
-      const validation = validateTransition("UNARCHIVE", task, ancestors);
-      if (!validation.valid) {
-        return createServiceErrorResponse(
-          validation.error.code,
-          validation.error.message,
-        );
-      }
-
-      const plan = buildTransitionPlan("UNARCHIVE", task, ancestors);
-      await executePlan(plan, tx);
-      await emitTransitionEvents(tx, {
-        type: TaskEventType.UNARCHIVED,
-        userId,
-        targetTaskId: task.id,
-        changed: writeFor(plan, "archivedAt"),
-      });
-
-      return createSuccessResponseWithData({ id: taskId });
-    });
-  }, "Failed to unarchive task");
+  return applyTransition({ kind: "UNARCHIVE", taskId, userId });
 }
 
 export function restoreDeletedTask({
@@ -784,52 +620,5 @@ export function restoreDeletedTask({
   taskId: string;
   userId: string;
 }) {
-  return serviceAction(async () => {
-    const task = await client.task.findUnique({
-      where: { id: taskId, deletedAt: { not: null } },
-      select: {
-        id: true,
-        parentId: true,
-        completedAt: true,
-        archivedAt: true,
-        deletedAt: true,
-        project: { select: { userId: true } },
-      },
-    });
-
-    if (!task) {
-      return createServiceErrorResponse("NOT_FOUND", "Task not found");
-    }
-    if (task.project.userId !== userId) {
-      return createServiceErrorResponse(
-        "AUTHORIZATION_ERROR",
-        "User does not have access to this task",
-      );
-    }
-
-    return await client.$transaction(async (tx) => {
-      const ancestors = await getAllAncestors(task.parentId, tx);
-      const validation = validateTransition("UNDELETE", task, ancestors);
-      if (!validation.valid) {
-        return createServiceErrorResponse(
-          validation.error.code,
-          validation.error.message,
-        );
-      }
-
-      const plan = buildTransitionPlan("UNDELETE", task, ancestors);
-      await executePlan(plan, tx);
-      await emitTransitionEvents(tx, {
-        type: TaskEventType.RESTORED,
-        userId,
-        targetTaskId: task.id,
-        changed: writeFor(plan, "deletedAt"),
-      });
-
-      return createSuccessResponseWithData({
-        id: taskId,
-        restoredCount: writeFor(plan, "deletedAt").ids.length,
-      });
-    });
-  }, "Failed to restore task");
+  return applyTransition({ kind: "UNDELETE", taskId, userId });
 }

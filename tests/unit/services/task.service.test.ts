@@ -19,7 +19,10 @@ import {
   createTask,
   deleteTask,
   completeTask,
+  uncompleteTask,
   archiveTask,
+  unarchiveTask,
+  restoreDeletedTask,
 } from "@/lib/services/task.service";
 import prisma from "@/lib/prisma";
 
@@ -281,6 +284,171 @@ describe("createTask — SUBTASK_CREATED events", () => {
 
     expect(result.success).toBe(true);
     expect(subtaskEventCalls(TaskEventType.SUBTASK_CREATED)).toHaveLength(0);
+  });
+});
+
+// The orchestrator's own contract (#62). The fetch filters on nothing but the
+// id, so a task in the wrong state now reaches the policy and comes back with
+// a real reason. Before, a per-kind `where` clause hid it as NOT_FOUND — the
+// same rule written twice, disagreeing about what the user did wrong.
+describe("applyTransition — the policy alone judges legality", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    db.$transaction.mockImplementation((fn: (tx: MockTx) => unknown) => fn(tx));
+    tx.activeTimer.findFirst.mockResolvedValue(null);
+    tx.task.updateMany.mockResolvedValue({ count: 1 });
+    tx.taskEvent.create.mockResolvedValue({ id: "event-1" });
+    tx.task.findUnique.mockResolvedValue(null); // no ancestors
+    tx.task.findMany.mockResolvedValue([]);
+  });
+
+  const targetInState = (overrides: Record<string, unknown>) =>
+    buildTask({
+      id: "t1",
+      parentId: null,
+      project: { userId: "test-user-1" },
+      ...overrides,
+    });
+
+  // This is the assertion that pins the change. The prisma mock ignores `where`,
+  // so a test that only reads the returned error would pass against the old
+  // per-kind filters too; the fetch shape is what actually tells them apart.
+  it.each([
+    ["completeTask", completeTask],
+    ["uncompleteTask", uncompleteTask],
+    ["archiveTask", archiveTask],
+    ["unarchiveTask", unarchiveTask],
+    ["deleteTask", deleteTask],
+    ["restoreDeletedTask", restoreDeletedTask],
+  ])("%s fetches by id alone, with no state filter", async (_name, run) => {
+    db.task.findUnique.mockResolvedValue(
+      targetInState({ archivedAt: new Date(), deletedAt: new Date() }),
+    );
+    tx.task.findMany.mockResolvedValue([lineageNode("t1", null)]);
+
+    await run({ taskId: "t1", userId: "test-user-1" });
+
+    expect(db.task.findUnique).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: "t1" } }),
+    );
+  });
+
+  it.each([
+    ["archiveTask on an already-archived task", archiveTask, { archivedAt: new Date() }, "Task is already archived"],
+    ["unarchiveTask on a task that is not archived", unarchiveTask, {}, "Task is not archived"],
+    ["restoreDeletedTask on a task that is not deleted", restoreDeletedTask, {}, "Task is not deleted"],
+    ["completeTask on a deleted task", completeTask, { deletedAt: new Date() }, "Task is deleted"],
+    ["uncompleteTask on a task that is not completed", uncompleteTask, {}, "Task is not completed"],
+  ])("%s says why, instead of NOT_FOUND", async (_name, run, state, reason) => {
+    db.task.findUnique.mockResolvedValue(targetInState(state));
+
+    const result = await run({ taskId: "t1", userId: "test-user-1" });
+
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.message).toBe(reason);
+      expect(result.error.code).not.toBe("NOT_FOUND");
+    }
+  });
+
+  it("still reports NOT_FOUND when the task really does not exist", async () => {
+    db.task.findUnique.mockResolvedValue(null);
+
+    const result = await completeTask({ taskId: "gone", userId: "test-user-1" });
+
+    expect(result.success).toBe(false);
+    if (!result.success) expect(result.error.code).toBe("NOT_FOUND");
+  });
+
+  it("checks the owner before opening a transaction", async () => {
+    db.task.findUnique.mockResolvedValue(
+      targetInState({ project: { userId: "someone-else" } }),
+    );
+
+    const result = await completeTask({ taskId: "t1", userId: "test-user-1" });
+
+    expect(result.success).toBe(false);
+    if (!result.success) expect(result.error.code).toBe("AUTHORIZATION_ERROR");
+    expect(db.$transaction).not.toHaveBeenCalled();
+  });
+});
+
+// The timer guard belongs to the kinds that reach down the tree: a running
+// timer below the target is only a problem when the target's state is about to
+// land on it. Backward kinds repair upward and never scan.
+describe("applyTransition — timer guard on the forward kinds only", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    db.$transaction.mockImplementation((fn: (tx: MockTx) => unknown) => fn(tx));
+    tx.task.updateMany.mockResolvedValue({ count: 1 });
+    tx.taskEvent.create.mockResolvedValue({ id: "event-1" });
+    tx.task.findUnique.mockResolvedValue(null);
+    tx.task.findMany.mockResolvedValue([lineageNode("t1", null)]);
+  });
+
+  it.each([
+    ["completeTask", completeTask, "Task with active Timer cannot be marked as complete"],
+    ["archiveTask", archiveTask, "Task with active Timer cannot be archived"],
+    ["deleteTask", deleteTask, "Task with active Timer cannot be deleted"],
+  ])("%s refuses while a timer runs in the subtree", async (_name, run, message) => {
+    db.task.findUnique.mockResolvedValue(
+      buildTask({ id: "t1", parentId: null, project: { userId: "test-user-1" } }),
+    );
+    tx.activeTimer.findFirst.mockResolvedValue(buildActiveTimer({ taskId: "t1" }));
+
+    const result = await run({ taskId: "t1", userId: "test-user-1" });
+
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.code).toBe("VALIDATION_ERROR");
+      expect(result.error.message).toBe(message);
+    }
+    expect(tx.task.updateMany).not.toHaveBeenCalled();
+  });
+
+  it("unarchiveTask never scans for descendants or timers", async () => {
+    db.task.findUnique.mockResolvedValue(
+      buildTask({
+        id: "t1",
+        parentId: null,
+        archivedAt: new Date(),
+        project: { userId: "test-user-1" },
+      }),
+    );
+    tx.activeTimer.findFirst.mockResolvedValue(buildActiveTimer({ taskId: "t1" }));
+
+    const result = await unarchiveTask({ taskId: "t1", userId: "test-user-1" });
+
+    expect(result.success).toBe(true);
+    expect(tx.activeTimer.findFirst).not.toHaveBeenCalled();
+    expect(tx.task.findMany).not.toHaveBeenCalled();
+  });
+
+  // How far a cascade reaches is the strength order's call. The service used to
+  // encode part of it in the descendant fetch — DELETE included archived rows,
+  // COMPLETE and ARCHIVE did not — which left the rule in two places. Now every
+  // forward kind hands the policy the whole subtree.
+  it.each([
+    ["completeTask", completeTask],
+    ["archiveTask", archiveTask],
+    ["deleteTask", deleteTask],
+  ])("%s scans the whole subtree, in whatever state", async (_name, run) => {
+    db.task.findUnique.mockResolvedValue(
+      buildTask({
+        id: "t1",
+        parentId: null,
+        project: { userId: "test-user-1" },
+      }),
+    );
+    tx.activeTimer.findFirst.mockResolvedValue(null);
+
+    await run({ taskId: "t1", userId: "test-user-1" });
+
+    expect(tx.task.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { projectId: "test-project-1", archivedAt: undefined, deletedAt: undefined },
+      }),
+    );
   });
 });
 
