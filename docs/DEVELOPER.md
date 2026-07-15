@@ -86,7 +86,11 @@ issue-tracker/
 │               ├── tasksWrapper.tsx   # Client component — task tree + create/edit dialogs
 │               ├── tasks.tsx         # Recursive task row rendering
 │               ├── taskRowButton.tsx  # Task row action buttons
-│               └── newRootTask.tsx    # Root task creation dialog
+│               ├── newRootTask.tsx    # Root task creation dialog
+│               └── archive/          # Archived & deleted task lists
+│                   ├── page.tsx
+│                   ├── archiveTaskList.tsx  # Restore dialogs for both lists
+│                   └── restoreCheck.ts      # Restore preflight — adapter over the domain policy (#64)
 ├── components/                       # Shared UI components (button, input, dialog, dropdown, etc.)
 │   └── forms/                        # Form components (create-project-form.tsx)
 ├── lib/
@@ -99,14 +103,14 @@ issue-tracker/
 │   ├── actions.ts                    # Legacy auth actions (superseded by lib/actions/auth.actions.ts)
 │   ├── consts.ts                     # Legacy Toggl constants (superseded by lib/toggl/consts.ts)
 │   ├── schema/                       # Zod schemas + derived types
-│   │   ├── task.ts                   # CreateTaskSchema, UpdateTaskSchema, TaskStatus, TaskNode type
+│   │   ├── task.ts                   # CreateTaskSchema, UpdateTaskSchema, TaskStatus, TaskNode, TaskLineage types
 │   │   ├── project.ts               # Project schemas
 │   │   └── timeEntry.ts             # Time entry schemas (placeholder)
 │   ├── domain/                       # Pure domain logic, client-importable (no prisma, no server-only)
 │   │   └── taskHierarchyPolicy.ts    # Hierarchy transition validation + plan building (ADR-0018)
 │   ├── services/                     # Business logic (pure functions, Prisma calls) — server-only
 │   │   ├── project.service.ts        # Project reads
-│   │   ├── task.service.ts           # Task CRUD (create, update, hasActiveTimers)
+│   │   ├── task.service.ts           # Task CRUD + applyTransition, the one orchestrator for the six hierarchy transitions (ADR-0018)
 │   │   ├── timeEntry.service.ts      # Historical time entry queries (future)
 │   │   ├── activeTask.service.ts     # Active timer management (start, stop, get, change)
 │   │   ├── serviceUtil.ts            # serviceAction wrapper, error responses

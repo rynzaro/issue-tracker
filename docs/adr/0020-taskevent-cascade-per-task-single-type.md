@@ -1,6 +1,11 @@
 # Cascading transitions emit one TaskEvent per affected task, same type, cascade origin in payload
 
-Hierarchy transitions (complete/uncomplete/archive/unarchive/delete/restore, ADR-0018) change many tasks in one authorized act. Each affected task gets its own event so every task's timeline reads complete on its own — a child completed via its parent must not have a silent state change. Cascaded events use the **same event type** as the direct act, with `causedBy: <targetTaskId>` in the payload; direct acts omit `causedBy`.
+Hierarchy transitions (complete/uncomplete/archive/unarchive/delete/restore, ADR-0018) change many tasks in one authorized act. Each affected task gets its own event so every task's timeline reads complete on its own — a child completed via its parent must not have a silent state change. Cascaded events use the **same event type** as the direct act; direct acts omit `causedBy`.
+
+`causedBy` in the payload names **the task that caused the change**:
+
+- cascade and repair events — the task the user acted on;
+- inherited states (#63) — the ancestor the state came from. A task restored under an archived ancestor comes back archived; it gets its restore event **and** an `ARCHIVED` event with `causedBy: <ancestor>`, because becoming archived is a state change of its own and the timeline must explain it. The event type is the forward act that sets the state; the stored date stays the ancestor's, while the event carries the time it happened.
 
 ## Considered Options
 
