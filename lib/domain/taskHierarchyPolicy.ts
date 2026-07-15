@@ -100,8 +100,11 @@ function writeOne(
  * state is a repair the transition makes to keep the tree legal (#63's
  * backdated inherits) — still a state change, so it gets its own event too,
  * planned where the repair is decided (`inheritWeakerStates`).
+ *
+ * Exported so a caller can tell the two apart in a plan — what the user asked
+ * for, against what had to be repaired around it (#64).
  */
-const OWN_STATE: Record<TransitionKind, TransitionState> = {
+export const OWN_STATE: Record<TransitionKind, TransitionState> = {
   COMPLETE: "completedAt",
   UNCOMPLETE: "completedAt",
   ARCHIVE: "archivedAt",
@@ -155,6 +158,12 @@ export type TransitionErrorCode = "UNEXPECTED_ERROR";
 export type ValidationError = {
   code: TransitionErrorCode;
   message: string;
+  /**
+   * The task the rule tripped on, when the rule was about a particular one.
+   * `message` is the domain's own wording; a caller that has to name the task
+   * to a user looks it up by this id and says it in its own words (#64).
+   */
+  taskId?: string;
 };
 export type ValidationResult =
   | { valid: true }
@@ -163,8 +172,12 @@ export type ValidationResult =
 function fail(
   code: ValidationError["code"],
   message: string,
+  taskId?: string,
 ): ValidationResult {
-  return { valid: false, error: { code, message } };
+  return {
+    valid: false,
+    error: { code, message, ...(taskId !== undefined ? { taskId } : {}) },
+  };
 }
 
 function ok(): ValidationResult {
@@ -173,37 +186,37 @@ function ok(): ValidationResult {
 
 /**
  * Self-state legality: whether the task's own flags permit this transition.
- * Services additionally filter their fetches (e.g. `deletedAt: null`) for
- * visibility and NOT_FOUND masking; legality itself is judged here.
+ * This is the only judge — callers fetch by id and ask, rather than filtering
+ * a wrong-state task out and calling it missing (#62).
  */
 function validateSelfState(
   kind: TransitionKind,
   task: LineageNode,
 ): ValidationResult {
   if (task.deletedAt && kind !== "UNDELETE")
-    return fail("UNEXPECTED_ERROR", "Task is deleted");
+    return fail("UNEXPECTED_ERROR", "Task is deleted", task.id);
   switch (kind) {
     case "COMPLETE":
-      if (task.archivedAt) return fail("UNEXPECTED_ERROR", "Task is archived");
+      if (task.archivedAt) return fail("UNEXPECTED_ERROR", "Task is archived", task.id);
       if (task.completedAt)
-        return fail("UNEXPECTED_ERROR", "Task is already completed");
+        return fail("UNEXPECTED_ERROR", "Task is already completed", task.id);
       return ok();
     case "UNCOMPLETE":
-      if (task.archivedAt) return fail("UNEXPECTED_ERROR", "Task is archived");
+      if (task.archivedAt) return fail("UNEXPECTED_ERROR", "Task is archived", task.id);
       if (!task.completedAt)
-        return fail("UNEXPECTED_ERROR", "Task is not completed");
+        return fail("UNEXPECTED_ERROR", "Task is not completed", task.id);
       return ok();
     case "ARCHIVE":
       if (task.archivedAt)
-        return fail("UNEXPECTED_ERROR", "Task is already archived");
+        return fail("UNEXPECTED_ERROR", "Task is already archived", task.id);
       return ok();
     case "UNARCHIVE":
       if (!task.archivedAt)
-        return fail("UNEXPECTED_ERROR", "Task is not archived");
+        return fail("UNEXPECTED_ERROR", "Task is not archived", task.id);
       return ok();
     case "UNDELETE":
       if (!task.deletedAt)
-        return fail("UNEXPECTED_ERROR", "Task is not deleted");
+        return fail("UNEXPECTED_ERROR", "Task is not deleted", task.id);
       return ok();
     case "DELETE":
       return ok();
@@ -240,9 +253,9 @@ export function validateTransition(
 function validateComplete(ancestors: LineageNode[]): ValidationResult {
   for (const a of ancestors) {
     if (a.deletedAt)
-      return fail("UNEXPECTED_ERROR", "Ancestor task is deleted");
+      return fail("UNEXPECTED_ERROR", "Ancestor task is deleted", a.id);
     if (a.archivedAt)
-      return fail("UNEXPECTED_ERROR", "Ancestor task is archived");
+      return fail("UNEXPECTED_ERROR", "Ancestor task is archived", a.id);
   }
   // Completion gap check: no uncompleted ancestor may sit between completed ancestors
   let seenUncompleted = false;
@@ -250,7 +263,7 @@ function validateComplete(ancestors: LineageNode[]): ValidationResult {
     if (!a.completedAt) {
       seenUncompleted = true;
     } else if (seenUncompleted) {
-      return fail("UNEXPECTED_ERROR", "Invalid ancestor completion chain");
+      return fail("UNEXPECTED_ERROR", "Invalid ancestor completion chain", a.id);
     }
   }
   return ok();
@@ -262,16 +275,16 @@ function validateUncomplete(
 ): ValidationResult {
   for (const a of ancestors) {
     if (a.deletedAt)
-      return fail("UNEXPECTED_ERROR", "Ancestor task is deleted");
+      return fail("UNEXPECTED_ERROR", "Ancestor task is deleted", a.id);
     if (a.archivedAt)
-      return fail("UNEXPECTED_ERROR", "Ancestor task is archived");
+      return fail("UNEXPECTED_ERROR", "Ancestor task is archived", a.id);
   }
   // Completion gap check: after the first uncompleted ancestor, no higher ancestor may be completed
   let reachedUncompleted = false;
   for (const a of ancestors) {
     if (a.completedAt) {
       if (reachedUncompleted) {
-        return fail("UNEXPECTED_ERROR", "Invalid ancestor completion chain");
+        return fail("UNEXPECTED_ERROR", "Invalid ancestor completion chain", a.id);
       }
     } else {
       reachedUncompleted = true;
@@ -283,9 +296,9 @@ function validateUncomplete(
 function validateArchive(ancestors: LineageNode[]): ValidationResult {
   for (const a of ancestors) {
     if (a.deletedAt)
-      return fail("UNEXPECTED_ERROR", "Ancestor task is deleted");
+      return fail("UNEXPECTED_ERROR", "Ancestor task is deleted", a.id);
     if (a.archivedAt)
-      return fail("UNEXPECTED_ERROR", "Ancestor task is archived");
+      return fail("UNEXPECTED_ERROR", "Ancestor task is archived", a.id);
   }
   return ok();
 }
@@ -293,14 +306,14 @@ function validateArchive(ancestors: LineageNode[]): ValidationResult {
 function validateUnarchive(ancestors: LineageNode[]): ValidationResult {
   for (const a of ancestors) {
     if (a.deletedAt)
-      return fail("UNEXPECTED_ERROR", "Ancestor task is deleted");
+      return fail("UNEXPECTED_ERROR", "Ancestor task is deleted", a.id);
   }
   // Archive gap check: after first unarchived ancestor, no higher ancestor may be archived
   let reachedUnarchived = false;
   for (const a of ancestors) {
     if (a.archivedAt) {
       if (reachedUnarchived) {
-        return fail("UNEXPECTED_ERROR", "Invalid ancestor archive chain");
+        return fail("UNEXPECTED_ERROR", "Invalid ancestor archive chain", a.id);
       }
     } else {
       reachedUnarchived = true;
@@ -312,7 +325,7 @@ function validateUnarchive(ancestors: LineageNode[]): ValidationResult {
 function validateDelete(ancestors: LineageNode[]): ValidationResult {
   for (const a of ancestors) {
     if (a.deletedAt)
-      return fail("UNEXPECTED_ERROR", "Ancestor task is deleted");
+      return fail("UNEXPECTED_ERROR", "Ancestor task is deleted", a.id);
   }
   return ok();
 }
@@ -323,7 +336,7 @@ function validateUndelete(ancestors: LineageNode[]): ValidationResult {
   for (const a of ancestors) {
     if (a.deletedAt) {
       if (reachedUndeleted) {
-        return fail("UNEXPECTED_ERROR", "Invalid ancestor deletion chain");
+        return fail("UNEXPECTED_ERROR", "Invalid ancestor deletion chain", a.id);
       }
     } else {
       reachedUndeleted = true;

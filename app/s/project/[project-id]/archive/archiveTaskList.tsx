@@ -1,7 +1,7 @@
 "use client";
 
-import { TaskNode } from "@/lib/schema/task";
-import { TaskParentInfo } from "@/lib/services/project.service";
+import { TaskNode, type TaskLineage } from "@/lib/schema/task";
+import { getRestoreCheck, getAffectedSummary } from "./restoreCheck";
 import { formatTime } from "@/lib/util";
 import {
   unarchiveTaskAction,
@@ -42,88 +42,6 @@ function TrashXIcon({ className }: { className?: string }) {
       </span>
     </span>
   );
-}
-
-type RestoreCheck = {
-  canRestore: boolean;
-  description: string;
-  warning?: string;
-  affectedAncestors: TaskParentInfo[];
-};
-
-function getAffectedSummary(affectedAncestors: TaskParentInfo[]): string {
-  if (affectedAncestors.length === 0) {
-    return "";
-  }
-
-  return `Diese Aktion stellt diese Aufgabe und ${affectedAncestors.length} weitere Aufgabe${affectedAncestors.length > 1 ? "n" : ""} wieder her.`;
-}
-
-function collectAncestors(
-  task: TaskNode,
-  parentMap: Record<string, TaskParentInfo>,
-): TaskParentInfo[] {
-  const ancestors: TaskParentInfo[] = [];
-  const visited = new Set<string>();
-  let currentParentId = task.parentId;
-
-  while (currentParentId && !visited.has(currentParentId)) {
-    visited.add(currentParentId);
-    const parent = parentMap[currentParentId];
-    if (!parent) break;
-    ancestors.push(parent);
-    currentParentId = parent.parentId;
-  }
-
-  return ancestors;
-}
-
-function getRestoreCheck(
-  task: TaskNode,
-  mode: "archived" | "deleted",
-  parentMap: Record<string, TaskParentInfo>,
-): RestoreCheck {
-  const base = `Bist du dir sicher?`;
-  const ancestors = collectAncestors(task, parentMap);
-  const affectedAncestors = ancestors.filter((ancestor) =>
-    mode === "archived"
-      ? ancestor.state === "archived"
-      : ancestor.state === "deleted",
-  );
-
-  const blockingAncestor = ancestors.find((ancestor) => {
-    if (mode === "archived") return ancestor.state === "deleted";
-    return ancestor.state === "archived";
-  });
-  if (blockingAncestor) {
-    const stateLabel =
-      blockingAncestor.state === "archived" ? "archiviert" : "gelöscht";
-    return {
-      canRestore: false,
-      description: `Wiederherstellung nicht möglich — die Überaufgabe „${blockingAncestor.title}" ist ${stateLabel}.`,
-      affectedAncestors,
-    };
-  }
-
-  // If any active completed ancestor exists and this task is not completed,
-  // restoring can force completion rollback up the chain.
-  const completedAncestor = ancestors.find(
-    (ancestor) => ancestor.state === "active_completed",
-  );
-  if (completedAncestor && !task.completedAt) {
-    return {
-      canRestore: true,
-      description: base,
-      warning: `Die Überaufgabe „${completedAncestor.title}" ist als erledigt markiert.`,
-      affectedAncestors,
-    };
-  }
-
-  return {
-    canRestore: true,
-    description: base,
-    affectedAncestors,
-  };
 }
 
 function ArchiveTaskNode({
@@ -215,7 +133,7 @@ export default function ArchiveTaskList({
 }: {
   tasks: TaskNode[];
   mode: "archived" | "deleted";
-  parentMap: Record<string, TaskParentInfo>;
+  parentMap: Record<string, TaskLineage>;
 }) {
   const { showToast } = useToast();
   const [taskToRestore, setTaskToRestore] = useState<TaskNode | null>(null);

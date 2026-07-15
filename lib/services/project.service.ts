@@ -14,7 +14,7 @@ import {
   ProjectWithTaskTree,
   UpdateProjectParams,
 } from "../schema/project";
-import { TaskNode } from "../schema/task";
+import { TaskNode, type TaskLineage } from "../schema/task";
 import { getActiveTimer } from "./activeTask.service";
 
 export async function createProject({
@@ -468,40 +468,14 @@ export function getDeletedTasksForProject({
 
 // ─── Task Parent Map (for restore dialogs) ─────────────────────────────────────
 
-export type TaskParentInfo = {
-  id: string;
-  parentId: string | null;
-  title: string;
-  state: "active" | "active_completed" | "archived" | "deleted";
-};
-
-type TaskParentRaw = {
-  id: string;
-  parentId: string | null;
-  title: string;
-  completedAt: Date | null;
-  archivedAt: Date | null;
-  deletedAt: Date | null;
-};
-
-function buildParentMap(
-  tasks: TaskParentRaw[],
-): Record<string, TaskParentInfo> {
-  const map: Record<string, TaskParentInfo> = {};
-  for (const t of tasks) {
-    let state: TaskParentInfo["state"];
-    if (t.deletedAt) {
-      state = "deleted";
-    } else if (t.archivedAt) {
-      state = "archived";
-    } else if (t.completedAt) {
-      state = "active_completed";
-    } else {
-      state = "active";
-    }
-    map[t.id] = { id: t.id, parentId: t.parentId, title: t.title, state };
-  }
-  return map;
+/**
+ * The project's tasks by id, in the shape the hierarchy policy reads. Both the
+ * restore dialog and the server judge a restore from this — one rule, one set
+ * of facts (#64). Handing over the raw dates is the point: this used to reduce
+ * them to a single state label, which is what forced the client to guess.
+ */
+function buildParentMap(tasks: TaskLineage[]): Record<string, TaskLineage> {
+  return Object.fromEntries(tasks.map((t) => [t.id, t]));
 }
 
 export function getProjectTaskParentMap({
@@ -537,7 +511,7 @@ export type ArchivePageData = {
   project: Project;
   archivedTasks: TaskNode[];
   deletedTasks: TaskNode[];
-  parentMap: Record<string, TaskParentInfo>;
+  parentMap: Record<string, TaskLineage>;
 };
 
 export function getArchivePageData({

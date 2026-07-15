@@ -1,7 +1,18 @@
 import { Prisma } from "@prisma/client";
 import z from "zod";
+import type { LineageNode } from "@/lib/domain/taskHierarchyPolicy";
 
 export type TaskStatus = "OPEN" | "IN_PROGRESS" | "DONE";
+
+/**
+ * A task as its descendants' lineage sees it: what the hierarchy policy needs
+ * to judge a transition, plus the title a dialog names it by.
+ *
+ * It carries the three dates rather than one state label. Collapsing them —
+ * "archived" winning over "completed" — threw away what the policy reads, so
+ * the client had to keep its own restore rule, and the two drifted apart (#64).
+ */
+export type TaskLineage = LineageNode & { title: string };
 
 export const CreateTaskSchema = z.object({
   projectId: z.cuid(),
