@@ -1,7 +1,11 @@
 import { Prisma, TaskEventType } from "@prisma/client";
 import client from "@/lib/prisma";
 import { CreateTaskParams, UpdateTaskParams } from "../schema/task";
-import { emitEvent, type EmitEventInput } from "./event.service";
+import {
+  emitEvent,
+  type EmitEventInput,
+  type TransitionEventType,
+} from "./event.service";
 import {
   createServiceErrorResponse,
   createSuccessResponseWithData,
@@ -75,19 +79,6 @@ async function collectDescendantNodes(
   }
   return nodes;
 }
-
-/**
- * The six hierarchy-transition verbs as stored. All share
- * `statusTransitionPayload` (`{at, causedBy?}`) in event.service, so a single
- * payload shape is valid for whichever verb an event entry names.
- */
-type TransitionEventType =
-  | typeof TaskEventType.COMPLETED
-  | typeof TaskEventType.UNCOMPLETED
-  | typeof TaskEventType.ARCHIVED
-  | typeof TaskEventType.UNARCHIVED
-  | typeof TaskEventType.DELETED
-  | typeof TaskEventType.RESTORED;
 
 /**
  * Domain kind → stored event type. The policy plans events in the domain's own
@@ -434,7 +425,7 @@ export function updateTask({
   return serviceAction(async () => {
     const task = await client.task.findUnique({
       where: { id: updateTaskParams.id, deletedAt: null, archivedAt: null },
-      select: { estimate: true, project: { select: { userId: true } } },
+      select: { project: { select: { userId: true } } },
     });
     if (!task) {
       return createServiceErrorResponse("NOT_FOUND", "Task not found");
@@ -454,11 +445,20 @@ export function updateTask({
 
     // null means "leave tags untouched"; an array (even empty) edits the set.
     const tagIds = updateTaskParams.tagIds;
-    const oldEstimate = task.estimate;
 
     const updatedTask = await client.$transaction(async (tx) => {
-      // Snapshot the tag set before the update so a TAGS_CHANGED event can record
-      // before/after. Tags are per-user, so scope the read to this actor.
+      // Snapshot what the events report on before the update, both reads inside
+      // the transaction so the "old" they record is the state this update
+      // actually wrote over. Throws if the task vanished between the auth fetch
+      // and here, which rolls the update back rather than emitting a wrong `old`.
+      const oldEstimate = (
+        await tx.task.findUniqueOrThrow({
+          where: { id: updateTaskParams.id },
+          select: { estimate: true },
+        })
+      ).estimate;
+
+      // Tags are per-user, so scope the read to this actor.
       const oldTagIds =
         tagIds !== null
           ? (

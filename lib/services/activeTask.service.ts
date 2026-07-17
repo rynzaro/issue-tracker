@@ -6,7 +6,7 @@ import {
   serviceQuery,
   serviceQueryOrNotFound,
 } from "./serviceUtil";
-import { emitStartedOnce } from "./startedEvent";
+import { emitStartedOnce } from "./event.service";
 import { calculateDurationInSeconds } from "../util";
 
 export function getActiveTimer({ userId }: { userId: string }) {
