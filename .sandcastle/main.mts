@@ -56,10 +56,12 @@ const hooks = {
   },
 };
 
-// Copy node_modules from the host into the worktree before each sandbox
-// starts. Avoids a full npm install from scratch; the hook above handles
-// platform-specific binaries and any packages added since the last copy.
-const copyToWorktree = ["node_modules"];
+// Nothing is copied from the host. Copying node_modules in cannot work: it
+// records the host's macOS store path in .modules.yaml, so pnpm in the Linux
+// sandbox sees a changed store and wants to wipe the directory — which with no
+// TTY aborts the install outright. Letting pnpm install clean is both correct
+// and faster than copying 800MB in only for pnpm to discard it.
+const copyToWorktree: string[] = [];
 
 // ---------------------------------------------------------------------------
 // Main loop
