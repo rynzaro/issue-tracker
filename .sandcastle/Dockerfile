@@ -25,6 +25,13 @@ ARG AGENT_GID=1000
 RUN groupmod -o -g $AGENT_GID node && usermod -o -u $AGENT_UID -g $AGENT_GID -d /home/agent -m -l agent node
 USER ${AGENT_UID}:${AGENT_GID}
 
+# Pre-download the pnpm release into the agent's corepack cache, so the
+# `corepack pnpm install` hook at container start never reaches out to npm.
+# Must match package.json's "packageManager": on drift corepack falls back to
+# fetching at start, which is what this bakes around.
+ARG PNPM_VERSION=10.29.2
+RUN corepack prepare pnpm@${PNPM_VERSION} --activate
+
 # Install Claude Code CLI
 RUN curl -fsSL https://claude.ai/install.sh | bash
 
