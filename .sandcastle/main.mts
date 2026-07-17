@@ -43,8 +43,16 @@ const planSchema = z.object({
 // Raise this if your backlog is large; lower it for a quick smoke-test run.
 const MAX_ITERATIONS = 10;
 
-// Hooks run inside the sandbox before the agent starts each iteration.
-// npm install ensures the sandbox always has fresh dependencies.
+// Hooks run inside the sandbox before the agent starts each iteration, so the
+// agent has dependencies installed.
+//
+// Only pass these to runs that get their own worktree (i.e. that pass a
+// branch). A run without a branch bind-mounts the host checkout itself, whose
+// node_modules was built on macOS: pnpm sees the host's storeDir in
+// .modules.yaml, wants to wipe the directory, finds no TTY, and aborts with
+// ERR_PNPM_ABORTED_REMOVE_MODULES_DIR_NO_TTY. Forcing it through (CI=true)
+// would be worse — it would overwrite the host's node_modules with Linux
+// binaries and break local dev.
 const hooks = {
   sandbox: {
     onSandboxReady: [
@@ -80,7 +88,9 @@ for (let iteration = 1; iteration <= MAX_ITERATIONS; iteration++) {
   // It outputs a <plan> JSON block — Output.object parses and validates it.
   // -------------------------------------------------------------------------
   const plan = await sandcastle.run({
-    hooks,
+    // No install hook: this run has no branch, so it bind-mounts the host
+    // checkout (see the hooks comment above). The planner only reads issues
+    // via gh and reasons about them — it never needs node_modules.
     sandbox: docker(),
     name: "planner",
     // One iteration is enough: the planner just needs to read and reason,
