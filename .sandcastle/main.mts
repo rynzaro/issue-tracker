@@ -43,32 +43,20 @@ const planSchema = z.object({
 // Raise this if your backlog is large; lower it for a quick smoke-test run.
 const MAX_ITERATIONS = 10;
 
-// Hooks run inside the sandbox before the agent starts each iteration, so the
-// agent has dependencies installed.
-//
-// Only pass these to runs that get their own worktree (i.e. that pass a
-// branch). A run without a branch bind-mounts the host checkout itself, whose
-// node_modules was built on macOS: pnpm sees the host's storeDir in
-// .modules.yaml, wants to wipe the directory, finds no TTY, and aborts with
-// ERR_PNPM_ABORTED_REMOVE_MODULES_DIR_NO_TTY. Forcing it through (CI=true)
-// would be worse — it would overwrite the host's node_modules with Linux
-// binaries and break local dev.
+// Hooks run inside the sandbox before the agent starts each iteration.
+// npm install ensures the sandbox always has fresh dependencies.
+// A cold install here takes ~50s; the default hook timeout is 60s, which the
+// real run tips over. Raise it so a legitimate install isn't killed early.
 const hooks = {
   sandbox: {
-    onSandboxReady: [
-      {
-        command: "corepack pnpm install --frozen-lockfile",
-        timeoutMs: 600_000,
-      },
-    ],
+    onSandboxReady: [{ command: "npm install", timeoutMs: 300_000 }],
   },
 };
 
-// Nothing is copied from the host. Copying node_modules in cannot work: it
-// records the host's macOS store path in .modules.yaml, so pnpm in the Linux
-// sandbox sees a changed store and wants to wipe the directory — which with no
-// TTY aborts the install outright. Letting pnpm install clean is both correct
-// and faster than copying 800MB in only for pnpm to discard it.
+// Do NOT copy the host node_modules into the worktree: this repo is
+// pnpm-managed, and running `npm install` over a pnpm-shaped node_modules
+// crashes npm ("Cannot read properties of null (reading 'matches')"). With an
+// empty worktree the hook does a clean install from scratch (~50s) instead.
 const copyToWorktree: string[] = [];
 
 // ---------------------------------------------------------------------------
@@ -88,9 +76,9 @@ for (let iteration = 1; iteration <= MAX_ITERATIONS; iteration++) {
   // It outputs a <plan> JSON block — Output.object parses and validates it.
   // -------------------------------------------------------------------------
   const plan = await sandcastle.run({
-    // No install hook: this run has no branch, so it bind-mounts the host
-    // checkout (see the hooks comment above). The planner only reads issues
-    // via gh and reasons about them — it never needs node_modules.
+    // No install hook: a branchless run bind-mounts the host checkout (with its
+    // pnpm node_modules, which crashes `npm install`), and the planner only
+    // reads issues via `gh` — it never needs node_modules.
     sandbox: docker(),
     name: "planner",
     // One iteration is enough: the planner just needs to read and reason,
@@ -225,7 +213,9 @@ for (let iteration = 1; iteration <= MAX_ITERATIONS; iteration++) {
   // uses to know which branches to merge and which issues to close.
   // -------------------------------------------------------------------------
   await sandcastle.run({
-    hooks,
+    // No install hook: like the planner, a branchless run bind-mounts the host
+    // checkout, so `npm install` would crash on the pnpm node_modules. The
+    // host's existing node_modules is already present for any verification.
     sandbox: docker(),
     name: "merger",
     maxIterations: 1,
