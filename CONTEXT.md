@@ -57,7 +57,20 @@ Completed work interval; mandatory `stoppedAt`, `duration` in seconds.
 The one running timer per user (`@@unique([userId])`, ADR-0016). Running work = ActiveTimer, finished work = TimeEntry; converting one to the other is the only transition, transactional, no overlaps.
 
 **Checkpoint**:
-Snapshot of a task + direct children (estimate, tracked time per child). First WORK_STARTED checkpoint on a task = **baseline** (`isBaseline`, scoped per-task). `existedAtBaseline` on CheckpointTask enables the scope/effort split.
+What a person believed the plan was at one moment — a frozen cross-section of a task + its direct children (estimate, tracked time per child). The record estimate-accuracy analysis grades. Records a **settled** judgment, never a change (ADR-0022); estimate judgments live here and nowhere else (ADR-0021). First WORK_STARTED checkpoint on a task = **baseline** (`isBaseline`, scoped per-task). `existedAtBaseline` on CheckpointTask enables the scope/effort split.
+_Avoid_: "snapshot" unqualified — it holds beliefs, not state; nothing is restorable from it.
+
+**Plan Checkpoint**:
+A checkpoint the user authored — they decided something (scope change, estimate change, manual save). Replaced in place until their thinking settles.
+
+**Reality Checkpoint**:
+A checkpoint the world forced — work started, or a task completed. Frozen on write, never replaced. Its value is what the user *still believed about the rest of the plan* when the fact landed.
+
+**Silence**:
+A checkpoint showing evidence arrived and the plan did not move — a sibling overran, its neighbours' estimates stayed put. Estimation evidence of its own: not acting emits no event, so only a frozen cross-section records it.
+
+**Settled Judgment**:
+A plan the user stopped editing. The unit a checkpoint stores. Individual edits inside a burst are half-formed thoughts, not judgments — which is why the debounce window exists (ADR-0022).
 
 **TodoItem**:
 Lightweight pre-task checklist entry on a task; convertible to sub-task, lineage via `convertedToTaskId`.
@@ -66,7 +79,10 @@ Lightweight pre-task checklist entry on a task; convertible to sub-task, lineage
 M:N; tags scoped per-user (ADR-0013); junction records who applied it (ADR-0014).
 
 **TaskEvent**:
-Append-only audit row per domain-meaningful mutation, 16 types, Zod-validated payloads. Records the acting user. Write-once: later corrections live in state, never in past events. Purpose: raw material for estimation-misjudgement analysis (alongside Checkpoints); no UI surface of its own. Pure audit trail: task state (datetime flags, ADR-0007) stays authoritative; events describe changes, never define them. A missed emission is a logging bug, not corruption.
+What happened — an append-only audit row per domain-meaningful mutation, Zod-validated payloads, recording the acting user. Write-once: later corrections live in state, never in past events. No UI surface of its own. Pure audit trail: task state (datetime flags, ADR-0007) stays authoritative; events describe changes, never define them. A missed emission is a logging bug, not corruption. Holds **facts only** — an estimate is a claim its author may be wrong about, so it belongs to Checkpoints (ADR-0021; `ESTIMATE_CHANGED` removal pending).
+
+**Three records, one home per fact**:
+Task fields define **current state** (ADR-0007). TaskEvents record **what happened**. Checkpoints record **what was believed** (ADR-0021). A fact with two homes has no rule for which wins when they disagree.
 
 **Status**:
 Derived from datetime flags, no enum (ADR-0007): `completedAt`, `archivedAt`, `deletedAt` (soft delete, ADR-0009). All three restorable via hierarchy transitions.
@@ -84,7 +100,7 @@ Derived from datetime flags, no enum (ADR-0007): `completedAt`, `archivedAt`, `d
 
 1. One ActiveTimer per user (DB-enforced).
 2. TaskEvents append-only — never update/delete rows.
-3. Checkpoints fire for changed task + direct parent, never grandparent+.
+3. Checkpoints fire for changed task + direct parent, never grandparent+. The parent is where the plan lives: a changed child is a *column* in the parent's cross-section, so the parent's checkpoint is the primary one, not a rollup courtesy. Grandparents hold derived totals, not beliefs.
 4. At most one baseline checkpoint per task.
 5. No state gaps in ancestor chains (e.g. completed ancestor above uncompleted descendant = integrity error, policy-enforced).
 6. Soft-deleted rows filtered from every query.
