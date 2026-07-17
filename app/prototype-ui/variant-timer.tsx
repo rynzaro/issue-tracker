@@ -13,9 +13,8 @@ import {
   StopIcon,
   ArrowUpIcon,
 } from "@heroicons/react/16/solid";
-import { useElapsedTimer } from "@/lib/hooks";
 import { PNode, findRunning, hasActiveDescendant, hasOverflow } from "./fakeTree";
-import { PulseDot, OverflowWarning, RowTime, hhmm } from "./shared";
+import { PulseDot, OverflowWarning, RowTime, hhmm, useElapsed } from "./shared";
 import { DoneMode, visibleChildren } from "./switcher-bar";
 
 export default function VariantTimer({
@@ -31,7 +30,7 @@ export default function VariantTimer({
 }) {
   const path = findRunning(roots);
   const running = path?.[path.length - 1] ?? null;
-  const elapsed = useElapsedTimer(running?.startedAt ?? null);
+  const elapsed = useElapsed(running?.startedAt ?? null);
 
   return (
     <div className="pb-32">

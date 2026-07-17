@@ -2,11 +2,35 @@
 // PROTOTYPE — throwaway. Shared bits so the four variants look like the real app
 // (dark mode, German, pulse dot, overflow triangle — all kept on purpose).
 
+import { useEffect, useState } from "react";
 import clsx from "clsx";
 import { ExclamationTriangleIcon } from "@heroicons/react/24/outline";
 import { Tooltip } from "@/components/tooltip";
 import { formatTime } from "@/lib/util";
 import { PNode, lesson } from "./fakeTree";
+
+/**
+ * Copy of lib/hooks.ts useElapsedTimer. Copied on purpose: that module also
+ * imports the server actions, which pull in prisma — the prototype must stay
+ * free of the server so it runs with no DB and no login.
+ */
+export function useElapsed(startedAt: Date | null): number {
+  const [elapsed, setElapsed] = useState(0);
+  useEffect(() => {
+    if (!startedAt) {
+      setElapsed(0);
+      return;
+    }
+    const start = new Date(startedAt).getTime();
+    setElapsed(Math.floor((Date.now() - start) / 1000));
+    const i = setInterval(
+      () => setElapsed(Math.floor((Date.now() - start) / 1000)),
+      1000,
+    );
+    return () => clearInterval(i);
+  }, [startedAt]);
+  return elapsed;
+}
 
 export function PulseDot() {
   return (

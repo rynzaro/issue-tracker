@@ -14,9 +14,8 @@ import {
   StopIcon,
 } from "@heroicons/react/16/solid";
 import { Heading } from "@/components/heading";
-import { useElapsedTimer } from "@/lib/hooks";
 import { PNode, findPath, hasOverflow, hasActiveDescendant, countDescendants } from "./fakeTree";
-import { PulseDot, OverflowWarning, RowTime, TimerChip, LessonPanel } from "./shared";
+import { PulseDot, OverflowWarning, RowTime, TimerChip, LessonPanel, useElapsed } from "./shared";
 import { DoneMode, visibleChildren } from "./switcher-bar";
 
 export default function VariantPlace({
@@ -44,7 +43,7 @@ export default function VariantPlace({
       : visibleChildren(kids, doneMode, showDone);
 
   const running = node?.status === "IN_PROGRESS";
-  const elapsed = useElapsedTimer(running ? node!.startedAt : null);
+  const elapsed = useElapsed(running ? node!.startedAt : null);
 
   return (
     <div className="pb-32">
@@ -158,7 +157,7 @@ function ChildRow({
 }) {
   const running = node.status === "IN_PROGRESS";
   const activeBelow = hasActiveDescendant(node);
-  const elapsed = useElapsedTimer(running ? node.startedAt : null);
+  const elapsed = useElapsed(running ? node.startedAt : null);
 
   return (
     <li>

@@ -7,9 +7,8 @@
 import { useRef, useEffect } from "react";
 import clsx from "clsx";
 import { PlayIcon, PlusIcon } from "@heroicons/react/16/solid";
-import { useElapsedTimer } from "@/lib/hooks";
 import { PNode, findPath, hasOverflow, hasActiveDescendant } from "./fakeTree";
-import { PulseDot, OverflowWarning, RowTime, TimerChip, LessonPanel } from "./shared";
+import { PulseDot, OverflowWarning, RowTime, TimerChip, LessonPanel, useElapsed } from "./shared";
 import { DoneMode, visibleChildren } from "./switcher-bar";
 
 export default function VariantColumns({
@@ -130,7 +129,7 @@ function ColRow({
 }) {
   const running = node.status === "IN_PROGRESS";
   const activeBelow = hasActiveDescendant(node);
-  const elapsed = useElapsedTimer(running ? node.startedAt : null);
+  const elapsed = useElapsed(running ? node.startedAt : null);
 
   return (
     <li>

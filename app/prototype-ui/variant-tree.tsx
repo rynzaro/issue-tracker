@@ -13,9 +13,8 @@ import {
   StopIcon,
   EllipsisHorizontalIcon,
 } from "@heroicons/react/16/solid";
-import { useElapsedTimer } from "@/lib/hooks";
 import { PNode, hasOverflow, hasActiveDescendant } from "./fakeTree";
-import { PulseDot, OverflowWarning, RowTime, TimerChip } from "./shared";
+import { PulseDot, OverflowWarning, RowTime, TimerChip, useElapsed } from "./shared";
 import { DoneMode, visibleChildren } from "./switcher-bar";
 
 export default function VariantTree({
@@ -66,7 +65,7 @@ function Row({
   const activeBelow = hasActiveDescendant(node);
   const [expanded, setExpanded] = useState(activeBelow || depth === 0);
   const [showDoneHere, setShowDoneHere] = useState(false);
-  const elapsed = useElapsedTimer(running ? node.startedAt : null);
+  const elapsed = useElapsed(running ? node.startedAt : null);
 
   const kids = node.children;
   const doneKids = kids.filter((c) => c.status === "DONE");
