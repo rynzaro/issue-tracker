@@ -168,7 +168,7 @@ model Checkpoint {
     label                    String?
     isBaseline               Boolean           @default(false)
     childCount               Int
-    estimatedTotal           Int? // in minutes, sum of task and subtasks
+    estimatedTotal           Int? // in minutes, the task's own estimate plus its direct children only (never grandchildren)
     trackedTotal             Int // in seconds, sum of task and subtasks
     ownEstimate              Int? // in minutes, only the task's own estimate
     newChildrenSinceBaseline Int               @default(0)
@@ -183,6 +183,7 @@ model CheckpointTask {
     Checkpoint          Checkpoint  @relation(fields: [checkpointId], references: [id])
     taskId              String
     task                Task        @relation(fields: [taskId], references: [id])
+    title               String
     estimate            Int? // in minutes
     trackedSoFar        Int // in seconds
     existedAtBaseline   Boolean
