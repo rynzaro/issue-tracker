@@ -8,8 +8,7 @@ import { buildFakeTree } from "./fakeTree";
 import { DoneMode, SwitcherBar } from "./switcher-bar";
 import VariantTree from "./variant-tree";
 import VariantPlace from "./variant-place";
-import VariantColumns from "./variant-columns";
-import VariantTimer from "./variant-timer";
+import VariantFlat from "./variant-flat";
 
 export default function PrototypeUI() {
   const router = useRouter();
@@ -60,20 +59,12 @@ export default function PrototypeUI() {
         />
       )}
       {variant === "3" && (
-        <VariantColumns
+        <VariantFlat
           roots={roots}
           focusId={focusId}
           doneMode={doneMode}
           showDone={showDone}
           onOpen={open}
-        />
-      )}
-      {variant === "4" && (
-        <VariantTimer
-          roots={roots}
-          doneMode={doneMode}
-          showDone={showDone}
-          onOpen={(id) => setParams({ v: "2", focus: id })}
         />
       )}
 

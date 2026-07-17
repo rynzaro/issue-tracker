@@ -1,22 +1,43 @@
 "use client";
-// PROTOTYPE — throwaway. Variant 2: the task is a PLACE.
-// You stand inside one task. Its title is the heading, its children are the
-// list, the lesson (own vs subs vs planned) is on the page — not in a dialog.
-// Depth is free here: you never render more than one level, so nesting can go
-// as deep as it likes.
+// PROTOTYPE — throwaway. Variant 2: "Fokus".
+// The thing Felix actually pictured: click a task → summary on top, the real
+// subtree as a tree below. The improvement over today is the ONE axis that was
+// never touched — indentation no longer carries depth:
+//   - indent stops after INDENT_CAP levels; deeper rows share one gutter and
+//     are told apart by a guide line + a depth marker, not by more margin
+//   - any row is clickable to RE-ROOT: it becomes the page, breadcrumb grows,
+//     indent resets to zero. You go deep by diving, not by scrolling right.
 
 import { useState } from "react";
 import clsx from "clsx";
 import {
+  ChevronDownIcon,
   ChevronRightIcon,
   PlayIcon,
   PlusIcon,
   StopIcon,
+  ArrowsPointingInIcon,
 } from "@heroicons/react/16/solid";
 import { Heading } from "@/components/heading";
-import { PNode, findPath, hasOverflow, hasActiveDescendant, countDescendants } from "./fakeTree";
-import { PulseDot, OverflowWarning, RowTime, TimerChip, LessonPanel, useElapsed } from "./shared";
+import {
+  PNode,
+  findPath,
+  hasOverflow,
+  hasActiveDescendant,
+  countDescendants,
+} from "./fakeTree";
+import {
+  PulseDot,
+  OverflowWarning,
+  RowTime,
+  TimerChip,
+  LessonPanel,
+  useElapsed,
+} from "./shared";
 import { DoneMode, visibleChildren } from "./switcher-bar";
+
+const INDENT_CAP = 3; // levels of real indent; beyond this the gutter is shared
+const STEP = 18;
 
 export default function VariantPlace({
   roots,
@@ -31,23 +52,17 @@ export default function VariantPlace({
   showDone: boolean;
   onOpen: (id: string | null) => void;
 }) {
-  const [showDoneHere, setShowDoneHere] = useState(false);
   const path = focusId ? findPath(roots, focusId) : null;
   const node = path?.[path.length - 1] ?? null;
-
   const kids = node ? node.children : roots;
-  const doneKids = kids.filter((c) => c.status === "DONE");
-  const shown =
-    doneMode === "perLevel" && showDoneHere
-      ? kids
-      : visibleChildren(kids, doneMode, showDone);
+  const shown = visibleChildren(kids, doneMode, showDone);
 
   const running = node?.status === "IN_PROGRESS";
   const elapsed = useElapsed(running ? node!.startedAt : null);
 
   return (
     <div className="pb-32">
-      {/* the path back — this is what makes depth survivable */}
+      {/* path back — climbing out of a dive */}
       <nav className="flex items-center gap-1 flex-wrap text-sm mb-4">
         <button
           type="button"
@@ -75,6 +90,7 @@ export default function VariantPlace({
         ))}
       </nav>
 
+      {/* ---- the summary ON TOP ---- */}
       {node ? (
         <>
           <div className="flex items-start justify-between gap-4 mb-1">
@@ -98,11 +114,9 @@ export default function VariantPlace({
             </div>
           </div>
           <p className="text-sm text-zinc-500 dark:text-zinc-400 mb-6">
-            {node.children.length} Unteraufgaben · {countDescendants(node)} im
-            ganzen Teilbaum
+            {node.children.length} direkte · {countDescendants(node)} im ganzen
+            Teilbaum · Ebene {(path?.length ?? 1) - 1}
           </p>
-
-          {/* the lesson lives HERE and only here */}
           <div className="mb-8">
             <LessonPanel node={node} />
           </div>
@@ -111,6 +125,7 @@ export default function VariantPlace({
         <Heading className="mb-6">Zeiterfassung v2 (Prototyp-Daten)</Heading>
       )}
 
+      {/* ---- the real tree BELOW ---- */}
       <div className="flex items-center justify-between mb-2">
         <h2 className="text-sm font-semibold dark:text-white">
           {node ? "Unteraufgaben" : "Aufgaben"}
@@ -124,71 +139,141 @@ export default function VariantPlace({
         </button>
       </div>
 
-      <ul className="divide-y divide-zinc-100 dark:divide-zinc-800 border-y border-zinc-100 dark:border-zinc-800">
+      <div className="border-y border-zinc-100 dark:border-zinc-800 py-1">
         {shown.map((c) => (
-          <ChildRow key={c.id} node={c} onOpen={onOpen} />
+          <SubRow
+            key={c.id}
+            node={c}
+            depth={0}
+            doneMode={doneMode}
+            showDone={showDone}
+            onDive={onOpen}
+          />
         ))}
         {shown.length === 0 && (
-          <li className="py-6 text-sm text-zinc-400">Keine Unteraufgaben.</li>
+          <p className="py-6 text-sm text-zinc-400">Keine Unteraufgaben.</p>
         )}
-      </ul>
-
-      {doneMode === "perLevel" && doneKids.length > 0 && (
-        <button
-          type="button"
-          onClick={() => setShowDoneHere((p) => !p)}
-          className="mt-3 text-xs text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200"
-        >
-          {showDoneHere
-            ? "Abgeschlossene ausblenden"
-            : `Abgeschlossen (${doneKids.length})`}
-        </button>
-      )}
+      </div>
     </div>
   );
 }
 
-function ChildRow({
+/** A node in the subtree. Expands in place; title dives (re-roots). */
+function SubRow({
   node,
-  onOpen,
+  depth,
+  doneMode,
+  showDone,
+  onDive,
 }: {
   node: PNode;
-  onOpen: (id: string) => void;
+  depth: number;
+  doneMode: DoneMode;
+  showDone: boolean;
+  onDive: (id: string) => void;
 }) {
   const running = node.status === "IN_PROGRESS";
   const activeBelow = hasActiveDescendant(node);
+  const [expanded, setExpanded] = useState(activeBelow);
   const elapsed = useElapsed(running ? node.startedAt : null);
 
+  const kids = visibleChildren(node.children, doneMode, showDone);
+  const hasKids = node.children.length > 0;
+
+  // indentation is CAPPED — this is the whole point
+  const capped = Math.min(depth, INDENT_CAP);
+  const overCap = depth > INDENT_CAP;
+
   return (
-    <li>
-      <button
-        type="button"
-        onClick={() => onOpen(node.id)}
-        className="w-full flex items-center gap-2 py-2.5 px-1 text-left hover:bg-gray-50 dark:hover:bg-zinc-800/60 rounded"
+    <div>
+      <div
+        className="group flex items-center gap-1.5 rounded-md pr-2 py-1.5 hover:bg-gray-50 dark:hover:bg-zinc-800/60"
+        style={{ paddingLeft: capped * STEP + 4 }}
       >
-        {(running || activeBelow) && <PulseDot />}
-        <span
+        {/* shared gutter marker once indent is capped */}
+        {overCap && (
+          <span className="mr-0.5 text-[10px] font-mono text-zinc-400 dark:text-zinc-500 tabular-nums">
+            {depth + 1}
+          </span>
+        )}
+
+        <button
+          type="button"
+          onClick={() => hasKids && setExpanded((p) => !p)}
           className={clsx(
-            "truncate text-sm",
+            "shrink-0 w-4 h-4 flex items-center justify-center text-zinc-400",
+            !hasKids && "invisible",
+          )}
+          aria-label={expanded ? "Zuklappen" : "Aufklappen"}
+        >
+          {expanded ? (
+            <ChevronDownIcon className="w-4 h-4" />
+          ) : (
+            <ChevronRightIcon className="w-4 h-4" />
+          )}
+        </button>
+
+        {(running || activeBelow) && <PulseDot />}
+
+        {/* title dives — re-root to this task */}
+        <button
+          type="button"
+          onClick={() => onDive(node.id)}
+          className={clsx(
+            "truncate text-left text-sm hover:underline",
             node.status === "DONE"
               ? "line-through text-zinc-400 dark:text-zinc-500"
               : "dark:text-white",
           )}
+          title="Öffnen (wird zur Seite)"
         >
           {node.title}
-        </span>
-        {node.children.length > 0 && (
+        </button>
+
+        {hasKids && (
           <span className="shrink-0 text-xs text-zinc-400 tabular-nums">
             {node.children.length}
           </span>
         )}
         {hasOverflow(node) && node.status !== "DONE" && <OverflowWarning />}
+
         <span className="ml-auto shrink-0 flex items-center gap-2">
           {running && <TimerChip seconds={elapsed} />}
           <RowTime node={node} extra={running ? elapsed : 0} />
-          <ChevronRightIcon className="w-4 h-4 text-zinc-300 dark:text-zinc-600" />
+          <span className="flex items-center gap-1 opacity-0 group-hover:opacity-100 focus-within:opacity-100">
+            <button
+              type="button"
+              aria-label="Timer"
+              className="p-1 rounded text-zinc-500 hover:text-zinc-900 hover:bg-zinc-200 dark:text-zinc-400 dark:hover:text-white dark:hover:bg-zinc-700"
+            >
+              <PlayIcon className="w-4 h-4" />
+            </button>
+            {hasKids && (
+              <button
+                type="button"
+                onClick={() => onDive(node.id)}
+                aria-label="Hierher tauchen"
+                className="p-1 rounded text-zinc-500 hover:text-zinc-900 hover:bg-zinc-200 dark:text-zinc-400 dark:hover:text-white dark:hover:bg-zinc-700"
+                title="Diese Aufgabe zur Seite machen"
+              >
+                <ArrowsPointingInIcon className="w-4 h-4" />
+              </button>
+            )}
+          </span>
         </span>
-      </button>
-    </li>
+      </div>
+
+      {expanded &&
+        kids.map((c) => (
+          <SubRow
+            key={c.id}
+            node={c}
+            depth={depth + 1}
+            doneMode={doneMode}
+            showDone={showDone}
+            onDive={onDive}
+          />
+        ))}
+    </div>
   );
 }

@@ -1,4 +1,7 @@
 "use client";
+/* eslint-disable react-hooks/set-state-in-effect --
+   useElapsed below is a faithful copy of lib/hooks.ts useElapsedTimer; the
+   setState-in-effect pattern is intentional for a throwaway prototype timer. */
 // PROTOTYPE — throwaway. Shared bits so the four variants look like the real app
 // (dark mode, German, pulse dot, overflow triangle — all kept on purpose).
 

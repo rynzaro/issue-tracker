@@ -21,10 +21,9 @@ export function visibleChildren<T extends { status: string }>(
 }
 
 export const VARIANTS = [
-  { v: "1", name: "Baum", hint: "ganzer Baum, dünne Linien" },
-  { v: "2", name: "Ort", hint: "eine Ebene, Aufgabe = Ort" },
-  { v: "3", name: "Spalten", hint: "Finder-Spalten, Tiefe nach rechts" },
-  { v: "4", name: "Timer", hint: "laufender Timer oben angepinnt" },
+  { v: "1", name: "Baum (heute)", hint: "aktueller Stand als Vergleich" },
+  { v: "2", name: "Fokus", hint: "Summary oben + Baum, Einrückung gedeckelt, tauchen" },
+  { v: "3", name: "Flach", hint: "Summary oben + Teilbaum ganz ohne Einrückung" },
 ] as const;
 
 export function SwitcherBar({
