@@ -1,5 +1,6 @@
 import client from "@/lib/prisma";
 import { assertCan } from "@/lib/authz/policy";
+import { sendEmail } from "@/lib/email/email.service";
 import {
   createServiceErrorResponse,
   createSuccessResponse,
@@ -113,8 +114,13 @@ export function addTaskMember({
       },
     });
 
-    // TODO(D-10): send email notification to targetUser.email
-    void targetUser.email;
+    if (targetUser.email) {
+      void sendEmail({
+        to: targetUser.email,
+        subject: "You were added to a task",
+        text: `You have been added as a collaborator to a task. Open it to see the details.`,
+      });
+    }
 
     return createSuccessResponseWithData<AddTaskMemberResult>({
       id: membership.id,

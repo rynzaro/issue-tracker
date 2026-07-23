@@ -12,6 +12,11 @@ vi.mock("@/lib/prisma", () => {
   return { default: mock };
 });
 
+const sendEmailMock = vi.fn();
+vi.mock("@/lib/email/email.service", () => ({
+  sendEmail: (...args: unknown[]) => sendEmailMock(...args),
+}));
+
 import {
   addTaskMember,
   removeTaskMember,
@@ -32,6 +37,7 @@ const grandchildId = "grandchild-1";
 
 beforeEach(() => {
   vi.clearAllMocks();
+  sendEmailMock.mockReset();
 });
 
 describe("getVisibleTaskIds", () => {
@@ -113,6 +119,12 @@ describe("addTaskMember", () => {
       expect(result.data.userId).toBe(memberId);
     }
     expect(db.taskMember.create).toHaveBeenCalled();
+    expect(sendEmailMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        to: buildUser({ id: memberId }).email,
+        subject: expect.stringContaining("added"),
+      }),
+    );
   });
 
   it("returns NOT_FOUND when task does not exist", async () => {
