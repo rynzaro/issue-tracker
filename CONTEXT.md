@@ -31,13 +31,21 @@ The user who logged a time entry. Only the author may amend or remove it; the pr
 **Estimation Evidence**:
 A person's time entries, seen as the record by which they judge their own ability to estimate. The reason execution authority is exclusive to the creator.
 
-**Task Member** _(future)_:
-A user added to a specific task. May create sub-tasks under it (which they then execute); may not edit or execute the task itself.
+**Task Member**:
+A user added to a specific task (the **host**). May create sub-tasks under the
+host (which they then execute); may not edit or execute the host itself. Holds
+only `task:create-child` on the host and full creator authority on their own
+subtree. Sees only the host and its descendants. Added via `TaskMember` table.
+_Avoid_: member, assignee, project member
 
 ### Judgments
 
 **Authorization**:
-Whether a principal may perform an act on a resource. Judged once, on the target of an operation — cascading effects (downward onto descendants, upward ancestor-chain repairs) are consequences of the authorized act, not separately authorized.
+Whether a principal may perform an act on a resource. Judged once on the target
+for simple acts; for hierarchy transitions, judged over the **write-set** returned
+by `buildTransitionPlan`. Cascading effects (downward onto descendants, upward
+ancestor-chain repairs) are consequences of the authorized act, not separately
+authorized.
 
 **Transition Legality**:
 Whether a task subtree may make a state change at all, regardless of who asks. A principal-free judgment, separate from authorization.
@@ -92,7 +100,7 @@ Derived from datetime flags, no enum (ADR-0007): `completedAt`, `archivedAt`, `d
 - **Stack**: Next.js 16 App Router, React 19, Prisma 7, MySQL 8 (Docker), NextAuth 5 (credentials-only), Tailwind 4, Zod, pnpm.
 - **Route boundary**: authenticated app under `app/s/`, public pages under `app/public/`; session middleware in `proxy.ts`.
 - **Three layers**: Component → Server Action (`lib/actions/`) → Service (`lib/services/`) → Prisma. Business logic in services only — except pure domain policy, which lives in `lib/domain/` (no prisma, no server-only imports, client-importable; #59). `lib/services/` is server-only (guarded via `import "server-only"` in `serviceUtil.ts`). Reads: server components call services directly. API routes only for external integrations.
-- **Security boundary (ADR-0017 → ADR-0019)**: actions + server components authenticate via `auth()`. Ownership checks today: 14 scattered sites inside services (`!== userId` comparisons; was 19 before `applyTransition` folded five per-verb checks into one). Decided target: central `lib/authz/policy.ts`, pure `can()`/`assertCan()`, `NOT_FOUND`-masked errors — **deliberately deferred until multiplayer** (#22; plan: `docs/AUTHORIZATION_PLAN.md`).
+- **Security boundary (ADR-0017 → ADR-0019)**: actions + server components authenticate via `auth()`. Ownership checks today: 14 scattered sites inside services (`!== userId` comparisons; was 19 before `applyTransition` folded five per-verb checks into one). Decided target: central `lib/authz/policy.ts`, pure `can()`/`assertCan()`, `NOT_FOUND`-masked errors — **deliberately deferred until multiplayer** (#22; plan: `docs/AUTHORIZATION_PLAN.md`). The Task Member feature extends this policy with `task:create-child` and a membership grant source.
 - **Hierarchy transitions (ADR-0018)**: complete/uncomplete/archive/unarchive/delete/restore all flow through one orchestrator, `applyTransition()` in `task.service.ts`, over `lib/domain/taskHierarchyPolicy.ts` — `validateTransition()` → `buildTransitionPlan()` → execute writes + events in one transaction. One strength order (`delete > archive > complete`) drives every kind. Never inline a hierarchy rule anywhere else — not in a service, not in a fetch `where` clause, not in the client; the policy is the only judge, client and server alike. Rules table + plan shape: the ADR.
 - **Toggl isolation**: all Toggl code in `lib/toggl/`; per-user tokens in User model, never env vars; app fully functional without Toggl.
 

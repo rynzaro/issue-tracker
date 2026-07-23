@@ -1,6 +1,6 @@
 # D-08 — Estimation-analysis grading scope under membership
 
-**Status:** open (downstream)
+**Status:** RESOLVED 2026-07-23 — Option A
 
 ## Context
 
@@ -44,6 +44,26 @@ tag analysis?
   ("how accurate were the estimates *I* tagged 'backend', regardless of who
   executed them"). Two views, one schema (`TaskTag.userId` + per-author
   checkpoints).
+
+## Resolution (2026-07-23)
+
+**Option A — per-principal grading.** Each principal is graded against their
+own checkpoints and their own time entries. The host owner is not graded on a
+member's subtask estimates, and a member is not graded on the host owner's
+plan.
+
+The Phase-3 dual-perspective tag analysis (FUTURE_COLLABORATION) is kept as a
+separate, later lens — it answers "how accurate were estimates I tagged X"
+across principals, not "what is the project's single accuracy number." It does
+not replace per-principal grading.
+
+Consequences:
+- `Checkpoint.createdById` (D-05-A) filters whose baseline each principal's
+  analysis uses.
+- `TimeEntry.userId` already isolates whose time is graded.
+- A member's time on their own created subtasks feeds only their own accuracy
+  numbers. The owner sees the member's tasks in their tree (visibility/structural
+  family) but those tasks do not enter the owner's estimation grading.
 
 ## Blocking edges
 

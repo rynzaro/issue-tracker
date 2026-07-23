@@ -25,6 +25,8 @@ model User {
     appliedTaskTags TaskTag[]    @relation("AppliedTaskTags")
     activeTimer     ActiveTimer?
     taskEvents      TaskEvent[]
+    taskMemberships TaskMember[]
+    checkpoints     Checkpoint[]
 }
 
 model Project {
@@ -81,9 +83,23 @@ model Task {
     checkpoints         Checkpoint[]
     checkpointTasks     CheckpointTask[]
     activeTimers        ActiveTimer[]
+    members             TaskMember[]
 
     @@index([projectId])
     @@index([createdById])
+}
+
+model TaskMember {
+    id        String   @id @default(cuid())
+    taskId    String
+    task      Task     @relation(fields: [taskId], references: [id])
+    userId    String
+    user      User     @relation(fields: [userId], references: [id])
+    createdAt DateTime @default(now())
+
+    @@unique([taskId, userId])
+    @@index([taskId])
+    @@index([userId])
 }
 
 model ActiveTimer {
@@ -96,15 +112,16 @@ model ActiveTimer {
 }
 
 model TimeEntry {
-    id        String   @id @default(cuid())
+    id        String    @id @default(cuid())
     startedAt DateTime
     stoppedAt DateTime
     duration  Int // SECONDS, computed on creation
-    createdAt DateTime @default(now())
+    createdAt DateTime  @default(now())
+    deletedAt DateTime? // soft delete (D-09)
     taskId    String
-    task      Task     @relation(fields: [taskId], references: [id])
+    task      Task      @relation(fields: [taskId], references: [id])
     userId    String
-    user      User     @relation(fields: [userId], references: [id])
+    user      User      @relation(fields: [userId], references: [id])
 }
 
 model TaskEvent {
@@ -164,6 +181,8 @@ model Checkpoint {
     project                  Project           @relation(fields: [projectId], references: [id])
     taskId                   String
     task                     Task              @relation(fields: [taskId], references: [id])
+    createdById              String
+    createdBy                User              @relation(fields: [createdById], references: [id])
     trigger                  CheckpointTrigger
     label                    String?
     isBaseline               Boolean           @default(false)
@@ -175,6 +194,8 @@ model Checkpoint {
     createdAt                DateTime          @default(now())
     checkpointTasks          CheckpointTask[]
     addedTasks               CheckpointTask[]  @relation("AddedAtCheckpoint")
+
+    @@index([createdById])
 }
 
 model CheckpointTask {

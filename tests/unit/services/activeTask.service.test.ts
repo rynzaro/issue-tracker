@@ -88,7 +88,7 @@ describe("startActiveTimer", () => {
     }
   });
 
-  it("returns AUTHORIZATION_ERROR when user does not own the task", async () => {
+  it("returns NOT_FOUND when user is not the task creator", async () => {
     db.task.findUnique.mockResolvedValue(
       buildTask({ createdById: "other-user" }),
     );
@@ -100,7 +100,7 @@ describe("startActiveTimer", () => {
 
     expect(result.success).toBe(false);
     if (!result.success) {
-      expect(result.error.code).toBe("AUTHORIZATION_ERROR");
+      expect(result.error.code).toBe("NOT_FOUND");
     }
   });
 
@@ -121,7 +121,7 @@ describe("startActiveTimer", () => {
     expect(db.$transaction).not.toHaveBeenCalled();
   });
 
-  it("checks ownership before the archived state (archived is not leaked to non-owners)", async () => {
+  it("masks archived state from non-creators as NOT_FOUND", async () => {
     db.task.findUnique.mockResolvedValue(
       buildTask({ createdById: "other-user", archivedAt: new Date() }),
     );
@@ -133,7 +133,7 @@ describe("startActiveTimer", () => {
 
     expect(result.success).toBe(false);
     if (!result.success) {
-      expect(result.error.code).toBe("AUTHORIZATION_ERROR");
+      expect(result.error.code).toBe("NOT_FOUND");
     }
   });
 

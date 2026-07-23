@@ -51,6 +51,12 @@ export const ArchiveTaskSchema = z.object({ taskId: z.cuid() });
 export const UnarchiveTaskSchema = z.object({ taskId: z.cuid() });
 export const RestoreDeletedTaskSchema = z.object({ taskId: z.cuid() });
 
+export const TaskMemberSchema = z.object({
+  taskId: z.cuid(),
+  memberUserId: z.cuid(),
+});
+export type TaskMemberParams = z.infer<typeof TaskMemberSchema>;
+
 /** Server-side task node with Date objects */
 export type TaskNode = Prisma.TaskGetPayload<{
   include: {

@@ -1,6 +1,6 @@
 # D-06 — Write-set authorization for member-initiated transitions
 
-**Status:** open (downstream)
+**Status:** RESOLVED 2026-07-23 — Option B
 
 ## Context
 
@@ -46,6 +46,40 @@ place the post-plan `assertCan` loop inside `applyTransition` (after
   the member's authority boundary, trim the plan to the authorized subset.
   Rejected by §7 ("bounded cascades are forbidden") — manufactures the
   invariant-#5 gap. Listed only to be refused.
+
+## Resolution (2026-07-23)
+
+**Option B — adopt the write-set rule and surface denials legibly.** Inside
+`applyTransition`: target `assertCan` up front (cheap, masks existence) →
+`buildTransitionPlan` → loop `assertCan` over every id in the plan's write-set
+→ `executePlan`. If the loop fails, the operation is denied with a dedicated
+error variant that explains *why* (e.g., "reopening this task would also reopen
+a task you cannot modify"), not a generic `TRANSITION_INVALID` or
+`UNEXPECTED_ERROR`.
+
+Consequences:
+- A member may complete/uncomplete tasks inside their own created subtree.
+- A member may **not** uncomplete a task whose upward repair would reopen a host
+  or owner task they lack authority over — the write-set loop denies it.
+- The intended finish-but-not-unfinish asymmetry is shipped; bounded cascades
+  remain forbidden.
+- A new error code is likely needed in `lib/errors.ts` (e.g.
+  `TRANSITION_UNAUTHORIZED_CASCADE`) or a structured payload on
+  `TRANSITION_INVALID`. Decide at implementation time; do not overload
+  `UNEXPECTED_ERROR`, which is reserved for invariant-5 gaps.
+
+## Implementation note (2026-07-23)
+
+Implemented in `lib/services/task.service.ts`:
+
+- `applyTransition` now calls `assertCan` on the target using the transition's
+  act (e.g. `task:complete`) before opening the transaction.
+- After `buildTransitionPlan`, `authorizeWriteSet` loops over every task id in
+  `plan.writes` and calls `assertCan` again. If any check fails, the operation
+  returns `TRANSITION_UNAUTHORIZED_CASCADE` with the offending `taskId` in
+  `details`.
+- The target task is used directly (no extra query); other plan ids are loaded in
+  the same transaction with `createdById`, `project.userId`, and `members`.
 
 ## Blocking edges
 

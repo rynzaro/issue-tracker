@@ -16,7 +16,10 @@ status: accepted 2026-07-02 — implementation deliberately deferred 2026-07-11 
 ```typescript
 type Principal = { userId: string };          // later: + role, projectGrants
 type Act = "project:read" | "project:update" | "project:delete"
-         | "task:complete" | "timeEntry:create" | /* ... */;
+         | "task:create" | "task:create-child" | "task:read" | "task:update"
+         | "task:complete" | "task:uncomplete" | "task:archive" | "task:unarchive"
+         | "task:delete" | "task:restore" | "timer:start"
+         | "timeEntry:create" | "timeEntry:read" | "timeEntry:update" | "timeEntry:delete";
 
 can(principal: Principal, act: Act, resource): boolean   // pure, sync, no I/O
 assertCan(principal, act, resource): ServiceErrorResponse | null

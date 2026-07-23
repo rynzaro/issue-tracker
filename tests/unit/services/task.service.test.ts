@@ -41,13 +41,21 @@ const subtaskEventCalls = (type: TaskEventType) =>
   );
 
 // Minimal LineageNode row as returned by the hierarchy fetches
-// (getAllAncestors / collectDescendantNodes selects).
-const lineageNode = (id: string, parentId: string | null) => ({
+// (getAllAncestors / collectDescendantNodes selects). Includes the fields the
+// write-set authorization query needs, since the mock ignores `select`.
+const lineageNode = (
+  id: string,
+  parentId: string | null,
+  createdById = "test-user-1",
+) => ({
   id,
   parentId,
   completedAt: null,
   archivedAt: null,
   deletedAt: null,
+  createdById,
+  project: { userId: "test-user-1" },
+  members: [],
 });
 
 describe("hasActiveTimers", () => {
@@ -148,9 +156,12 @@ describe("updateTask — TAGS_CHANGED event", () => {
     db.$transaction.mockImplementation((fn: (client: MockTx) => unknown) =>
       fn(tx),
     );
-    // Owner passes the access check (select is { project: { userId } }).
+    // Owner passes the access check.
     db.task.findUnique.mockResolvedValue({
+      estimate: 60,
+      createdById: "test-user-1",
       project: { userId: "test-user-1" },
+      members: [],
     });
     tx.task.update.mockResolvedValue(buildTask());
     tx.taskEvent.create.mockResolvedValue({ id: "event-1" });
@@ -229,6 +240,36 @@ describe("updateTask — TAGS_CHANGED event", () => {
   });
 });
 
+describe("updateTask — authorization", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("returns NOT_FOUND when user is neither project owner nor task creator", async () => {
+    db.task.findUnique.mockResolvedValue({
+      estimate: 60,
+      createdById: "other-user",
+      project: { userId: "other-user" },
+      members: [],
+    });
+
+    const result = await updateTask({
+      userId: "test-user-1",
+      updateTaskParams: {
+        id: "test-task-1",
+        title: "Hacked",
+        tagIds: null,
+      },
+    });
+
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.code).toBe("NOT_FOUND");
+    }
+    expect(db.$transaction).not.toHaveBeenCalled();
+  });
+});
+
 describe("createTask — SUBTASK_CREATED events", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -284,6 +325,58 @@ describe("createTask — SUBTASK_CREATED events", () => {
 
     expect(result.success).toBe(true);
     expect(subtaskEventCalls(TaskEventType.SUBTASK_CREATED)).toHaveLength(0);
+  });
+
+  it("allows a Task Member to create a child under the host task", async () => {
+    const memberId = "member-1";
+    db.project.findUnique.mockResolvedValue({ userId: "owner-1" });
+    db.task.findUnique.mockResolvedValue({
+      id: "host-1",
+      createdById: "owner-1",
+      members: [{ userId: memberId }],
+    });
+    tx.task.create.mockResolvedValue(
+      buildTask({
+        id: "member-child",
+        title: "Member child",
+        parentId: "host-1",
+        createdById: memberId,
+      }),
+    );
+
+    const result = await createTask({
+      userId: memberId,
+      createTaskParams: {
+        projectId: "test-project-1",
+        parentId: "host-1",
+        title: "Member child",
+      },
+    });
+
+    expect(result.success).toBe(true);
+  });
+
+  it("denies a non-member from creating a child under someone else's task", async () => {
+    db.project.findUnique.mockResolvedValue({ userId: "owner-1" });
+    db.task.findUnique.mockResolvedValue({
+      id: "host-1",
+      createdById: "owner-1",
+      members: [{ userId: "member-1" }],
+    });
+
+    const result = await createTask({
+      userId: "stranger-1",
+      createTaskParams: {
+        projectId: "test-project-1",
+        parentId: "host-1",
+        title: "Unauthorized child",
+      },
+    });
+
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.code).toBe("NOT_FOUND");
+    }
   });
 });
 
@@ -362,16 +455,121 @@ describe("applyTransition — the policy alone judges legality", () => {
     if (!result.success) expect(result.error.code).toBe("NOT_FOUND");
   });
 
-  it("checks the owner before opening a transaction", async () => {
+  it("denies a principal who is neither owner nor creator before opening a transaction", async () => {
     db.task.findUnique.mockResolvedValue(
-      targetInState({ project: { userId: "someone-else" } }),
+      targetInState({
+        project: { userId: "someone-else" },
+        createdById: "someone-else",
+      }),
     );
 
     const result = await completeTask({ taskId: "t1", userId: "test-user-1" });
 
     expect(result.success).toBe(false);
-    if (!result.success) expect(result.error.code).toBe("AUTHORIZATION_ERROR");
+    if (!result.success) expect(result.error.code).toBe("NOT_FOUND");
     expect(db.$transaction).not.toHaveBeenCalled();
+  });
+});
+
+// Write-set authorization (D-06): a member may complete their own subtree, but
+// an upward repair that would reopen an owner task is denied.
+describe("applyTransition — write-set authorization under Task Membership", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    db.$transaction.mockImplementation((fn: (tx: MockTx) => unknown) => fn(tx));
+    tx.activeTimer.findFirst.mockResolvedValue(null);
+    tx.task.updateMany.mockResolvedValue({ count: 1 });
+    tx.taskEvent.create.mockResolvedValue({ id: "event-1" });
+    tx.task.findUnique.mockResolvedValue(null);
+  });
+
+  it("allows a Task Member to complete a subtask they created", async () => {
+    const memberId = "member-1";
+    db.task.findUnique.mockResolvedValue(
+      buildTask({
+        id: "member-subtask",
+        parentId: "host-1",
+        completedAt: null,
+        project: { userId: "owner-1" },
+        createdById: memberId,
+      }),
+    );
+    tx.task.findMany.mockResolvedValue([lineageNode("member-subtask", "host-1")]);
+
+    const result = await completeTask({
+      taskId: "member-subtask",
+      userId: memberId,
+    });
+
+    expect(result.success).toBe(true);
+    expect(tx.task.updateMany).toHaveBeenCalled();
+  });
+
+  it("denies a member's uncomplete when it would repair an owner ancestor", async () => {
+    const memberId = "member-1";
+    const done = new Date("2026-01-02");
+    db.task.findUnique.mockResolvedValue(
+      buildTask({
+        id: "member-subtask",
+        parentId: "host-1",
+        completedAt: done,
+        project: { userId: "owner-1" },
+        createdById: memberId,
+      }),
+    );
+    // host-1 is also completed and owned by the owner.
+    tx.task.findUnique.mockImplementation(
+      (args: { where: { id: string } }) => {
+        if (args.where.id === "host-1") {
+          return Promise.resolve({
+            id: "host-1",
+            parentId: null,
+            completedAt: done,
+            archivedAt: null,
+            deletedAt: null,
+            createdById: "owner-1",
+            project: { userId: "owner-1" },
+            members: [],
+          });
+        }
+        return Promise.resolve(null);
+      },
+    );
+    tx.task.findMany.mockResolvedValue([
+      lineageNode("member-subtask", "host-1"),
+    ]);
+
+    const result = await uncompleteTask({
+      taskId: "member-subtask",
+      userId: memberId,
+    });
+
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.code).toBe("TRANSITION_UNAUTHORIZED_CASCADE");
+    }
+    expect(tx.task.updateMany).not.toHaveBeenCalled();
+  });
+
+  it("allows the project owner to complete/uncomplete any task", async () => {
+    const ownerId = "owner-1";
+    db.task.findUnique.mockResolvedValue(
+      buildTask({
+        id: "any-task",
+        parentId: null,
+        completedAt: null,
+        project: { userId: ownerId },
+        createdById: "member-1",
+      }),
+    );
+    tx.task.findMany.mockResolvedValue([lineageNode("any-task", null)]);
+
+    const result = await completeTask({
+      taskId: "any-task",
+      userId: ownerId,
+    });
+
+    expect(result.success).toBe(true);
   });
 });
 
@@ -717,7 +915,9 @@ describe("updateTask — ESTIMATE_CHANGED event", () => {
   it("emits ESTIMATE_CHANGED with old and new when the estimate changes", async () => {
     db.task.findUnique.mockResolvedValue({
       estimate: 60,
+      createdById: "test-user-1",
       project: { userId: "test-user-1" },
+      members: [],
     });
     tx.task.update.mockResolvedValue(buildTask({ id: "task-1", estimate: 120 }));
 
@@ -746,7 +946,9 @@ describe("updateTask — ESTIMATE_CHANGED event", () => {
   it("emits ESTIMATE_CHANGED with old null when setting an estimate on a task that had none", async () => {
     db.task.findUnique.mockResolvedValue({
       estimate: null,
+      createdById: "test-user-1",
       project: { userId: "test-user-1" },
+      members: [],
     });
     tx.task.update.mockResolvedValue(buildTask({ id: "task-1", estimate: 45 }));
 
@@ -773,7 +975,9 @@ describe("updateTask — ESTIMATE_CHANGED event", () => {
   it("does not emit ESTIMATE_CHANGED when the estimate is not part of the update", async () => {
     db.task.findUnique.mockResolvedValue({
       estimate: 60,
+      createdById: "test-user-1",
       project: { userId: "test-user-1" },
+      members: [],
     });
     tx.task.update.mockResolvedValue(buildTask({ id: "task-1", estimate: 60 }));
 
@@ -792,7 +996,9 @@ describe("updateTask — ESTIMATE_CHANGED event", () => {
   it("does not emit ESTIMATE_CHANGED when the estimate is unchanged", async () => {
     db.task.findUnique.mockResolvedValue({
       estimate: 60,
+      createdById: "test-user-1",
       project: { userId: "test-user-1" },
+      members: [],
     });
     tx.task.update.mockResolvedValue(buildTask({ id: "task-1", estimate: 60 }));
 

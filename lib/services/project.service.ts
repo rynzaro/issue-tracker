@@ -5,9 +5,10 @@ import {
   logServiceError,
   serviceAction,
   serviceQuery,
-  ServiceErrorResponse,
   ServiceResponseWithData,
 } from "./serviceUtil";
+import { ServiceErrorResponse } from "@/lib/errors";
+import { assertCan } from "@/lib/authz/policy";
 import { Prisma, Project } from "@prisma/client";
 import {
   CreateProjectParams,
@@ -16,6 +17,8 @@ import {
 } from "../schema/project";
 import { TaskNode, type TaskLineage } from "../schema/task";
 import { getActiveTimer } from "./activeTask.service";
+import { getVisibleTaskIds } from "./taskMember.service";
+import { TaskEventType } from "@prisma/client";
 
 export async function createProject({
   userId,
@@ -70,13 +73,8 @@ export function updateProject({
       return createServiceErrorResponse("NOT_FOUND", "Project not found");
     }
 
-    if (project.userId !== userId) {
-      logServiceError(
-        "Unauthorized project update",
-        `User ${userId} attempted to update project ${projectId} owned by ${project.userId}`,
-      );
-      return createServiceErrorResponse("NOT_FOUND", "Project not found");
-    }
+    const auth = assertCan({ userId }, "project:update", project);
+    if (auth) return auth;
 
     // Prisma treats `undefined` fields as "don't update" — no conditional spreads needed
     const { name, description, isDefault } = updates;
@@ -120,13 +118,8 @@ export function deleteProject({
       return createServiceErrorResponse("NOT_FOUND", "Project not found");
     }
 
-    if (project.userId !== userId) {
-      logServiceError(
-        "Unauthorized project delete",
-        `User ${userId} attempted to delete project ${projectId} owned by ${project.userId}`,
-      );
-      return createServiceErrorResponse("NOT_FOUND", "Project not found");
-    }
+    const auth = assertCan({ userId }, "project:delete", project);
+    if (auth) return auth;
 
     // Interactive transaction: check active timers + soft-delete atomically
     // Consistent with deleteTask — prevents race where a timer starts between check and delete
@@ -186,13 +179,8 @@ export function getUserProjectById({
       return createServiceErrorResponse("NOT_FOUND", "Project not found");
     }
 
-    if (project.userId !== userId) {
-      logServiceError(
-        "Unauthorized project access",
-        `User ${userId} attempted to access project ${projectId} owned by ${project.userId}`,
-      );
-      return createServiceErrorResponse("NOT_FOUND", "Project not found");
-    }
+    const auth = assertCan({ userId }, "project:read", project);
+    if (auth) return auth;
 
     return createSuccessResponseWithData(project);
   }, "Failed to fetch project");
@@ -208,16 +196,7 @@ export function getUserProjectWithTasks({
   return serviceAction(async () => {
     const project = await client.project.findUnique({
       where: { id: projectId, deletedAt: null },
-      include: {
-        tasks: {
-          where: { deletedAt: null, archivedAt: null },
-          include: {
-            todoItems: true,
-            taskTags: { include: { tag: true } },
-            timeEntries: { select: { duration: true } },
-          },
-        },
-      },
+      select: { userId: true },
     });
 
     if (!project) {
@@ -225,15 +204,50 @@ export function getUserProjectWithTasks({
     }
 
     if (project.userId !== userId) {
-      logServiceError(
-        "Unauthorized project access",
-        `User ${userId} attempted to access project ${projectId} owned by ${project.userId}`,
-      );
-      return createServiceErrorResponse("NOT_FOUND", "Project not found");
+      // Members see only their host subtree (D-03-A).
+      const visibleIds = await getVisibleTaskIds(projectId, userId);
+      if (visibleIds === null || visibleIds.size === 0) {
+        logServiceError(
+          "Unauthorized project access",
+          `User ${userId} attempted to access project ${projectId}`,
+        );
+        return createServiceErrorResponse("NOT_FOUND", "Project not found");
+      }
+
+      return fetchProjectWithTasks(projectId, Array.from(visibleIds));
     }
 
-    return createSuccessResponseWithData(project);
+    return fetchProjectWithTasks(projectId);
   }, "Failed to fetch project");
+}
+
+async function fetchProjectWithTasks(
+  projectId: string,
+  visibleTaskIds?: string[],
+) {
+  const project = await client.project.findUnique({
+    where: { id: projectId, deletedAt: null },
+    include: {
+      tasks: {
+        where: {
+          ...(visibleTaskIds ? { id: { in: visibleTaskIds } } : {}),
+          deletedAt: null,
+          archivedAt: null,
+        },
+        include: {
+          todoItems: true,
+          taskTags: { include: { tag: true } },
+          timeEntries: { select: { duration: true } },
+        },
+      },
+    },
+  });
+
+  if (!project) {
+    return createServiceErrorResponse("NOT_FOUND", "Project not found");
+  }
+
+  return createSuccessResponseWithData(project);
 }
 
 export function getProjectsByUser(userId: string) {
@@ -416,13 +430,8 @@ async function verifyProjectOwnership(
   if (!project) {
     return createServiceErrorResponse("NOT_FOUND", "Project not found");
   }
-  if (project.userId !== userId) {
-    logServiceError(
-      "Unauthorized project access",
-      `User ${userId} attempted to access project ${projectId} owned by ${project.userId}`,
-    );
-    return createServiceErrorResponse("NOT_FOUND", "Project not found");
-  }
+  const auth = assertCan({ userId }, "project:read", project);
+  if (auth) return auth;
   return null;
 }
 
@@ -528,13 +537,8 @@ export function getArchivePageData({
     if (!project) {
       return createServiceErrorResponse("NOT_FOUND", "Project not found");
     }
-    if (project.userId !== userId) {
-      logServiceError(
-        "Unauthorized project access",
-        `User ${userId} attempted to access project ${projectId} owned by ${project.userId}`,
-      );
-      return createServiceErrorResponse("NOT_FOUND", "Project not found");
-    }
+    const auth = assertCan({ userId }, "project:read", project);
+    if (auth) return auth;
 
     const [archivedRaw, deletedRaw, allTasks] = await Promise.all([
       client.task.findMany({
@@ -565,4 +569,71 @@ export function getArchivePageData({
       parentMap: buildParentMap(allTasks),
     });
   }, "Failed to fetch archive page data");
+}
+
+// ─── Owner Activity Feed ─────────────────────────────────────────────────────────
+
+export type ActivityFeedItem = {
+  id: string;
+  taskId: string;
+  actorUserId: string;
+  eventType: TaskEventType;
+  payload: unknown;
+  createdAt: Date;
+};
+
+/**
+ * Owner-facing activity feed for a project (D-10).
+ *
+ * Returns recent `TaskEvent` rows for tasks in the project, ordered newest first.
+ * Members do not get a project-wide feed; call sites must ensure the principal is
+ * the project owner (today via `assertCan("project:read")`).
+ */
+export function getProjectActivityFeed({
+  userId,
+  projectId,
+  limit = 50,
+}: {
+  userId: string;
+  projectId: string;
+  limit?: number;
+}): Promise<ServiceResponseWithData<ActivityFeedItem[]>> {
+  return serviceAction(async () => {
+    const project = await client.project.findUnique({
+      where: { id: projectId, deletedAt: null },
+      select: { userId: true },
+    });
+    if (!project) {
+      return createServiceErrorResponse("NOT_FOUND", "Project not found");
+    }
+    const auth = assertCan({ userId }, "project:read", project);
+    if (auth) return auth;
+
+    const events = await client.taskEvent.findMany({
+      where: {
+        task: { projectId },
+      },
+      orderBy: { createdAt: "desc" },
+      take: limit,
+      select: {
+        id: true,
+        taskId: true,
+        userId: true,
+        eventType: true,
+        payload: true,
+        createdAt: true,
+      },
+    });
+
+    return createSuccessResponseWithData(
+      events.map((e) => ({
+        id: e.id,
+        taskId: e.taskId,
+        actorUserId: e.userId,
+        eventType: e.eventType,
+        payload: e.payload,
+        createdAt: e.createdAt,
+      })),
+    );
+  }, "Failed to fetch project activity feed");
 }

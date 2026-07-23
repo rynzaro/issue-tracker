@@ -5,30 +5,15 @@ import "server-only";
 
 import { Prisma } from "@prisma/client";
 import { z } from "zod";
+import {
+  createServiceErrorResponse,
+  type ServiceErrorCode,
+  type ServiceErrorResponse,
+} from "@/lib/errors";
 
-// ─── Error Codes ───────────────────────────────────────────────────────────────
-
-export type ServiceErrorCode =
-  | "INTERNAL_SERVER_ERROR"
-  | "AUTHORIZATION_ERROR"
-  | "UNEXPECTED_ERROR"
-  | "VALIDATION_ERROR"
-  // A hierarchy move the rules do not allow on a sound tree — the user's to
-  // fix, not a fault. Raised by the transition policy (#14); UNEXPECTED_ERROR
-  // keeps its meaning of "this should not be possible".
-  | "TRANSITION_INVALID"
-  | "NOT_FOUND";
+export { createServiceErrorResponse };
 
 // ─── Response Types ────────────────────────────────────────────────────────────
-
-export type ServiceErrorResponse = {
-  success: false;
-  error: {
-    code: ServiceErrorCode;
-    message: string;
-    details?: unknown;
-  };
-};
 
 export type ServiceResponse =
   | {
@@ -92,21 +77,6 @@ export function createSuccessResponseWithData<T>(
   data: T,
 ): ServiceResponseWithData<T> {
   return { success: true, data };
-}
-
-export function createServiceErrorResponse(
-  code: ServiceErrorCode,
-  message: string,
-  details?: unknown,
-): ServiceErrorResponse {
-  return {
-    success: false,
-    error: {
-      code,
-      message,
-      ...(details !== undefined ? { details } : {}),
-    },
-  };
 }
 
 // ─── Validation Helper ─────────────────────────────────────────────────────────

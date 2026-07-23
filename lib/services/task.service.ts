@@ -7,6 +7,7 @@ import {
   createSuccessResponseWithData,
   serviceAction,
 } from "./serviceUtil";
+import { assertCan } from "@/lib/authz/policy";
 import {
   validateTransition,
   buildTransitionPlan,
@@ -14,6 +15,7 @@ import {
   type TransitionKind,
   type TransitionPlan,
 } from "../domain/taskHierarchyPolicy";
+import type { Act } from "@/lib/authz/policy";
 
 // ─── Shared Helpers ────────────────────────────────────────────────────────────
 
@@ -190,6 +192,15 @@ type TransitionTarget = LineageNode & {
   project: { userId: string };
 };
 
+const ACT_FOR_KIND: Record<TransitionKind, Act> = {
+  COMPLETE: "task:complete",
+  UNCOMPLETE: "task:uncomplete",
+  ARCHIVE: "task:archive",
+  UNARCHIVE: "task:unarchive",
+  DELETE: "task:delete",
+  UNDELETE: "task:restore",
+};
+
 /** How many tasks a plan touches — a task counts once even if several writes name it. */
 function countChanged(plan: TransitionPlan): number {
   return new Set(plan.writes.flatMap((w) => w.ids)).size;
@@ -233,18 +244,24 @@ async function applyTransition({
         completedAt: true,
         archivedAt: true,
         deletedAt: true,
+        createdById: true,
         project: { select: { userId: true } },
+        members: { select: { userId: true } },
       },
     });
     if (!task) {
       return createServiceErrorResponse("NOT_FOUND", "Task not found");
     }
-    if (task.project.userId !== userId) {
-      return createServiceErrorResponse(
-        "AUTHORIZATION_ERROR",
-        "User does not have access to this task",
-      );
-    }
+    const targetAuth = assertCan(
+      { userId },
+      ACT_FOR_KIND[kind],
+      {
+        project: task.project,
+        createdById: task.createdById,
+        memberIds: (task.members ?? []).map((m) => m.userId),
+      },
+    );
+    if (targetAuth) return targetAuth;
 
     return await client.$transaction(async (tx) => {
       const ancestors = await getAllAncestors(task.parentId, tx);
@@ -280,6 +297,19 @@ async function applyTransition({
       }
 
       const plan = buildTransitionPlan(kind, task, ancestors, descendants);
+
+      // Write-set authorization (D-06): every task the plan touches must be
+      // transitionable by the principal. This creates the intended
+      // finish-but-not-unfinish asymmetry under Task Membership.
+      const auth = await authorizeWriteSet(
+        tx,
+        { userId },
+        ACT_FOR_KIND[kind],
+        plan,
+        task,
+      );
+      if (auth) return auth;
+
       await executePlan(plan, tx, userId);
       await afterPlan?.(tx, task);
 
@@ -289,6 +319,79 @@ async function applyTransition({
       });
     });
   }, config.failureMessage);
+}
+
+type AuthTaskInfo = {
+  id: string;
+  createdById: string;
+  project: { userId: string };
+  members: { userId: string }[];
+};
+
+/**
+ * Verify the principal may transition every task in the plan's write-set.
+ * Returns a legible cascade-denial error when unauthorized. The target task is
+ * already loaded and used directly so single-task transitions avoid an extra
+ * query.
+ */
+async function authorizeWriteSet(
+  db: Pick<typeof client, "task">,
+  principal: { userId: string },
+  act: Act,
+  plan: TransitionPlan,
+  target: AuthTaskInfo,
+): Promise<ReturnType<typeof createServiceErrorResponse> | null> {
+  const ids = Array.from(
+    new Set(plan.writes.flatMap((write) => write.ids)),
+  );
+  if (ids.length === 0) return null;
+
+  const byId = new Map<string, AuthTaskInfo>([[target.id, target]]);
+  const otherIds = ids.filter((id) => id !== target.id);
+
+  if (otherIds.length > 0) {
+    const rows = await db.task.findMany({
+      where: { id: { in: otherIds } },
+      select: {
+        id: true,
+        createdById: true,
+        project: { select: { userId: true } },
+        members: { select: { userId: true } },
+      },
+    });
+    for (const row of rows) {
+      byId.set(row.id, {
+        id: row.id,
+        createdById: row.createdById,
+        project: row.project,
+        members: row.members ?? [],
+      });
+    }
+  }
+
+  for (const id of ids) {
+    const row = byId.get(id);
+    if (!row) {
+      // A planned task vanished mid-transaction — treat as unexpected.
+      return createServiceErrorResponse(
+        "UNEXPECTED_ERROR",
+        "Transition plan referenced a missing task",
+      );
+    }
+    const denied = assertCan(principal, act, {
+      project: row.project,
+      createdById: row.createdById,
+      memberIds: (row.members ?? []).map((m) => m.userId),
+    });
+    if (denied) {
+      return createServiceErrorResponse(
+        "TRANSITION_UNAUTHORIZED_CASCADE",
+        "This transition would change a task you cannot modify",
+        { taskId: id },
+      );
+    }
+  }
+  return null;
 }
 
 async function getAllAncestors(
@@ -332,18 +435,9 @@ export function createTask({
     if (!project) {
       return createServiceErrorResponse("NOT_FOUND", "Project not found");
     }
-    if (project.userId !== userId) {
-      return createServiceErrorResponse(
-        "AUTHORIZATION_ERROR",
-        "User does not have access to this project",
-      );
-    }
 
-    // Verify parent task exists, belongs to the same project, and is not
-    // soft-deleted, archived, or completed. Blocking completed parents keeps
-    // completedAt cascade invariants intact (see ADR-0018) — reopening a
-    // completed task to add subtasks is a deliberate future feature, not
-    // this guard's job.
+    // Authorization: root tasks require project ownership; sub-tasks require
+    // ownership, parent-task creator, or parent-task membership (Task Member).
     if (createTaskParams.parentId) {
       const parentTask = await client.task.findUnique({
         where: {
@@ -353,11 +447,28 @@ export function createTask({
           archivedAt: null,
           completedAt: null,
         },
-        select: { id: true },
+        select: {
+          id: true,
+          createdById: true,
+          members: { select: { userId: true } },
+        },
       });
       if (!parentTask) {
         return createServiceErrorResponse("NOT_FOUND", "Parent task not found");
       }
+      const auth = assertCan(
+        { userId },
+        "task:create-child",
+        {
+          project,
+          createdById: parentTask.createdById,
+          memberIds: (parentTask.members ?? []).map((m) => m.userId),
+        },
+      );
+      if (auth) return auth;
+    } else {
+      const auth = assertCan({ userId }, "task:create", project);
+      if (auth) return auth;
     }
 
     const task = await client.$transaction(async (tx) => {
@@ -434,7 +545,12 @@ export function updateTask({
   return serviceAction(async () => {
     const task = await client.task.findUnique({
       where: { id: updateTaskParams.id, deletedAt: null, archivedAt: null },
-      select: { estimate: true, project: { select: { userId: true } } },
+      select: {
+        estimate: true,
+        createdById: true,
+        project: { select: { userId: true } },
+        members: { select: { userId: true } },
+      },
     });
     if (!task) {
       return createServiceErrorResponse("NOT_FOUND", "Task not found");
@@ -445,12 +561,17 @@ export function updateTask({
         "Task is not associated with a project",
       );
     }
-    if (task.project.userId !== userId) {
-      return createServiceErrorResponse(
-        "AUTHORIZATION_ERROR",
-        "User does not have access to this task",
-      );
-    }
+
+    const auth = assertCan(
+      { userId },
+      "task:update",
+      {
+        project: task.project,
+        createdById: task.createdById,
+        memberIds: (task.members ?? []).map((m) => m.userId),
+      },
+    );
+    if (auth) return auth;
 
     // null means "leave tags untouched"; an array (even empty) edits the set.
     const tagIds = updateTaskParams.tagIds;

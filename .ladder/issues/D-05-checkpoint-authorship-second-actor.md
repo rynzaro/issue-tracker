@@ -1,6 +1,6 @@
 # D-05 — Checkpoint authorship with a second actor
 
-**Status:** open (downstream — the hard conceptual one)
+**Status:** RESOLVED 2026-07-23 — Option A
 
 ## Context
 
@@ -62,6 +62,45 @@ close the host owner's plan window?
   "the world" includes other actors' completions). Hybrid; matches ADR-0022's
   authored-by distinction (plan = user, reality = world) but needs a clear rule
   for whose baseline a member's subtask gets.
+
+## Resolution (2026-07-23)
+
+**Option A — per-principal checkpoints.** Each `Checkpoint` row carries a
+`createdById` (schema addition). A member's actions write checkpoints in the
+_member's own stream_; the host owner's stream remains theirs.
+
+Specific rules:
+- A member adding a child under the host is a `SCOPE_CHANGE` **plan checkpoint**
+  authored by the member on the host task. The new child appears in the host
+  owner's parent cross-section only as a *fact* (a `CheckpointTask` column), not
+  as the owner's belief.
+- A member's `WORK_STARTED` on their own subtask is the member's reality
+  checkpoint and the subtask's baseline. It **does not** close the host owner's
+  plan window — debounce windows are per-principal. The owner may still be
+  editing their own plan when the member starts work.
+- A member's `TASK_COMPLETED` on their own subtask fires a reality checkpoint on
+  the *host* authored by the member, recording what the member still believed
+  about their own subtree and the visible siblings at that moment.
+
+Read asymmetry accepted (D-03-A): a member can create children that become
+columns in a host-parent checkpoint the member cannot read. The owner owns the
+host plan; the member owns their subtree.
+
+Consequences:
+- `Checkpoint` schema gains `createdById` plus relation to `User`.
+- `CheckpointTask` attribution stays unchanged; attribution of the *cross-section*
+  moves to `Checkpoint.createdById`.
+- Analysis (#26) grades each principal against their own checkpoint stream
+  (D-08-A).
+
+## Implementation note (2026-07-23)
+
+- Schema: `Checkpoint.createdById` added to `prisma/schema.prisma`; Prisma
+  client regenerated.
+- `lib/services/checkpoint.service.ts` updated with the per-principal design
+  contract. The actual checkpoint creation/debounce/baseline service is
+  Iteration 3 work and currently a placeholder; when it lands it must pass the
+  acting principal as `createdById` and never default to `project.userId`.
 
 ## Blocking edges
 

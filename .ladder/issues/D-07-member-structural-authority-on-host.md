@@ -1,6 +1,6 @@
 # D-07 — Task Member's structural authority on the host task
 
-**Status:** open (downstream)
+**Status:** RESOLVED 2026-07-23 — Option A
 
 ## Context
 
@@ -46,6 +46,24 @@ execution). Is `task:create-child` a distinct act in the policy, or a
 - **C. Membership grants a broader structural subset.** e.g. member may also
   edit the host's estimate. Reject: contradicts CONTEXT.md ("may not edit the
   task itself") and D-04's principle that the host's plan is the owner's.
+
+## Resolution (2026-07-23)
+
+**Option A — distinct act `task:create-child`, host off-limits otherwise.** A
+Task Member holds exactly one structural act on the host task: creating a child
+under it. They may **not** edit, complete, archive, delete, or execute the
+host. On any task they themselves created, they hold the creator's full
+structural and execution authority — including adding further sub-tasks under
+it (their own `task:create-child`, inherited from creator ownership). This is
+consistent with D-04: a person's subtree, their evidence.
+
+Consequences:
+- The policy act list gains `task:create-child` in addition to `task:create`.
+- `task:create` keeps its existing project-owner grant; `task:create-child` is
+  granted by **project owner OR host-task owner OR host-task membership**.
+- A member creating a child under the host becomes that child's `createdById`,
+  so they may shape and execute the child's subtree (D-04, D-06).
+- The host task remains the owner's plan; the member cannot alter it.
 
 ## Blocking edges
 

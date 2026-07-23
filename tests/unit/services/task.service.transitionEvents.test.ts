@@ -32,6 +32,9 @@ type Row = {
   completedAt: Date | null;
   archivedAt: Date | null;
   deletedAt: Date | null;
+  createdById?: string;
+  project?: { userId: string };
+  members?: { userId: string }[];
 };
 
 function row(
@@ -45,6 +48,9 @@ function row(
     completedAt: null,
     archivedAt: null,
     deletedAt: null,
+    createdById: USER,
+    project: { userId: USER },
+    members: [],
     ...overrides,
   };
 }
@@ -56,6 +62,8 @@ function target(overrides: Partial<Row> = {}) {
     parentId: null,
     projectId: PROJECT,
     project: { userId: USER },
+    createdById: USER,
+    members: [],
     ...overrides,
   });
 }

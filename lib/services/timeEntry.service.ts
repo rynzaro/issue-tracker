@@ -5,6 +5,7 @@ import {
   serviceAction,
 } from "./serviceUtil";
 import { emitStartedOnce } from "./startedEvent";
+import { assertCan } from "@/lib/authz/policy";
 import { calculateDurationInSeconds } from "../util";
 
 // ─── Reads ─────────────────────────────────────────────────────────────────────
@@ -19,21 +20,35 @@ export function getTimeEntriesForTask({
   return serviceAction(async () => {
     const task = await client.task.findUnique({
       where: { id: taskId, deletedAt: null },
-      select: { createdById: true },
+      select: {
+        createdById: true,
+        project: { select: { userId: true } },
+        members: { select: { userId: true } },
+      },
     });
     if (!task) return createServiceErrorResponse("NOT_FOUND", "Task not found");
-    if (task.createdById !== userId)
-      return createServiceErrorResponse(
-        "AUTHORIZATION_ERROR",
-        "User does not have access to this task",
-      );
 
     const entries = await client.timeEntry.findMany({
-      where: { taskId },
+      where: { taskId, deletedAt: null },
       orderBy: { startedAt: "desc" },
     });
 
-    return createSuccessResponseWithData(entries);
+    // Filter server-side: owner or entry author sees entries. Others get an
+    // empty list (they have no entries on this task, not NOT_FOUND).
+    const visible = entries.filter((entry) => {
+      const auth = assertCan(
+        { userId },
+        "timeEntry:read",
+        {
+          project: task.project,
+          taskCreatedById: task.createdById,
+          entryAuthorId: entry.userId,
+        },
+      );
+      return !auth;
+    });
+
+    return createSuccessResponseWithData(visible);
   }, "Failed to fetch time entries");
 }
 
@@ -53,14 +68,24 @@ export function createManualTimeEntry({
   return serviceAction(async () => {
     const task = await client.task.findUnique({
       where: { id: taskId, deletedAt: null },
-      select: { createdById: true },
+      select: {
+        createdById: true,
+        project: { select: { userId: true } },
+        members: { select: { userId: true } },
+      },
     });
     if (!task) return createServiceErrorResponse("NOT_FOUND", "Task not found");
-    if (task.createdById !== userId)
-      return createServiceErrorResponse(
-        "AUTHORIZATION_ERROR",
-        "User does not have access to this task",
-      );
+
+    const auth = assertCan(
+      { userId },
+      "timeEntry:create",
+      {
+        project: task.project,
+        taskCreatedById: task.createdById,
+        entryAuthorId: userId,
+      },
+    );
+    if (auth) return auth;
 
     // Transaction so the entry and any first-work STARTED event commit together
     // (emit failure rolls back the entry). This path was single-statement before #55.
@@ -103,17 +128,28 @@ export function updateTimeEntry({
     });
     if (!existing)
       return createServiceErrorResponse("NOT_FOUND", "Time entry not found");
-    if (existing.userId !== userId)
-      return createServiceErrorResponse(
-        "AUTHORIZATION_ERROR",
-        "User does not own this time entry",
-      );
 
     const task = await client.task.findUnique({
       where: { id: existing.taskId, deletedAt: null },
-      select: { id: true },
+      select: {
+        id: true,
+        createdById: true,
+        project: { select: { userId: true } },
+        members: { select: { userId: true } },
+      },
     });
     if (!task) return createServiceErrorResponse("NOT_FOUND", "Task not found");
+
+    const auth = assertCan(
+      { userId },
+      "timeEntry:update",
+      {
+        project: task.project,
+        taskCreatedById: task.createdById,
+        entryAuthorId: existing.userId,
+      },
+    );
+    if (auth) return auth;
 
     const updated = await client.timeEntry.update({
       where: { id: timeEntryId },
@@ -141,20 +177,32 @@ export function deleteTimeEntry({
     });
     if (!existing)
       return createServiceErrorResponse("NOT_FOUND", "Time entry not found");
-    if (existing.userId !== userId)
-      return createServiceErrorResponse(
-        "AUTHORIZATION_ERROR",
-        "User does not own this time entry",
-      );
 
     const task = await client.task.findUnique({
       where: { id: existing.taskId, deletedAt: null },
-      select: { id: true },
+      select: {
+        id: true,
+        createdById: true,
+        project: { select: { userId: true } },
+        members: { select: { userId: true } },
+      },
     });
     if (!task) return createServiceErrorResponse("NOT_FOUND", "Task not found");
 
-    await client.timeEntry.delete({
+    const auth = assertCan(
+      { userId },
+      "timeEntry:delete",
+      {
+        project: task.project,
+        taskCreatedById: task.createdById,
+        entryAuthorId: existing.userId,
+      },
+    );
+    if (auth) return auth;
+
+    await client.timeEntry.update({
       where: { id: timeEntryId },
+      data: { deletedAt: new Date() },
     });
 
     return createSuccessResponseWithData(null);
