@@ -20,7 +20,7 @@ import { Dispatch, SetStateAction, useState } from "react";
 import IconButton from "../../../../components/iconButton";
 import { Subheading } from "@/components/heading";
 import { SecondaryText } from "@/components/text";
-import { formatTime, getActiveDescendantStartedAt } from "@/lib/util";
+import { formatTime } from "@/lib/util";
 import { useElapsedTimer } from "@/lib/hooks";
 import {
   startActiveTimerAction,
@@ -83,14 +83,9 @@ export default function Tasks({
   const [loading, setLoading] = useState(false);
   const { showToast } = useToast();
 
-  const timerStartedAt =
-    task.status === "IN_PROGRESS"
-      ? task.activeTimerStartedAt
-      : task.hasActiveDescendant
-        ? getActiveDescendantStartedAt(task)
-        : null;
-
-  const elapsed = useElapsedTimer(timerStartedAt);
+  const elapsed = useElapsedTimer(
+    task.activeTimerStartedAt ?? task.activeDescendantStartedAt,
+  );
   const displayTotal = task.totalTimeSpent + elapsed;
 
   async function handleCompleteTask(completeTaskParams: { taskId: string }) {

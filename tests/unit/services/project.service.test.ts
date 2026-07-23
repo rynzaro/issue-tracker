@@ -18,7 +18,10 @@ vi.mock("@/lib/services/activeTask.service", () => ({
   getActiveTimer: vi.fn(),
 }));
 
-import { getProjectTaskTree } from "@/lib/services/project.service";
+import {
+  getProjectTaskTree,
+  getProjectActivityFeed,
+} from "@/lib/services/project.service";
 import { getActiveTimer } from "@/lib/services/activeTask.service";
 import prisma from "@/lib/prisma";
 
@@ -403,5 +406,92 @@ describe("getProjectTaskTree", () => {
     if (result.success) {
       expect(result.data.tasks[0]).not.toHaveProperty("timeEntries");
     }
+  });
+
+  it("returns NOT_FOUND for a non-owner with no Task Memberships", async () => {
+    db.project.findUnique.mockResolvedValue({
+      ...buildProject(),
+      userId: "owner-1",
+    });
+    db.taskMember.findMany.mockResolvedValue([]);
+
+    const result = await getProjectTaskTree({
+      userId: "stranger-1",
+      projectId: "test-project-1",
+    });
+
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.code).toBe("NOT_FOUND");
+    }
+  });
+});
+
+describe("getProjectActivityFeed", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("returns events for tasks in the project sorted newest first", async () => {
+    const events = [
+      {
+        id: "event-2",
+        taskId: "task-1",
+        userId: "member-1",
+        eventType: "COMPLETED",
+        payload: { at: "2026-07-23T10:00:00Z" },
+        createdAt: new Date("2026-07-23T10:00:00Z"),
+      },
+      {
+        id: "event-1",
+        taskId: "task-1",
+        userId: "member-1",
+        eventType: "STARTED",
+        payload: { startedAt: "2026-07-23T09:00:00Z" },
+        createdAt: new Date("2026-07-23T09:00:00Z"),
+      },
+    ];
+    db.project.findUnique.mockResolvedValue({
+      ...buildProject(),
+      userId: "owner-1",
+    });
+    db.taskEvent.findMany.mockResolvedValue(events);
+
+    const result = await getProjectActivityFeed({
+      userId: "owner-1",
+      projectId: "test-project-1",
+    });
+
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data).toHaveLength(2);
+      expect(result.data[0].id).toBe("event-2");
+      expect(result.data[1].id).toBe("event-1");
+    }
+    expect(db.taskEvent.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { task: { projectId: "test-project-1" } },
+        orderBy: { createdAt: "desc" },
+        take: 50,
+      }),
+    );
+  });
+
+  it("returns NOT_FOUND when caller is not the project owner", async () => {
+    db.project.findUnique.mockResolvedValue({
+      ...buildProject(),
+      userId: "owner-1",
+    });
+
+    const result = await getProjectActivityFeed({
+      userId: "stranger-1",
+      projectId: "test-project-1",
+    });
+
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.code).toBe("NOT_FOUND");
+    }
+    expect(db.taskEvent.findMany).not.toHaveBeenCalled();
   });
 });

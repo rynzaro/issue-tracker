@@ -8,17 +8,23 @@ import { Heading } from "@/components/heading";
 import { Input } from "@/components/input";
 import { Strong, SecondaryText, TextLink } from "@/components/text";
 import { authenticate } from "@/lib/actions/auth.actions";
-import { ExclamationCircleIcon } from "@heroicons/react/16/solid";
+import { ErrorToast, useToast } from "@/lib/notification/toastProvider";
 import { useSearchParams } from "next/navigation";
-import { useActionState } from "react";
+import { useActionState, useEffect } from "react";
 
 export default function Login() {
   const searchParams = useSearchParams();
   const callbackUrl = searchParams.get("callbackUrl") || "/s/main";
-  const [errorMessage, formAction, isPending] = useActionState(
+  const [result, formAction, isPending] = useActionState(
     authenticate,
     undefined,
   );
+  const { showToast } = useToast();
+
+  useEffect(() => {
+    if (!result) return;
+    showToast(<ErrorToast title={result.message} />);
+  }, [result, showToast]);
 
   return (
     <AuthLayout>
@@ -29,7 +35,7 @@ export default function Login() {
         <Heading>Sign in to your account</Heading>
         <Field>
           <Label>Email</Label>
-          <Input type="email" name="email" />
+          <Input type="email" name="email" defaultValue={result?.email} />
         </Field>
         <Field>
           <Label>Password</Label>
@@ -47,9 +53,11 @@ export default function Login() {
           </SecondaryText>
         </div>
         <input type="hidden" name="redirectTo" value={callbackUrl} />
-        <Button type="submit" className="w-full" aria-disabled={isPending}>
-          Login
-        </Button>
+        <div>
+          <Button type="submit" className="w-full" aria-disabled={isPending}>
+            Login
+          </Button>
+        </div>
         <SecondaryText>
           Don’t have an account?{" "}
           <TextLink href="/public/sign-up">

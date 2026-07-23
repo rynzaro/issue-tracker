@@ -6,6 +6,8 @@ import {
   serviceQuery,
   serviceQueryOrNotFound,
 } from "./serviceUtil";
+import { emitStartedOnce } from "./startedEvent";
+import { assertCan } from "@/lib/authz/policy";
 import { calculateDurationInSeconds } from "../util";
 
 export function getActiveTimer({ userId }: { userId: string }) {
@@ -45,16 +47,23 @@ export function startActiveTimer({
   taskId: string;
 }) {
   return serviceAction(async () => {
-    // TODO: Replace with project membership/role check when collaboration is implemented
     const task = await client.task.findUnique({
       where: { id: taskId, deletedAt: null },
-      select: { createdById: true },
+      select: { createdById: true, archivedAt: true },
     });
     if (!task) return createServiceErrorResponse("NOT_FOUND", "Task not found");
-    if (task.createdById !== userId)
+
+    const auth = assertCan({ userId }, "timer:start", {
+      createdById: task.createdById,
+    });
+    if (auth) return auth;
+
+    // Archive is frozen state: an archived subtree must hold no running timer
+    // (the reverse direction of archiveTask's running-descendant-timer block).
+    if (task.archivedAt)
       return createServiceErrorResponse(
-        "AUTHORIZATION_ERROR",
-        "User does not have access to this task",
+        "VALIDATION_ERROR",
+        "Cannot start a timer on an archived task",
       );
 
     const result = await client.$transaction(async (tx) => {
@@ -81,6 +90,9 @@ export function startActiveTimer({
       const newActiveTimer = await tx.activeTimer.create({
         data: { userId, taskId, startedAt: now },
       });
+
+      // Record the task's first work; no-op if a STARTED already exists (#55).
+      await emitStartedOnce(tx, { taskId, userId, startedAt: now });
 
       return { activeTimer: newActiveTimer, timeEntry: createdTimeEntry };
     });

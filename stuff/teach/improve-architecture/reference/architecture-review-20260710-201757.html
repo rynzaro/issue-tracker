@@ -1,0 +1,420 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Architecture review — issue-tracker</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script type="module">
+      import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
+      mermaid.initialize({ startOnLoad: true, theme: "neutral", securityLevel: "loose" });
+    </script>
+    <style>
+      .seam { border-top: 2px dashed #94a3b8; }
+      .band { display: flex; align-items: center; justify-content: center; text-align: center; }
+      .deepbox { background: linear-gradient(135deg, #0f172a, #1e293b); }
+    </style>
+  </head>
+  <body class="bg-stone-50 text-slate-900 font-sans">
+    <main class="max-w-5xl mx-auto px-6 py-12 space-y-12">
+
+      <!-- ══════════ HEADER ══════════ -->
+      <header class="space-y-3">
+        <h1 class="font-serif text-4xl">Architecture review — <span class="text-emerald-700">issue-tracker</span></h1>
+        <p class="text-sm text-slate-500">2026-07-10 · deepening opportunities · settled ground (AD-18/19/20, AF-3, REFACTOR_TODO) not re-litigated</p>
+        <div class="flex flex-wrap gap-4 text-xs text-slate-600 pt-1">
+          <span class="inline-flex items-center gap-1.5"><span class="inline-block w-4 h-3 border border-slate-400 bg-white"></span> module</span>
+          <span class="inline-flex items-center gap-1.5"><span class="inline-block w-5 border-t-2 border-dashed border-slate-400"></span> seam</span>
+          <span class="inline-flex items-center gap-1.5"><span class="inline-block w-5 border-t-2 border-red-600"></span> leakage</span>
+          <span class="inline-flex items-center gap-1.5"><span class="inline-block w-4 h-3 deepbox rounded-sm"></span> deep module</span>
+        </div>
+      </header>
+
+      <section id="candidates" class="space-y-10">
+
+      <!-- ══════════ CANDIDATE 1 ══════════ -->
+      <article id="c1" class="rounded-xl border border-slate-200 bg-white p-6 space-y-4 shadow-sm">
+        <div class="flex items-start justify-between gap-4">
+          <h2 class="font-serif text-2xl">1 · One assembly module for the Task tree</h2>
+          <div class="flex gap-2 shrink-0">
+            <span class="px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800">Strong</span>
+            <span class="px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-600">in-process</span>
+          </div>
+        </div>
+        <p class="font-mono text-sm text-slate-600">lib/services/project.service.ts:250-334, 348-395 · app/s/project/[project-id]/tasks.tsx:86-91 · lib/util.ts:120-131</p>
+
+        <!-- before / after -->
+        <div class="grid md:grid-cols-2 gap-4">
+          <!-- BEFORE -->
+          <div class="rounded-lg border border-slate-200 bg-stone-50 p-4">
+            <p class="text-xs uppercase tracking-wider text-slate-400 mb-3">Before</p>
+            <div class="space-y-2" style="min-height:300px">
+              <div class="flex gap-2">
+                <div class="flex-1 border border-slate-400 bg-white rounded p-2">
+                  <p class="text-xs uppercase tracking-wider font-medium">getProjectTaskTree</p>
+                  <p class="text-[10px] text-slate-500 leading-4">map build · link · post-order:<br/>status · hasActiveDescendant<br/>rollup · estimate overflow</p>
+                </div>
+                <div class="flex flex-col justify-center items-center px-1">
+                  <span class="text-red-600 text-lg leading-none">⇄</span>
+                  <span class="text-[9px] text-red-600 text-center leading-3">same math,<br/>2 copies,<br/>drifting</span>
+                </div>
+                <div class="flex-1 border border-slate-400 bg-white rounded p-2">
+                  <p class="text-xs uppercase tracking-wider font-medium">buildTaskNodeTree</p>
+                  <p class="text-[10px] text-slate-500 leading-4">map build · link · post-order:<br/>rollup · estimate overflow<br/><span class="text-red-600">status set inline, no activity</span></p>
+                </div>
+              </div>
+              <div class="text-center text-[10px] text-slate-500">ancestors get <span class="font-mono">hasActiveDescendant: boolean</span> — <span class="text-red-600">the descendant's start Date is discarded</span></div>
+              <div class="seam relative my-3"><span class="absolute -top-2 right-0 bg-stone-50 px-1 text-[9px] uppercase tracking-wider text-slate-400">server → client seam</span></div>
+              <div class="border border-slate-400 bg-white rounded p-2">
+                <p class="text-xs uppercase tracking-wider font-medium">tasks.tsx (client)</p>
+                <p class="text-[10px] text-red-600 leading-4">↻ re-walks the subtree — getActiveDescendantStartedAt() — to recover the Date the implementation already had</p>
+              </div>
+            </div>
+          </div>
+          <!-- AFTER -->
+          <div class="rounded-lg border border-slate-200 bg-stone-50 p-4">
+            <p class="text-xs uppercase tracking-wider text-slate-400 mb-3">After</p>
+            <div class="space-y-2" style="min-height:300px">
+              <div class="flex gap-2 justify-center">
+                <span class="px-2 py-1 rounded border border-slate-300 bg-white text-[10px] uppercase tracking-wider">project page</span>
+                <span class="px-2 py-1 rounded border border-slate-300 bg-white text-[10px] uppercase tracking-wider">archive page</span>
+              </div>
+              <div class="text-center text-slate-400 text-sm leading-none">↓ ↓</div>
+              <div class="deepbox rounded-lg p-3 text-white">
+                <p class="text-xs uppercase tracking-wider font-medium text-emerald-300">Task tree assembly</p>
+                <p class="text-[10px] font-mono text-slate-300 mt-1">buildTaskTree(rows, activeTimer?) → TaskNode[]</p>
+                <p class="text-[10px] text-slate-500 mt-2 leading-4">map build · link · post-order · status · activity · rollup · overflow — internal, one copy</p>
+              </div>
+              <div class="text-center text-[10px] text-emerald-700">nodes carry <span class="font-mono">activeDescendantStartedAt: Date | null</span></div>
+              <div class="seam relative my-3"><span class="absolute -top-2 right-0 bg-stone-50 px-1 text-[9px] uppercase tracking-wider text-slate-400">server → client seam</span></div>
+              <div class="border border-slate-300 bg-white rounded p-2">
+                <p class="text-xs uppercase tracking-wider font-medium">tasks.tsx (client)</p>
+                <p class="text-[10px] text-emerald-700 leading-4">renders. No second traversal — getActiveDescendantStartedAt() deleted.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <p class="text-sm"><span class="font-medium">Problem:</span> two near-duplicate implementations of “flat rows → enriched TaskNode tree” already drift (archive path sets status inline, skips activity), and the seam to the client leaks — ancestors carry only a boolean, so the client re-walks the subtree to recover the ActiveTimer start Date the server discarded.</p>
+        <p class="text-sm"><span class="font-medium">Solution:</span> one deep tree-assembly module behind a small interface; both the project page and the archive path become its adapters’ callers, and nodes ship the full answer across the seam.</p>
+        <ul class="text-sm text-slate-700 grid sm:grid-cols-2 gap-x-6 gap-y-1 list-disc list-inside">
+          <li>locality: rollup math in one implementation</li>
+          <li>leverage: archive path inherits the rollup tests</li>
+          <li>client-side re-traversal deleted</li>
+          <li>seam carries Date, not boolean</li>
+        </ul>
+      </article>
+
+      <!-- ══════════ CANDIDATE 2 ══════════ -->
+      <article id="c2" class="rounded-xl border border-slate-200 bg-white p-6 space-y-4 shadow-sm">
+        <div class="flex items-start justify-between gap-4">
+          <h2 class="font-serif text-2xl">2 · Deepen the hierarchy transition runner</h2>
+          <div class="flex gap-2 shrink-0">
+            <span class="px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800">Strong</span>
+            <span class="px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-600">in-process</span>
+          </div>
+        </div>
+        <p class="font-mono text-sm text-slate-600">lib/services/task.service.ts:246-628 (×6 mutations) · lib/services/taskHierarchyPolicy.ts</p>
+
+        <div class="grid md:grid-cols-2 gap-4">
+          <!-- BEFORE: cross-section, six columns -->
+          <div class="rounded-lg border border-slate-200 bg-stone-50 p-4">
+            <p class="text-xs uppercase tracking-wider text-slate-400 mb-3">Before — the same six bands, re-typed six times</p>
+            <div class="flex gap-1.5" style="min-height:300px">
+              <div class="flex-[1.6] flex flex-col gap-1">
+                <p class="text-[9px] uppercase tracking-wider text-center text-slate-500 h-6 flex items-end justify-center pb-0.5">delete</p>
+                <div class="band flex-1 border-l-4 border-amber-500 bg-amber-50 rounded-r text-[9px] px-1 leading-3">load + self-state<br/>hidden in where-clause</div>
+                <div class="band flex-1 border-l-4 border-slate-300 bg-white rounded-r text-[9px] px-1">ownership if</div>
+                <div class="band flex-1 border-l-4 border-slate-300 bg-white rounded-r text-[9px] px-1">validateTransition</div>
+                <div class="band flex-1 border-l-4 border-red-400 bg-white rounded-r text-[9px] px-1 leading-3">timer guard<br/>(copy-pasted)</div>
+                <div class="band flex-1 border-l-4 border-slate-300 bg-white rounded-r text-[9px] px-1">buildTransitionPlan</div>
+                <div class="band flex-1 border-l-4 border-slate-300 bg-white rounded-r text-[9px] px-1">executePlan</div>
+              </div>
+              <div class="flex-1 flex flex-col gap-1"><p class="text-[9px] uppercase tracking-wider text-center text-slate-500 h-6 flex items-end justify-center pb-0.5">complete</p><div class="flex-1 border-l-4 border-amber-400 bg-amber-50/50 rounded-r"></div><div class="flex-1 border-l-4 border-slate-200 bg-white rounded-r"></div><div class="flex-1 border-l-4 border-slate-200 bg-white rounded-r"></div><div class="flex-1 border-l-4 border-red-300 bg-white rounded-r"></div><div class="flex-1 border-l-4 border-slate-200 bg-white rounded-r"></div><div class="flex-1 border-l-4 border-slate-200 bg-white rounded-r"></div></div>
+              <div class="flex-1 flex flex-col gap-1"><p class="text-[9px] uppercase tracking-wider text-center text-slate-500 h-6 flex items-end justify-center pb-0.5">uncompl.</p><div class="flex-1 border-l-4 border-amber-400 bg-amber-50/50 rounded-r"></div><div class="flex-1 border-l-4 border-slate-200 bg-white rounded-r"></div><div class="flex-1 border-l-4 border-slate-200 bg-white rounded-r"></div><div class="flex-1 border-l-4 border-slate-100 bg-white rounded-r"></div><div class="flex-1 border-l-4 border-slate-200 bg-white rounded-r"></div><div class="flex-1 border-l-4 border-slate-200 bg-white rounded-r"></div></div>
+              <div class="flex-1 flex flex-col gap-1"><p class="text-[9px] uppercase tracking-wider text-center text-slate-500 h-6 flex items-end justify-center pb-0.5">archive</p><div class="flex-1 border-l-4 border-amber-400 bg-amber-50/50 rounded-r"></div><div class="flex-1 border-l-4 border-slate-200 bg-white rounded-r"></div><div class="flex-1 border-l-4 border-slate-200 bg-white rounded-r"></div><div class="flex-1 border-l-4 border-red-300 bg-white rounded-r"></div><div class="flex-1 border-l-4 border-slate-200 bg-white rounded-r"></div><div class="flex-1 border-l-4 border-slate-200 bg-white rounded-r"></div></div>
+              <div class="flex-1 flex flex-col gap-1"><p class="text-[9px] uppercase tracking-wider text-center text-slate-500 h-6 flex items-end justify-center pb-0.5">unarch.</p><div class="flex-1 border-l-4 border-amber-400 bg-amber-50/50 rounded-r"></div><div class="flex-1 border-l-4 border-slate-200 bg-white rounded-r"></div><div class="flex-1 border-l-4 border-slate-200 bg-white rounded-r"></div><div class="flex-1 border-l-4 border-slate-100 bg-white rounded-r"></div><div class="flex-1 border-l-4 border-slate-200 bg-white rounded-r"></div><div class="flex-1 border-l-4 border-slate-200 bg-white rounded-r"></div></div>
+              <div class="flex-1 flex flex-col gap-1"><p class="text-[9px] uppercase tracking-wider text-center text-slate-500 h-6 flex items-end justify-center pb-0.5">restore</p><div class="flex-1 border-l-4 border-amber-400 bg-amber-50/50 rounded-r"></div><div class="flex-1 border-l-4 border-slate-200 bg-white rounded-r"></div><div class="flex-1 border-l-4 border-slate-200 bg-white rounded-r"></div><div class="flex-1 border-l-4 border-slate-100 bg-white rounded-r"></div><div class="flex-1 border-l-4 border-slate-200 bg-white rounded-r"></div><div class="flex-1 border-l-4 border-slate-200 bg-white rounded-r"></div></div>
+            </div>
+            <p class="text-[10px] text-red-600 mt-2">amber band = the where-clause where each operation hides its own self-state rule — how the completeTask/archivedAt gap slipped through</p>
+          </div>
+          <!-- AFTER -->
+          <div class="rounded-lg border border-slate-200 bg-stone-50 p-4">
+            <p class="text-xs uppercase tracking-wider text-slate-400 mb-3">After — one deep band, six thin callers</p>
+            <div class="flex flex-col gap-2" style="min-height:300px">
+              <div class="flex flex-wrap gap-1.5 justify-center">
+                <span class="px-2 py-0.5 rounded border border-slate-300 bg-white text-[9px] uppercase tracking-wider">delete</span>
+                <span class="px-2 py-0.5 rounded border border-slate-300 bg-white text-[9px] uppercase tracking-wider">complete</span>
+                <span class="px-2 py-0.5 rounded border border-slate-300 bg-white text-[9px] uppercase tracking-wider">uncomplete</span>
+                <span class="px-2 py-0.5 rounded border border-slate-300 bg-white text-[9px] uppercase tracking-wider">archive</span>
+                <span class="px-2 py-0.5 rounded border border-slate-300 bg-white text-[9px] uppercase tracking-wider">unarchive</span>
+                <span class="px-2 py-0.5 rounded border border-slate-300 bg-white text-[9px] uppercase tracking-wider">restore</span>
+              </div>
+              <div class="text-center text-slate-400 text-sm leading-none">↓</div>
+              <div class="deepbox rounded-lg p-4 text-white flex-1 flex flex-col justify-center">
+                <p class="text-xs uppercase tracking-wider font-medium text-emerald-300">runTaskTransition</p>
+                <p class="text-[10px] font-mono text-slate-300 mt-1">(kind: TransitionKind, taskId, principal) → TransitionResult</p>
+                <p class="text-[10px] text-slate-500 mt-3 leading-4">load once · assertCan (AD-20, ×1) · self-state + ancestor legality → taskHierarchyPolicy · timer guard · buildTransitionPlan · executePlan — all internal</p>
+              </div>
+              <div class="flex gap-2 justify-center">
+                <span class="px-2 py-1 rounded bg-emerald-50 border border-emerald-200 text-[10px] text-emerald-800">self-state joins ancestor-state in taskHierarchyPolicy</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <p class="text-sm"><span class="font-medium">Problem:</span> six mutations re-type the same ~40-line load → ownership → validate → timer-guard → plan → execute sequence, and each hides its self-state legality in its own <span class="font-mono text-xs">findUnique</span> where-clause — so hierarchy legality has two sources of truth and gaps slip between them.</p>
+        <p class="text-sm"><span class="font-medium">Solution:</span> one deep transition-runner module whose implementation absorbs the preamble and hands <em>all</em> legality (self + ancestor) to the hierarchy transition policy; the six service functions collapse to one-line callers.</p>
+        <ul class="text-sm text-slate-700 grid sm:grid-cols-2 gap-x-6 gap-y-1 list-disc list-inside">
+          <li>leverage: one interface, six call sites</li>
+          <li>locality: legality decided in one module</li>
+          <li>six untested mutations gain a test surface</li>
+          <li>timer guard stops being copy-pasted</li>
+        </ul>
+        <div class="rounded-md bg-amber-50 border border-amber-200 px-3 py-2 text-xs text-amber-900">
+          <span class="font-medium">Pairs with AD-20</span> (does not contradict it): the runner becomes the single place <span class="font-mono">assertCan</span> is called in task.service — the migration shrinks from 8 scattered edits to 1. Also structurally absorbs two REFACTOR_TODO items: scattered self-state where-clauses, and a home for the <span class="font-mono">TRANSITION_INVALID</span> error-taxonomy split.
+        </div>
+      </article>
+
+      <!-- ══════════ CANDIDATE 3 ══════════ -->
+      <article id="c3" class="rounded-xl border border-slate-200 bg-white p-6 space-y-4 shadow-sm">
+        <div class="flex items-start justify-between gap-4">
+          <h2 class="font-serif text-2xl">3 · One server-action wrapper</h2>
+          <div class="flex gap-2 shrink-0">
+            <span class="px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800">Worth exploring</span>
+            <span class="px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-600">in-process</span>
+          </div>
+        </div>
+        <p class="font-mono text-sm text-slate-600">lib/actions/task.actions.ts (8 fns) · project.actions.ts · timeEntry.actions.ts · activeTask.actions.ts — 21 actions, 21 identical auth blocks</p>
+
+        <!-- mass diagram -->
+        <div class="grid md:grid-cols-2 gap-4">
+          <div class="rounded-lg border border-slate-200 bg-stone-50 p-4">
+            <p class="text-xs uppercase tracking-wider text-slate-400 mb-3">Before — shallow: interface ≈ implementation, ×21</p>
+            <div class="flex items-end justify-center gap-6" style="min-height:280px">
+              <div class="flex gap-3 items-end">
+                <div class="w-24">
+                  <div class="border border-slate-400 bg-white rounded-t px-1 py-0.5 text-[9px] uppercase tracking-wider text-center" style="height:110px">interface<br/><span class="normal-case text-slate-500">auth contract · zod schema · error shape · revalidate path</span></div>
+                  <div class="border border-t-0 border-slate-400 bg-slate-100 rounded-b px-1 py-0.5 text-[9px] uppercase tracking-wider text-center" style="height:130px">implementation<br/><span class="normal-case text-slate-500">auth() · session if · validateInput · delegate · revalidatePath</span></div>
+                  <p class="text-[9px] text-center mt-1 text-slate-500">one action</p>
+                </div>
+                <div class="w-16 opacity-60">
+                  <div class="border border-slate-300 bg-white rounded-t" style="height:110px"></div>
+                  <div class="border border-t-0 border-slate-300 bg-slate-100 rounded-b" style="height:130px"></div>
+                </div>
+                <div class="w-16 opacity-30">
+                  <div class="border border-slate-300 bg-white rounded-t" style="height:110px"></div>
+                  <div class="border border-t-0 border-slate-300 bg-slate-100 rounded-b" style="height:130px"></div>
+                </div>
+                <p class="text-2xl text-slate-400 pb-8">×21</p>
+              </div>
+            </div>
+          </div>
+          <div class="rounded-lg border border-slate-200 bg-stone-50 p-4">
+            <p class="text-xs uppercase tracking-wider text-slate-400 mb-3">After — thin declarations over one deep wrapper</p>
+            <div class="flex flex-col items-center justify-end gap-2" style="min-height:280px">
+              <div class="flex gap-1.5 items-end">
+                <div class="w-14 border border-slate-300 bg-white rounded" style="height:22px"></div>
+                <div class="w-14 border border-slate-300 bg-white rounded" style="height:22px"></div>
+                <div class="w-14 border border-slate-300 bg-white rounded" style="height:22px"></div>
+                <div class="w-14 border border-slate-300 bg-white rounded" style="height:22px"></div>
+                <p class="text-sm text-slate-400 pl-1">×21 declarations</p>
+              </div>
+              <div class="text-slate-400 text-sm leading-none">↓</div>
+              <div class="deepbox rounded-lg p-3 text-white w-64 text-center" style="height:130px">
+                <p class="text-xs uppercase tracking-wider font-medium text-emerald-300 mt-2">serverAction</p>
+                <p class="text-[10px] font-mono text-slate-300 mt-1">(schema, handler, { revalidate })</p>
+                <p class="text-[10px] text-slate-500 mt-2">auth · validate · delegate · revalidate — internal</p>
+              </div>
+              <p class="text-[9px] text-slate-500">mirrors serviceAction/serviceQuery, which already exist and are deep</p>
+            </div>
+          </div>
+        </div>
+
+        <p class="text-sm"><span class="font-medium">Problem:</span> every action re-types the same five steps, so each is a shallow module — its interface (auth contract, schema, revalidate path, error shape) is the whole implementation — and consistency is by hand (project.actions already drifts to inline <span class="font-mono text-xs">z.string().cuid().safeParse</span>).</p>
+        <p class="text-sm"><span class="font-medium">Solution:</span> a higher-order wrapper module, the actions-layer twin of <span class="font-mono text-xs">serviceAction</span>; each action becomes a declaration of schema + service call + paths, and AF-3's layering is unchanged.</p>
+        <ul class="text-sm text-slate-700 grid sm:grid-cols-2 gap-x-6 gap-y-1 list-disc list-inside">
+          <li>interface shrinks; wrapper absorbs boilerplate</li>
+          <li>“forgot auth()” structurally impossible</li>
+          <li>locality: revalidation policy in one place</li>
+          <li>21 actions testable via one contract</li>
+        </ul>
+        <div class="rounded-md bg-amber-50 border border-amber-200 px-3 py-2 text-xs text-amber-900">
+          Already sketched in REFACTOR_TODO as the optional <span class="font-mono">withAuth</span> wrapper, “decide separately.” This review adds the depth argument; the decision is still open, not settled — hence a candidate, not a re-report.
+        </div>
+      </article>
+
+      <!-- ══════════ CANDIDATE 4 ══════════ -->
+      <article id="c4" class="rounded-xl border border-slate-200 bg-white p-6 space-y-4 shadow-sm">
+        <div class="flex items-start justify-between gap-4">
+          <h2 class="font-serif text-2xl">4 · One elapsed-time display module</h2>
+          <div class="flex gap-2 shrink-0">
+            <span class="px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800">Worth exploring</span>
+            <span class="px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-600">in-process</span>
+          </div>
+        </div>
+        <p class="font-mono text-sm text-slate-600">tasks.tsx:48-53 · active-timer-navbar.tsx:37-40 · active-timer-pill.tsx:43-51 (×2) · time-entry-dialog.tsx:469-481 · datetime-input.tsx:125-137</p>
+
+        <div class="grid md:grid-cols-2 gap-4">
+          <div class="rounded-lg border border-slate-200 bg-white p-4">
+            <p class="text-xs uppercase tracking-wider text-slate-400 mb-2">Before — the 3600 s rule, four private copies</p>
+            <pre class="mermaid">
+flowchart TB
+  T[tasks.tsx] --> R1["formatElapsed<br/>&lt; 3600 ? MM:SS : HH:MM"]
+  N[active-timer-navbar] --> R2["ternary copy 2"]
+  P[active-timer-pill] --> R3["shortDisplay copy 3"]
+  P --> R4["fullDisplay copy 4"]
+  classDef leak stroke:#dc2626,stroke-width:2px;
+  class R1,R2,R3,R4 leak
+            </pre>
+          </div>
+          <div class="rounded-lg border border-slate-200 bg-white p-4">
+            <p class="text-xs uppercase tracking-wider text-slate-400 mb-2">After — one interface, every timer surface</p>
+            <pre class="mermaid">
+flowchart TB
+  T[tasks.tsx] --> M
+  N[active-timer-navbar] --> M
+  P[active-timer-pill] --> M
+  D[time-entry-dialog] --> M
+  I[datetime-input] --> M
+  M["formatElapsed / date-part helpers<br/>(joins formatTime, already tested)"]
+  classDef deep fill:#0f172a,color:#fff,stroke:#0f172a;
+  class M deep
+            </pre>
+          </div>
+        </div>
+
+        <p class="text-sm"><span class="font-medium">Problem:</span> the display rule “under an hour → MM:SS, else HH:MM” is implemented four times across the timer surfaces, and two components additionally carry private copies of date-part formatting — a threshold change today means four edits and a drift risk.</p>
+        <p class="text-sm"><span class="font-medium">Solution:</span> fold the elapsed rule and the date-part helpers into the <span class="font-mono text-xs">formatTime</span> family, whose interface is already the tested time-formatting module.</p>
+        <ul class="text-sm text-slate-700 grid sm:grid-cols-2 gap-x-6 gap-y-1 list-disc list-inside">
+          <li>one 3600 s threshold, not four</li>
+          <li>leverage: rides formatTime's existing tests</li>
+          <li>pill, navbar, tree render identically</li>
+        </ul>
+      </article>
+
+      <!-- ══════════ CANDIDATE 5 ══════════ -->
+      <article id="c5" class="rounded-xl border border-slate-200 bg-white p-6 space-y-4 shadow-sm">
+        <div class="flex items-start justify-between gap-4">
+          <h2 class="font-serif text-2xl">5 · Delete the dead island, unify the error taxonomy</h2>
+          <div class="flex gap-2 shrink-0">
+            <span class="px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800">Strong</span>
+            <span class="px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-600">in-process</span>
+          </div>
+        </div>
+        <p class="font-mono text-sm text-slate-600">legacy/ (4 files) · lib/types.ts · lib/consts.ts · lib/dateUtils.ts (empty) · lib/actions.ts (shim) · lib/util.ts:33-38,106-118 · lib/errors.ts vs lib/util.ts:3-31 · app/s/project/[project-id]/todoList.tsx</p>
+
+        <div class="grid md:grid-cols-2 gap-4">
+          <div class="rounded-lg border border-slate-200 bg-stone-50 p-4">
+            <p class="text-xs uppercase tracking-wider text-slate-400 mb-3">Before — an island that only imports itself</p>
+            <div class="relative" style="min-height:280px">
+              <div class="absolute left-0 top-0 w-[44%] border border-slate-300 bg-white rounded p-2">
+                <p class="text-[10px] uppercase tracking-wider">live app</p>
+                <p class="text-[9px] text-slate-500 leading-3 mt-1">app/ · lib/services · lib/actions/ · components/</p>
+              </div>
+              <div class="absolute right-0 top-8 w-[48%] border-2 border-red-300 bg-red-50/50 rounded p-2 space-y-1">
+                <p class="text-[10px] uppercase tracking-wider text-red-700">dead island — zero inbound arrows</p>
+                <div class="border border-slate-300 bg-white rounded px-1.5 py-0.5 text-[9px]">legacy/ ×4 <span class="text-red-600">(imports a route that doesn't exist)</span></div>
+                <div class="border border-slate-300 bg-white rounded px-1.5 py-0.5 text-[9px]">lib/types.ts · lib/consts.ts <span class="text-slate-400">← only legacy imports them</span></div>
+                <div class="border border-slate-300 bg-white rounded px-1.5 py-0.5 text-[9px]">util.ts: parseTaskString · getActiveDescendantElapsed</div>
+                <div class="border border-slate-300 bg-white rounded px-1.5 py-0.5 text-[9px]">lib/dateUtils.ts (empty) · lib/actions.ts (re-export shim)</div>
+                <div class="border border-slate-300 bg-white rounded px-1.5 py-0.5 text-[9px]">todoList.tsx <span class="text-red-600">(unwired, infinite recursion)</span></div>
+              </div>
+              <div class="absolute left-0 bottom-2 w-full flex gap-2 items-center">
+                <div class="flex-1 border border-slate-400 bg-white rounded px-1.5 py-1 text-[9px]">util.ts: ApiErrorResponse</div>
+                <span class="text-red-600 text-[9px] shrink-0">two taxonomies,<br/>same name</span>
+                <div class="flex-1 border border-slate-400 bg-white rounded px-1.5 py-1 text-[9px]">errors.ts: ApiErrorResponse</div>
+              </div>
+            </div>
+          </div>
+          <div class="rounded-lg border border-slate-200 bg-stone-50 p-4">
+            <p class="text-xs uppercase tracking-wider text-slate-400 mb-3">After — complexity vanishes</p>
+            <div class="relative flex flex-col justify-between" style="min-height:280px">
+              <div class="w-[44%] border border-slate-300 bg-white rounded p-2">
+                <p class="text-[10px] uppercase tracking-wider">live app</p>
+                <p class="text-[9px] text-slate-500 leading-3 mt-1">unchanged — nothing imported the island</p>
+              </div>
+              <div class="self-end w-[48%] border-2 border-dashed border-slate-300 rounded p-4 text-center">
+                <p class="text-[10px] uppercase tracking-wider text-slate-400">deleted</p>
+                <p class="text-[9px] text-slate-400 mt-1">~10 files · 3 TaskNode types → 1<br/>one decoy grep-hit set gone</p>
+              </div>
+              <div class="w-full border border-slate-400 bg-white rounded px-2 py-1.5 text-[9px]">one API-error taxonomy (errors.ts <em>or</em> util.ts — pick one)</div>
+            </div>
+          </div>
+        </div>
+
+        <p class="text-sm"><span class="font-medium">Problem:</span> a cluster of modules is kept alive only by each other — nothing in the live app imports it — and it actively misleads navigation: three <span class="font-mono text-xs">TaskNode</span> types, two <span class="font-mono text-xs">ApiErrorResponse</span> taxonomies, an empty dateUtils, a pass-through actions shim.</p>
+        <p class="text-sm"><span class="font-medium">Solution:</span> delete the island wholesale (it fails the deletion test in the good direction — complexity vanishes), repoint the two <span class="font-mono text-xs">lib/actions</span> importers, and collapse the two error taxonomies into one module.</p>
+        <ul class="text-sm text-slate-700 grid sm:grid-cols-2 gap-x-6 gap-y-1 list-disc list-inside">
+          <li>deletion test: pure pass-through, zero cost</li>
+          <li>one TaskNode, one ApiErrorResponse</li>
+          <li>AI-navigability: decoy modules gone</li>
+          <li>absorbs the todoList.tsx bug item</li>
+        </ul>
+      </article>
+
+      <!-- ══════════ CANDIDATE 6 ══════════ -->
+      <article id="c6" class="rounded-xl border border-slate-200 bg-white p-6 space-y-4 shadow-sm">
+        <div class="flex items-start justify-between gap-4">
+          <h2 class="font-serif text-2xl">6 · A real adapter at the Prisma seam</h2>
+          <div class="flex gap-2 shrink-0">
+            <span class="px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-200 text-slate-700">Speculative</span>
+            <span class="px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-600">local-substitutable</span>
+          </div>
+        </div>
+        <p class="font-mono text-sm text-slate-600">tests/helpers/prisma-mock.ts · tests/unit/services/*.test.ts</p>
+
+        <div class="grid md:grid-cols-2 gap-4">
+          <div class="rounded-lg border border-slate-200 bg-white p-4">
+            <p class="text-xs uppercase tracking-wider text-slate-400 mb-2">Before — a degenerate adapter</p>
+            <pre class="mermaid">
+flowchart TB
+  TESTS[service tests] -->|"must assert exact<br/>findUnique args"| MOCK["prisma-mock<br/>8 bare vi.fn per model"]
+  TESTS -->|"must know mockTx<br/>is a separate object"| TX[mockTx]
+  MOCK -.-> TX
+  SVC[services] --> PRISMA[Prisma client]
+  classDef leak stroke:#dc2626,stroke-width:2px;
+  class MOCK,TX leak
+            </pre>
+          </div>
+          <div class="rounded-lg border border-slate-200 bg-white p-4">
+            <p class="text-xs uppercase tracking-wider text-slate-400 mb-2">After — two adapters make the seam real</p>
+            <pre class="mermaid">
+flowchart TB
+  TESTS[service tests] --> SEAM
+  SVC[services] --> SEAM
+  SEAM["db client interface<br/>(the seam services already cross)"]
+  SEAM --- FAKE["in-memory fake<br/>real filter/update semantics<br/>$transaction = same object"]
+  SEAM --- PRISMA[Prisma client]
+  classDef deep fill:#0f172a,color:#fff,stroke:#0f172a;
+  classDef adapter stroke-dasharray:4 4;
+  class SEAM deep
+  class FAKE,PRISMA adapter
+            </pre>
+          </div>
+        </div>
+
+        <p class="text-sm"><span class="font-medium">Problem:</span> the mock has no query semantics, so tests either echo the implementation (asserting exact <span class="font-mono text-xs">findUnique</span> arguments) or can't reach transactional paths at all — the six hierarchy transitions and both timer flows run inside <span class="font-mono text-xs">$transaction</span>, and a test must know <span class="font-mono text-xs">mockTx</span> is a separate object to touch them; that interface complexity is why they're untested.</p>
+        <p class="text-sm"><span class="font-medium">Solution:</span> an in-memory fake with real semantics as a second adapter at the seam services already cross — one adapter is a hypothetical seam, two make it real — so tests set up rows and assert outcomes.</p>
+        <ul class="text-sm text-slate-700 grid sm:grid-cols-2 gap-x-6 gap-y-1 list-disc list-inside">
+          <li>tests assert behaviour, not call shapes</li>
+          <li>mockTx knowledge leaves the interface</li>
+          <li>with №2: transitions tested end-to-end</li>
+        </ul>
+        <div class="rounded-md bg-slate-100 border border-slate-200 px-3 py-2 text-xs text-slate-600">
+          Speculative because the fake must track Prisma's where-clause semantics closely enough to be trusted — worth prototyping against one service before committing. Cheaper alternative if №2 lands first: test through <span class="font-mono">runTaskTransition</span>'s interface and keep the mock only for leaf queries.
+        </div>
+      </article>
+
+      </section>
+
+      <!-- ══════════ TOP RECOMMENDATION ══════════ -->
+      <section id="top-recommendation" class="rounded-xl border-2 border-emerald-600 bg-emerald-50/60 p-8 space-y-3">
+        <p class="text-xs uppercase tracking-wider text-emerald-700 font-medium">Top recommendation</p>
+        <h2 class="font-serif text-3xl"><a href="#c2" class="hover:underline">№ 2 — Deepen the hierarchy transition runner</a></h2>
+        <p class="text-sm text-slate-700 max-w-3xl">Highest leverage per line changed: one interface replaces six re-typed preambles, hierarchy legality gets a single home in the transition policy (closing the class of gap behind the completeTask/archivedAt issue), the six untested mutations become testable through one interface — and it makes the queued AD-20 hand-implementation smaller, since <span class="font-mono text-xs">assertCan</span> lands in one place instead of eight. Do № 5 (the dead island) any afternoon — it's free.</p>
+      </section>
+
+      <footer class="text-xs text-slate-400 pb-8">issue-tracker · architecture review · vocabulary: /codebase-design · settled decisions respected: AD-18/19/20, AF-3, REFACTOR_TODO</footer>
+    </main>
+  </body>
+</html>

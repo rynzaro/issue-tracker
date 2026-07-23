@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { TaskEventType } from "@prisma/client";
 import {
   createMockPrismaClient,
   mockTx,
@@ -61,6 +62,7 @@ describe("getActiveTimer", () => {
 
     expect(db.activeTimer.findUnique).toHaveBeenCalledWith({
       where: { userId: "specific-user" },
+      include: { task: { select: { title: true } } },
     });
   });
 });
@@ -86,7 +88,7 @@ describe("startActiveTimer", () => {
     }
   });
 
-  it("returns AUTHORIZATION_ERROR when user does not own the task", async () => {
+  it("returns NOT_FOUND when user is not the task creator", async () => {
     db.task.findUnique.mockResolvedValue(
       buildTask({ createdById: "other-user" }),
     );
@@ -98,7 +100,40 @@ describe("startActiveTimer", () => {
 
     expect(result.success).toBe(false);
     if (!result.success) {
-      expect(result.error.code).toBe("AUTHORIZATION_ERROR");
+      expect(result.error.code).toBe("NOT_FOUND");
+    }
+  });
+
+  it("returns VALIDATION_ERROR when the task is archived", async () => {
+    db.task.findUnique.mockResolvedValue(
+      buildTask({ createdById: "test-user-1", archivedAt: new Date() }),
+    );
+
+    const result = await startActiveTimer({
+      userId: "test-user-1",
+      taskId: "test-task-1",
+    });
+
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.code).toBe("VALIDATION_ERROR");
+    }
+    expect(db.$transaction).not.toHaveBeenCalled();
+  });
+
+  it("masks archived state from non-creators as NOT_FOUND", async () => {
+    db.task.findUnique.mockResolvedValue(
+      buildTask({ createdById: "other-user", archivedAt: new Date() }),
+    );
+
+    const result = await startActiveTimer({
+      userId: "test-user-1",
+      taskId: "test-task-1",
+    });
+
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.code).toBe("NOT_FOUND");
     }
   });
 
@@ -207,6 +242,71 @@ describe("startActiveTimer", () => {
     const createTimerOrder = tx.activeTimer.create.mock.invocationCallOrder[0];
     expect(createEntryOrder).toBeLessThan(deleteTimerOrder);
     expect(deleteTimerOrder).toBeLessThan(createTimerOrder);
+  });
+});
+
+describe("startActiveTimer — STARTED event", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    db.$transaction.mockImplementation((fn) => fn(tx));
+    db.task.findUnique.mockResolvedValue(
+      buildTask({ createdById: "test-user-1" }),
+    );
+    tx.activeTimer.findUnique.mockResolvedValue(null);
+    tx.activeTimer.create.mockResolvedValue(buildActiveTimer());
+  });
+
+  it("emits STARTED with the start time on the task's first work", async () => {
+    tx.taskEvent.findFirst.mockResolvedValue(null); // no prior STARTED
+
+    await startActiveTimer({ userId: "test-user-1", taskId: "test-task-1" });
+
+    expect(tx.taskEvent.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          taskId: "test-task-1",
+          userId: "test-user-1",
+          eventType: TaskEventType.STARTED,
+          // stored as an ISO-8601 string by emitEvent's timestamp transform
+          payload: { startedAt: expect.any(String) },
+        }),
+      }),
+    );
+  });
+
+  it("does not emit a second STARTED when the task already has one", async () => {
+    tx.taskEvent.findFirst.mockResolvedValue({ id: "existing-started" });
+
+    await startActiveTimer({ userId: "test-user-1", taskId: "test-task-1" });
+
+    expect(tx.taskEvent.create).not.toHaveBeenCalled();
+  });
+
+  it("scopes the prior-STARTED guard to this task and event type", async () => {
+    tx.taskEvent.findFirst.mockResolvedValue(null);
+
+    await startActiveTimer({ userId: "test-user-1", taskId: "test-task-1" });
+
+    expect(tx.taskEvent.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          taskId: "test-task-1",
+          eventType: TaskEventType.STARTED,
+        }),
+      }),
+    );
+  });
+
+  it("fails the action (rolls back) when the STARTED emit throws", async () => {
+    tx.taskEvent.findFirst.mockResolvedValue(null);
+    tx.taskEvent.create.mockRejectedValue(new Error("emit failed"));
+
+    const result = await startActiveTimer({
+      userId: "test-user-1",
+      taskId: "test-task-1",
+    });
+
+    expect(result.success).toBe(false);
   });
 });
 

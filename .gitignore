@@ -61,3 +61,4 @@ logs/
 .pnpm-store/node_modules/
 
 /app/generated/prisma
+.claude/worktrees/

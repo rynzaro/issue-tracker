@@ -4,19 +4,34 @@ import { signIn, signOut } from "@/auth";
 import { redirect } from "next/navigation";
 import { AuthError } from "next-auth";
 
+export type AuthenticateResult = {
+  kind: "invalid-credentials" | "unknown-error";
+  message: string;
+  email: string;
+};
+
 export async function authenticate(
-  prevState: string | undefined,
+  prevState: AuthenticateResult | undefined,
   formData: FormData,
-) {
+): Promise<AuthenticateResult | undefined> {
   try {
     await signIn("credentials", formData);
   } catch (error) {
     if (error instanceof AuthError) {
+      const email = String(formData.get("email") ?? "");
       switch (error.type) {
         case "CredentialsSignin":
-          return "Invalid credentials.";
+          return {
+            kind: "invalid-credentials",
+            message: "The email or password is incorrect.",
+            email,
+          };
         default:
-          return "Something went wrong.";
+          return {
+            kind: "unknown-error",
+            message: "Something went wrong.",
+            email,
+          };
       }
     }
     throw error;

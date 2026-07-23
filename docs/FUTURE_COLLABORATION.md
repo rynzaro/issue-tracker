@@ -1,6 +1,6 @@
 # Future: Collaboration & Team Features
 
-Anchor document for expanding the current single-user architecture into a collaborative platform. The schema foundations (AD-12 through AD-15) were designed to make this transition non-breaking.
+Anchor document for expanding the current single-user architecture into a collaborative platform. The schema foundations (ADR-0011 through ADR-0014) were designed to make this transition non-breaking.
 
 ---
 
@@ -24,6 +24,14 @@ One app for tracking, planning, and analyzing — no need for separate tools.
 | `Tag.userId`                | Per-user tag vocabulary           | Each team member tags tasks with THEIR tags             |
 | `TaskTag.userId`            | Who applied this tag to this task | Enables dual-perspective analysis (planner vs executor) |
 | `TimeEntry.userId`          | Who tracked this time             | Already multi-user ready — no changes needed            |
+
+---
+
+## Authorization model (decided 2026-07-11, implementation deferred)
+
+The authorization design for collaboration is settled and recorded: two authority families — **structural** (project owner: edit/archive/delete/project ops) and **execution** (task creator, exclusive: timers and time logging — time entries are personal estimation evidence) — plus entry-author rights on individual entries. Hierarchy transitions get authorized over the **write-set** of the cascade plan, because un-transitions repair ancestor chains upward. Full design, caveats, gate verification, and migration checklist: `docs/AUTHORIZATION_PLAN.md` (tickets #22, #38).
+
+⚠️ Two statements in this document predate that decision and conflict with it — reconcile before implementing: the table row above saying "project membership = task access" (true only for the structural/visibility family), and Phase 2's `assigneeId` = "who executes it" semantics (incompatible with creator-exclusive execution; the task-membership vision — members create sub-tasks they execute — replaces assignment).
 
 ---
 

@@ -24,6 +24,9 @@ model User {
     tags            Tag[]
     appliedTaskTags TaskTag[]    @relation("AppliedTaskTags")
     activeTimer     ActiveTimer?
+    taskEvents      TaskEvent[]
+    taskMemberships TaskMember[]
+    checkpoints     Checkpoint[]
 }
 
 model Project {
@@ -80,9 +83,23 @@ model Task {
     checkpoints         Checkpoint[]
     checkpointTasks     CheckpointTask[]
     activeTimers        ActiveTimer[]
+    members             TaskMember[]
 
     @@index([projectId])
     @@index([createdById])
+}
+
+model TaskMember {
+    id        String   @id @default(cuid())
+    taskId    String
+    task      Task     @relation(fields: [taskId], references: [id])
+    userId    String
+    user      User     @relation(fields: [userId], references: [id])
+    createdAt DateTime @default(now())
+
+    @@unique([taskId, userId])
+    @@index([taskId])
+    @@index([userId])
 }
 
 model ActiveTimer {
@@ -95,24 +112,30 @@ model ActiveTimer {
 }
 
 model TimeEntry {
-    id        String   @id @default(cuid())
+    id        String    @id @default(cuid())
     startedAt DateTime
     stoppedAt DateTime
     duration  Int // SECONDS, computed on creation
-    createdAt DateTime @default(now())
+    createdAt DateTime  @default(now())
+    deletedAt DateTime? // soft delete (D-09)
     taskId    String
-    task      Task     @relation(fields: [taskId], references: [id])
+    task      Task      @relation(fields: [taskId], references: [id])
     userId    String
-    user      User     @relation(fields: [userId], references: [id])
+    user      User      @relation(fields: [userId], references: [id])
 }
 
 model TaskEvent {
     id        String        @id @default(cuid())
     taskId    String
     task      Task          @relation(fields: [taskId], references: [id])
+    userId    String // the acting user (actor)
+    user      User          @relation(fields: [userId], references: [id])
     eventType TaskEventType
     payload   Json
     createdAt DateTime      @default(now())
+
+    @@index([taskId])
+    @@index([userId])
 }
 
 model TodoItem {
@@ -158,17 +181,21 @@ model Checkpoint {
     project                  Project           @relation(fields: [projectId], references: [id])
     taskId                   String
     task                     Task              @relation(fields: [taskId], references: [id])
+    createdById              String
+    createdBy                User              @relation(fields: [createdById], references: [id])
     trigger                  CheckpointTrigger
     label                    String?
     isBaseline               Boolean           @default(false)
     childCount               Int
-    estimatedTotal           Int? // in minutes, sum of task and subtasks
+    estimatedTotal           Int? // in minutes, the task's own estimate plus its direct children only (never grandchildren)
     trackedTotal             Int // in seconds, sum of task and subtasks
     ownEstimate              Int? // in minutes, only the task's own estimate
     newChildrenSinceBaseline Int               @default(0)
     createdAt                DateTime          @default(now())
     checkpointTasks          CheckpointTask[]
     addedTasks               CheckpointTask[]  @relation("AddedAtCheckpoint")
+
+    @@index([createdById])
 }
 
 model CheckpointTask {
@@ -177,6 +204,7 @@ model CheckpointTask {
     Checkpoint          Checkpoint  @relation(fields: [checkpointId], references: [id])
     taskId              String
     task                Task        @relation(fields: [taskId], references: [id])
+    title               String
     estimate            Int? // in minutes
     trackedSoFar        Int // in seconds
     existedAtBaseline   Boolean
@@ -188,17 +216,21 @@ model CheckpointTask {
 }
 
 enum TaskEventType {
-    ESTIMATE_SET
+    CREATED
+    STARTED
+    COMPLETED
+    UNCOMPLETED
+    ARCHIVED
+    UNARCHIVED
+    DELETED
+    RESTORED
     ESTIMATE_CHANGED
     SUBTASK_CREATED
     SUBTASK_REMOVED
+    TAGS_CHANGED
     TODO_ADDED
     TODO_CONVERTED
     TODO_COMPLETED
-    TASK_STARTED
-    TASK_COMPLETED
-    TASK_STATUS_CHANGED
-    TAGS_CHANGED
     CHECKPOINT_CREATED
 }
 

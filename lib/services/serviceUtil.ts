@@ -1,25 +1,19 @@
+// Guard: fail the build if client code ever imports service utilities (and
+// with them prisma) — domain logic importable from the client lives in
+// lib/domain/ instead (#59).
+import "server-only";
+
 import { Prisma } from "@prisma/client";
 import { z } from "zod";
+import {
+  createServiceErrorResponse,
+  type ServiceErrorCode,
+  type ServiceErrorResponse,
+} from "@/lib/errors";
 
-// ─── Error Codes ───────────────────────────────────────────────────────────────
-
-export type ServiceErrorCode =
-  | "INTERNAL_SERVER_ERROR"
-  | "AUTHORIZATION_ERROR"
-  | "UNEXPECTED_ERROR"
-  | "VALIDATION_ERROR"
-  | "NOT_FOUND";
+export { createServiceErrorResponse };
 
 // ─── Response Types ────────────────────────────────────────────────────────────
-
-export type ServiceErrorResponse = {
-  success: false;
-  error: {
-    code: ServiceErrorCode;
-    message: string;
-    details?: unknown;
-  };
-};
 
 export type ServiceResponse =
   | {
@@ -83,21 +77,6 @@ export function createSuccessResponseWithData<T>(
   data: T,
 ): ServiceResponseWithData<T> {
   return { success: true, data };
-}
-
-export function createServiceErrorResponse(
-  code: ServiceErrorCode,
-  message: string,
-  details?: unknown,
-): ServiceErrorResponse {
-  return {
-    success: false,
-    error: {
-      code,
-      message,
-      ...(details !== undefined ? { details } : {}),
-    },
-  };
 }
 
 // ─── Validation Helper ─────────────────────────────────────────────────────────
