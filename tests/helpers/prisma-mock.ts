@@ -3,6 +3,7 @@ import { vi } from "vitest";
 function mockMethods() {
   return {
     findUnique: vi.fn(),
+    findUniqueOrThrow: vi.fn(),
     findFirst: vi.fn(),
     findMany: vi.fn(),
     create: vi.fn(),

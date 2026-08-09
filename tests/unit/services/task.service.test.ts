@@ -152,6 +152,9 @@ describe("updateTask — TAGS_CHANGED event", () => {
     db.task.findUnique.mockResolvedValue({
       project: { userId: "test-user-1" },
     });
+    // The in-transaction estimate snapshot; unestimated, so these tag tests
+    // never trip ESTIMATE_CHANGED.
+    tx.task.findUniqueOrThrow.mockResolvedValue({ estimate: null });
     tx.task.update.mockResolvedValue(buildTask());
     tx.taskEvent.create.mockResolvedValue({ id: "event-1" });
   });
@@ -716,9 +719,9 @@ describe("updateTask — ESTIMATE_CHANGED event", () => {
 
   it("emits ESTIMATE_CHANGED with old and new when the estimate changes", async () => {
     db.task.findUnique.mockResolvedValue({
-      estimate: 60,
       project: { userId: "test-user-1" },
     });
+    tx.task.findUniqueOrThrow.mockResolvedValue({ estimate: 60 });
     tx.task.update.mockResolvedValue(buildTask({ id: "task-1", estimate: 120 }));
 
     const result = await updateTask({
@@ -745,9 +748,9 @@ describe("updateTask — ESTIMATE_CHANGED event", () => {
 
   it("emits ESTIMATE_CHANGED with old null when setting an estimate on a task that had none", async () => {
     db.task.findUnique.mockResolvedValue({
-      estimate: null,
       project: { userId: "test-user-1" },
     });
+    tx.task.findUniqueOrThrow.mockResolvedValue({ estimate: null });
     tx.task.update.mockResolvedValue(buildTask({ id: "task-1", estimate: 45 }));
 
     await updateTask({
@@ -772,9 +775,9 @@ describe("updateTask — ESTIMATE_CHANGED event", () => {
 
   it("does not emit ESTIMATE_CHANGED when the estimate is not part of the update", async () => {
     db.task.findUnique.mockResolvedValue({
-      estimate: 60,
       project: { userId: "test-user-1" },
     });
+    tx.task.findUniqueOrThrow.mockResolvedValue({ estimate: 60 });
     tx.task.update.mockResolvedValue(buildTask({ id: "task-1", estimate: 60 }));
 
     await updateTask({
@@ -791,9 +794,9 @@ describe("updateTask — ESTIMATE_CHANGED event", () => {
 
   it("does not emit ESTIMATE_CHANGED when the estimate is unchanged", async () => {
     db.task.findUnique.mockResolvedValue({
-      estimate: 60,
       project: { userId: "test-user-1" },
     });
+    tx.task.findUniqueOrThrow.mockResolvedValue({ estimate: 60 });
     tx.task.update.mockResolvedValue(buildTask({ id: "task-1", estimate: 60 }));
 
     await updateTask({

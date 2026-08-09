@@ -20,6 +20,21 @@ const statusTransitionPayload = z.object({
   causedBy: z.string().optional(), // set only on cascaded events: the task the direct act targeted
 });
 
+/**
+ * The six hierarchy-transition verbs as stored. Declared here, next to the
+ * payload they share, so callers planning transitions name them from one place.
+ * Every member maps to `statusTransitionPayload` below, so a single `{at,
+ * causedBy?}` is valid for whichever verb an event names — a member that drifts
+ * onto a different schema breaks that promise at the call site, not silently.
+ */
+export type TransitionEventType =
+  | typeof TaskEventType.COMPLETED
+  | typeof TaskEventType.UNCOMPLETED
+  | typeof TaskEventType.ARCHIVED
+  | typeof TaskEventType.UNARCHIVED
+  | typeof TaskEventType.DELETED
+  | typeof TaskEventType.RESTORED;
+
 const subtaskPayload = z.object({
   childTaskId: z.string(),
   childTitle: z.string(),
@@ -101,5 +116,41 @@ export async function emitEvent(
       // Validated above; the cast bridges Zod's output type to Prisma's Json input.
       payload: validatedPayload as unknown as Prisma.InputJsonValue,
     },
+  });
+}
+
+/**
+ * Emit a write-once STARTED event marking a task's first work (#23/#55).
+ *
+ * Skips the emit when the ledger already holds a STARTED for the task, so later
+ * timers or manual entries — even backdated ones — never move or duplicate it:
+ * corrections live in state, not in past events (#23).
+ *
+ * Runs on the caller's transaction client, so the guard read and the insert
+ * commit (or roll back) together with the caller's mutation. Note the guard is
+ * best-effort under concurrency: without a unique constraint on
+ * (taskId, eventType), two transactions racing on the same task could each see
+ * "no prior STARTED" and both insert. Acceptable single-user; a partial unique
+ * index would close it if that ever matters.
+ */
+export async function emitStartedOnce(
+  tx: Prisma.TransactionClient,
+  {
+    taskId,
+    userId,
+    startedAt,
+  }: { taskId: string; userId: string; startedAt: Date },
+) {
+  const priorStarted = await tx.taskEvent.findFirst({
+    where: { taskId, eventType: TaskEventType.STARTED },
+    select: { id: true },
+  });
+  if (priorStarted) return null;
+
+  return emitEvent(tx, {
+    taskId,
+    userId,
+    type: TaskEventType.STARTED,
+    payload: { startedAt },
   });
 }

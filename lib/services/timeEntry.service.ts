@@ -4,7 +4,7 @@ import {
   createSuccessResponseWithData,
   serviceAction,
 } from "./serviceUtil";
-import { emitStartedOnce } from "./startedEvent";
+import { emitStartedOnce } from "./event.service";
 import { calculateDurationInSeconds } from "../util";
 
 // ─── Reads ─────────────────────────────────────────────────────────────────────

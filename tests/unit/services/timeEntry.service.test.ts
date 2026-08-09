@@ -1,5 +1,4 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { TaskEventType } from "@prisma/client";
 import {
   createMockPrismaClient,
   mockTx,
@@ -7,6 +6,7 @@ import {
   type MockTx,
 } from "@/tests/helpers/prisma-mock";
 import { buildTask, buildTimeEntry } from "@/tests/helpers/factories";
+import { describeStartedOnceWiring } from "@/tests/helpers/startedOnce";
 
 vi.mock("@/lib/prisma", () => {
   const mock = createMockPrismaClient();
@@ -229,86 +229,36 @@ describe("createManualTimeEntry", () => {
 
 // ─── createManualTimeEntry — STARTED event ───────────────────────────────────────
 
-describe("createManualTimeEntry — STARTED event", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
+describeStartedOnceWiring({
+  name: "createManualTimeEntry — STARTED event",
+  tx,
+  setup: () => {
     db.$transaction.mockImplementation((fn) => fn(tx));
     db.task.findUnique.mockResolvedValue(
       buildTask({ createdById: "test-user-1" }),
     );
     tx.timeEntry.create.mockResolvedValue(buildTimeEntry());
-  });
-
-  it("emits STARTED with the entry's start time when the task has no prior STARTED", async () => {
-    tx.taskEvent.findFirst.mockResolvedValue(null);
-
-    await createManualTimeEntry({
+  },
+  act: () =>
+    createManualTimeEntry({
       userId: "test-user-1",
       taskId: "test-task-1",
       startedAt: new Date("2026-01-01T10:00:00Z"),
       stoppedAt: new Date("2026-01-01T11:00:00Z"),
-    });
-
-    expect(tx.taskEvent.create).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: expect.objectContaining({
-          taskId: "test-task-1",
-          userId: "test-user-1",
-          eventType: TaskEventType.STARTED,
-          payload: { startedAt: "2026-01-01T10:00:00.000Z" },
-        }),
-      }),
-    );
-  });
-
-  it("does not re-emit STARTED for a backdated entry when one already exists", async () => {
-    // Task already started (via timer or an earlier entry); a later, backdated
-    // manual entry must not move or duplicate STARTED (#23: corrections live in state).
-    tx.taskEvent.findFirst.mockResolvedValue({ id: "existing-started" });
-
-    await createManualTimeEntry({
+    }),
+  // a manual entry carries its own start time, so the stored value is exact
+  expectedStartedAt: "2026-01-01T10:00:00.000Z",
+  // Task already started (via timer or an earlier entry); a later, backdated manual
+  // entry must not move or duplicate STARTED (#23: corrections live in state).
+  alreadyStartedCase:
+    "does not re-emit STARTED for a backdated entry when one already exists",
+  actWhenAlreadyStarted: () =>
+    createManualTimeEntry({
       userId: "test-user-1",
       taskId: "test-task-1",
       startedAt: new Date("2025-12-01T08:00:00Z"), // backdated before the existing STARTED
       stoppedAt: new Date("2025-12-01T09:00:00Z"),
-    });
-
-    expect(tx.taskEvent.create).not.toHaveBeenCalled();
-  });
-
-  it("scopes the prior-STARTED guard to this task and event type", async () => {
-    tx.taskEvent.findFirst.mockResolvedValue(null);
-
-    await createManualTimeEntry({
-      userId: "test-user-1",
-      taskId: "test-task-1",
-      startedAt: new Date("2026-01-01T10:00:00Z"),
-      stoppedAt: new Date("2026-01-01T11:00:00Z"),
-    });
-
-    expect(tx.taskEvent.findFirst).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: expect.objectContaining({
-          taskId: "test-task-1",
-          eventType: TaskEventType.STARTED,
-        }),
-      }),
-    );
-  });
-
-  it("fails the action (rolls back) when the STARTED emit throws", async () => {
-    tx.taskEvent.findFirst.mockResolvedValue(null);
-    tx.taskEvent.create.mockRejectedValue(new Error("emit failed"));
-
-    const result = await createManualTimeEntry({
-      userId: "test-user-1",
-      taskId: "test-task-1",
-      startedAt: new Date("2026-01-01T10:00:00Z"),
-      stoppedAt: new Date("2026-01-01T11:00:00Z"),
-    });
-
-    expect(result.success).toBe(false);
-  });
+    }),
 });
 
 // ─── updateTimeEntry ───────────────────────────────────────────────────────────

@@ -1,5 +1,4 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { TaskEventType } from "@prisma/client";
 import {
   createMockPrismaClient,
   mockTx,
@@ -11,6 +10,7 @@ import {
   buildActiveTimer,
   buildTimeEntry,
 } from "@/tests/helpers/factories";
+import { describeStartedOnceWiring } from "@/tests/helpers/startedOnce";
 
 vi.mock("@/lib/prisma", () => {
   const mock = createMockPrismaClient();
@@ -245,69 +245,20 @@ describe("startActiveTimer", () => {
   });
 });
 
-describe("startActiveTimer — STARTED event", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
+describeStartedOnceWiring({
+  name: "startActiveTimer — STARTED event",
+  tx,
+  setup: () => {
     db.$transaction.mockImplementation((fn) => fn(tx));
     db.task.findUnique.mockResolvedValue(
       buildTask({ createdById: "test-user-1" }),
     );
     tx.activeTimer.findUnique.mockResolvedValue(null);
     tx.activeTimer.create.mockResolvedValue(buildActiveTimer());
-  });
-
-  it("emits STARTED with the start time on the task's first work", async () => {
-    tx.taskEvent.findFirst.mockResolvedValue(null); // no prior STARTED
-
-    await startActiveTimer({ userId: "test-user-1", taskId: "test-task-1" });
-
-    expect(tx.taskEvent.create).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: expect.objectContaining({
-          taskId: "test-task-1",
-          userId: "test-user-1",
-          eventType: TaskEventType.STARTED,
-          // stored as an ISO-8601 string by emitEvent's timestamp transform
-          payload: { startedAt: expect.any(String) },
-        }),
-      }),
-    );
-  });
-
-  it("does not emit a second STARTED when the task already has one", async () => {
-    tx.taskEvent.findFirst.mockResolvedValue({ id: "existing-started" });
-
-    await startActiveTimer({ userId: "test-user-1", taskId: "test-task-1" });
-
-    expect(tx.taskEvent.create).not.toHaveBeenCalled();
-  });
-
-  it("scopes the prior-STARTED guard to this task and event type", async () => {
-    tx.taskEvent.findFirst.mockResolvedValue(null);
-
-    await startActiveTimer({ userId: "test-user-1", taskId: "test-task-1" });
-
-    expect(tx.taskEvent.findFirst).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: expect.objectContaining({
-          taskId: "test-task-1",
-          eventType: TaskEventType.STARTED,
-        }),
-      }),
-    );
-  });
-
-  it("fails the action (rolls back) when the STARTED emit throws", async () => {
-    tx.taskEvent.findFirst.mockResolvedValue(null);
-    tx.taskEvent.create.mockRejectedValue(new Error("emit failed"));
-
-    const result = await startActiveTimer({
-      userId: "test-user-1",
-      taskId: "test-task-1",
-    });
-
-    expect(result.success).toBe(false);
-  });
+  },
+  act: () => startActiveTimer({ userId: "test-user-1", taskId: "test-task-1" }),
+  // the timer starts "now", so only the shape is knowable here
+  expectedStartedAt: expect.any(String),
 });
 
 describe("stopActiveTimer", () => {
