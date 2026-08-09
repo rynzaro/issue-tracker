@@ -10,6 +10,7 @@ import {
   AlertTitle,
 } from "@/components/alert";
 import { updateProjectAction } from "@/lib/actions/project.actions";
+import { ErrorToast, useToast } from "@/lib/notification/toastProvider";
 
 export default function SetDefaultButton({
   projectId,
@@ -20,11 +21,10 @@ export default function SetDefaultButton({
 }) {
   const [showConfirm, setShowConfirm] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const { showToast } = useToast();
 
   async function handleSetDefault() {
     setLoading(true);
-    setError(null);
 
     const result = await updateProjectAction({
       id: projectId,
@@ -33,10 +33,15 @@ export default function SetDefaultButton({
 
     setLoading(false);
 
-    if (result.success) {
-      setShowConfirm(false);
-    } else {
-      setError(result.error.message);
+    setShowConfirm(false);
+
+    if (!result.success) {
+      showToast(
+        <ErrorToast
+          title="Standardprojekt konnte nicht gesetzt werden"
+          description={result.error.message}
+        />,
+      );
     }
   }
 
@@ -51,21 +56,12 @@ export default function SetDefaultButton({
         <StarIcon className="w-5 h-5 text-zinc-500 dark:text-zinc-400" />
       </button>
 
-      <Alert
-        open={showConfirm}
-        onClose={() => {
-          setShowConfirm(false);
-          setError(null);
-        }}
-      >
+      <Alert open={showConfirm} onClose={() => setShowConfirm(false)}>
         <AlertTitle>„{projectName}" als Standardprojekt festlegen?</AlertTitle>
         <AlertDescription>
           Dieses Projekt wird als Startseite angezeigt. Das bisherige
           Standardprojekt wird zurückgesetzt.
         </AlertDescription>
-        {error && (
-          <p className="mt-2 text-sm text-red-600 dark:text-red-400">{error}</p>
-        )}
         <AlertActions>
           <Button
             plain

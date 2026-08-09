@@ -13,6 +13,7 @@ import { Input } from "@/components/input";
 import { Textarea } from "@/components/textarea";
 import { SwitchField, Switch } from "@/components/switch";
 import { updateProjectAction } from "@/lib/actions/project.actions";
+import { ErrorToast, useToast } from "@/lib/notification/toastProvider";
 
 export default function UpdateProjectForm({
   projectId,
@@ -29,8 +30,8 @@ export default function UpdateProjectForm({
   const [description, setDescription] = useState(initialDescription);
   const [isDefault, setIsDefault] = useState(initialIsDefault);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
+  const { showToast } = useToast();
 
   // Tracks the last-saved values so isPristine stays correct after saves
   const [baseline, setBaseline] = useState({
@@ -47,11 +48,15 @@ export default function UpdateProjectForm({
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (name.trim().length < 2) {
-      setError("Der Projektname muss mindestens 2 Zeichen lang sein.");
+      showToast(
+        <ErrorToast
+          title="Ungültiger Projektname"
+          description="Der Projektname muss mindestens 2 Zeichen lang sein."
+        />,
+      );
       return;
     }
     setLoading(true);
-    setError(null);
     setSaved(false);
 
     const trimmedName = name.trim();
@@ -72,7 +77,12 @@ export default function UpdateProjectForm({
       setSaved(true);
       setTimeout(() => setSaved(false), 3000);
     } else {
-      setError(result.error.message);
+      showToast(
+        <ErrorToast
+          title="Projekt konnte nicht gespeichert werden"
+          description={result.error.message}
+        />,
+      );
     }
   }
 
@@ -119,11 +129,6 @@ export default function UpdateProjectForm({
             {saved && (
               <span className="text-sm text-green-600 dark:text-green-400">
                 Gespeichert
-              </span>
-            )}
-            {error && (
-              <span className="text-sm text-red-600 dark:text-red-400">
-                {error}
               </span>
             )}
           </div>

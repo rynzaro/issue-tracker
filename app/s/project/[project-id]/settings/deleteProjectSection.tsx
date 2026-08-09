@@ -12,6 +12,7 @@ import {
 import { deleteProjectAction } from "@/lib/actions/project.actions";
 import { Subheading } from "@/components/heading";
 import { SecondaryText } from "@/components/text";
+import { ErrorToast, useToast } from "@/lib/notification/toastProvider";
 
 export default function DeleteProjectSection({
   projectId,
@@ -22,12 +23,11 @@ export default function DeleteProjectSection({
 }) {
   const [showConfirm, setShowConfirm] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const router = useRouter();
+  const { showToast } = useToast();
 
   async function handleDelete() {
     setLoading(true);
-    setError(null);
 
     const result = await deleteProjectAction(projectId);
 
@@ -35,7 +35,15 @@ export default function DeleteProjectSection({
       router.push("/s/main");
     } else {
       setLoading(false);
-      setError(result.error.message);
+      // Close the dialog first: while it is open the page outside is inert,
+      // so a toast behind it could not be dismissed or read.
+      setShowConfirm(false);
+      showToast(
+        <ErrorToast
+          title="Projekt konnte nicht gelöscht werden"
+          description={result.error.message}
+        />,
+      );
     }
   }
 
@@ -51,11 +59,6 @@ export default function DeleteProjectSection({
         <Button color="red" onClick={() => setShowConfirm(true)}>
           Projekt löschen
         </Button>
-        {error && (
-          <span className="text-sm text-red-600 dark:text-red-400">
-            {error}
-          </span>
-        )}
       </div>
 
       <Alert open={showConfirm} onClose={() => setShowConfirm(false)}>
