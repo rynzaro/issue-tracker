@@ -421,13 +421,13 @@ export default function TimeEntryDialog({
             </p>
             <div className="flex flex-col gap-2">
               <DateTimeInput
-                value={editStart}
-                onChange={setEditStart}
+                value={newStart}
+                onChange={setNewStart}
                 label="Start:"
               />
               <DateTimeInput
-                value={editEnd}
-                onChange={setEditEnd}
+                value={newEnd}
+                onChange={setNewEnd}
                 label="Ende:"
               />
             </div>
